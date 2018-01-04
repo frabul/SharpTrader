@@ -53,6 +53,21 @@ namespace SharpTrader
         Sell
     }
 
+    public enum OrderType
+    {
+        Limit,
+        Market,
+    }
+
+    public class Order
+    {
+        public OrderType Type { get; }
+        public TradeType TradeType { get; }
+        public string Id { get; }
+        public object Status { get; }
+        public double Amount { get; }
+        public double Rate { get; }
+    }
     public class MarginTrade
     {
         public MarginTradeType Type { get; private set; }
@@ -87,6 +102,7 @@ namespace SharpTrader
 
     public interface ITrade
     {
+        string Market { get; }
         string Symbol { get; }
         double Amount { get; }
         double Price { get; }
