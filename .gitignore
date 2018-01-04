@@ -1,0 +1,10 @@
+*.obj
+*.ncb
+*.sdf
+*/bin/
+*/Obj/
+*/Release/
+*/Debug/
+Release/
+Debug/
+packages/
