@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoloniexMiner", "..\PoloniexMiner\PoloniexMiner.csproj", "{CDE38981-DF5C-424D-A10C-BFD40FBC77F6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoloniexMiner", ".\PoloniexMiner\PoloniexMiner.csproj", "{CDE38981-DF5C-424D-A10C-BFD40FBC77F6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Core", "SharpTrader.core\SharpTrader.Core.csproj", "{320B1902-461A-4B88-8852-D881DC4E5293}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Core", ".\SharpTrader.Core\SharpTrader.Core.csproj", "{320B1902-461A-4B88-8852-D881DC4E5293}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
