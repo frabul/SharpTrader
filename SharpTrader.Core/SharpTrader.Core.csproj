@@ -45,6 +45,7 @@
     <Compile Include="IMarketApi.cs" />
     <Compile Include="MultiMarketSimulator.cs" />
     <Compile Include="MultiMarketSimulator.SymbolFeed.cs" />
+    <Compile Include="TimeSerie.cs" />
     <Compile Include="Transactions.cs" />
     <Compile Include="Candle.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

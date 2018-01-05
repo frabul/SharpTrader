@@ -59,15 +59,28 @@ namespace SharpTrader
         Market,
     }
 
-    public class Order
+    public enum OrderStatus
     {
-        public OrderType Type { get; }
-        public TradeType TradeType { get; }
-        public string Id { get; }
-        public object Status { get; }
-        public double Amount { get; }
-        public double Rate { get; }
+        Cancelled,
+        PendingCancel,
+        Rejected,
+        Expired,
+        Pending,
+        PartiallyFilled,
+        Filled,
     }
+    public interface IOrder
+    {
+        OrderStatus Status { get; }
+        OrderType Type { get; }
+        TradeType TradeType { get; }
+        string Id { get; }
+        double Amount { get; }
+        double Rate { get; } 
+        string Symbol { get; }
+        string Market { get; }
+    }
+
     public class MarginTrade
     {
         public MarginTradeType Type { get; private set; }

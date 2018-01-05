@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-    public partial class MultiMarketSimulator : IMarketApi
+    public partial class MultiMarketSimulator
     {
-        string[] _Markets;
-        List<SymbolFeed> Feeds;
-        SymbolData[] SymbolsData;
+        Market[] _Markets;
+        Dictionary<string, SymbolData> SymbolsData;
 
         public DateTime Time { get; private set; }
 
@@ -19,52 +18,58 @@ namespace SharpTrader
 
         }
 
-        public IEnumerable<string> Markets => _Markets;
-
-        public MarginTrade ClosePosition(Position pos, double price = 0)
-        {
-            throw new NotImplementedException();
-        }
-
-        public ISymbolFeed GetSymbolFeed(string market, string symbol)
-        {
-            var sf = Feeds.Where(sd => sd.Market == market && sd.Symbol == symbol).FirstOrDefault();
-            if (sf == null)
-            {
-                if (!Markets.Contains(market))
-                    throw new InvalidOperationException("Market unavailable");
-                var symbolData = SymbolsData.Where(sd => sd.Market == market && sd.Symbol == symbol).FirstOrDefault();
-                if (symbolData == null)
-                    throw new Exception($"Symbol {symbol} data not found for market {market}");
-                //todo create symbol feed, add the data up to current date and 
-                sf = new SymbolFeed();
-
-            }
-            return sf;
-        }
-
+        public IEnumerable<IMarketApi> Markets => _Markets;
 
         public IEnumerable<string> GetSymbols(string market)
         {
             throw new NotImplementedException();
         }
 
-        public IMarketOperation LimitOrder(string market, string symbol, TradeType type, double amount, double rate)
-        {
-            throw new NotImplementedException();
-        }
 
-        public IMarketOperation MarketOrder(string market, string symbol, TradeType type, double amount)
+
+        public void Run()
         {
-            throw new NotImplementedException();
+            //find the nearest candle of all SymbolsData between the symbols that have been requested
+            DateTime nextTick = DateTime.MaxValue;
+            foreach (var market in _Markets)
+                foreach (var feed in market.SymbolsFeed.Values)
+                {
+                    var sdata = SymbolsData[feed.Market + "_" + feed.Symbol];
+                    if (nextTick > sdata.Ticks.NextTickTime)
+                        nextTick = sdata.Ticks.NextTickTime;
+                }
+
+            if (nextTick == DateTime.MaxValue)
+                return;
+
+            //update market time
+            this.Time = nextTick;
+
+            //add new candle to all symbol feeds that have it
+            foreach (var market in _Markets)
+                foreach (var feed in market.SymbolsFeed.Values)
+                {
+                    var data = SymbolsData[market.Name + "_" + feed.Symbol];
+                    if (data.Ticks.NextTickTime <= this.Time)
+                    {
+                        data.Ticks.Next();
+                        market.AddNewCandle(feed, data.Ticks.Tick);
+                    } 
+                } 
+            //raise orders/trades events
+
+
+            //raise symbol feeds events
         }
 
         private class SymbolData
         {
-            public Candle[] Data;
+            public TimeSerie<Candle> Ticks;
+            public TimeSpan TimeSpan;
             public string Market;
             public string Symbol;
             public double Spread;
+            public string SymbolKey => Market + "_" + Symbol;
         }
 
         public class MarketInfo

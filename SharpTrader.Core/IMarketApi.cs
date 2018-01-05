@@ -12,38 +12,28 @@ namespace SharpTrader
         /// Current date and time
         /// </summary>
         DateTime Time { get; }
-         
+
         /// <summary>
         /// Put a market order
         /// </summary> 
-        IMarketOperation MarketOrder(string market, string symbol, TradeType type, double amount);
+        IMarketOperation MarketOrder(string symbol, TradeType type, double amount);
 
         /// <summary>
         /// Puts a limit order on the market
         /// </summary> 
-        IMarketOperation LimitOrder(string market, string symbol, TradeType type, double amount, double rate);
-
-        /// <summary>
-        /// Returns available markets
-        /// </summary>
-        IEnumerable<string> Markets { get; }
-
-        /// <summary>
-        /// Returns available symbols for a given market
-        /// </summary>
-        IEnumerable<string> GetSymbols(string market);
+        IMarketOperation LimitOrder(string symbol, TradeType type, double amount, double rate);
 
         /// <summary>
         /// Subscribes to updates from a given symbol in a given market
         /// </summary> 
-        ISymbolFeed GetSymbolFeed(string market, string symbol);
+        ISymbolFeed GetSymbolFeed(string symbol);
 
     }
 
     public interface ISymbolFeed
     {
         event Action<ISymbolFeed> OnTick;
-        event Action<ISymbolFeed> NewCandle;
+        event Action<ISymbolFeed> OnNewCandle;
         string Symbol { get; }
         string Market { get; }
 

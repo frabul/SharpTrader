@@ -13,9 +13,24 @@ namespace SharpTrader
         { 
             return (long)Math.Round((date - Extensions.BaseUnixTime).TotalSeconds);
         }
+
         public static DateTime ToDatetime(this long epoch)
         {
             return Extensions.BaseUnixTime.AddSeconds(epoch);
+        }
+        public static DateTime ToDatetime(this int epoch)
+        {
+            return Extensions.BaseUnixTime.AddSeconds(epoch);
+        }
+
+        
+    }
+
+    public class Utils
+    {
+        public static void GetAssets(string symbol, out string asset, out string counterAsset)
+        {
+            throw new NotImplementedException();
         }
     }
 }
