@@ -41,6 +41,7 @@ namespace SharpTrader
             return string.Format("{0} EN:{1}   TP:{2}   SL{3}", Enum.GetName(Type.GetType(), Type), Entry, TakeProfit, StopLoss);
         }
     }
+
     public enum MarginTradeType
     {
         Long,

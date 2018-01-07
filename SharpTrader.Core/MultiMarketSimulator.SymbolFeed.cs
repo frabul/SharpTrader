@@ -23,6 +23,7 @@ namespace SharpTrader
             public double TakerFee { get; private set; } = 0.0025;
             public DateTime Time { get; internal set; }
 
+            public IEnumerable<SymbolFeed> Feeds => SymbolsFeed.Values;
             public IEnumerable<SymbolFeed> ActiveFeeds { get { lock (locker) return SymbolsFeed.Values; } }
 
             public Market(string name, double makerFee, double takerFee)
@@ -37,7 +38,7 @@ namespace SharpTrader
                 SymbolFeed sf;
                 var feedFound = SymbolsFeed.TryGetValue(symbol, out sf);
                 if (!feedFound)
-                { 
+                {
                     //TODO request feed creation
 
                     //var symbolData = SymbolsData.Where(sd => sd.Market == market && sd.Symbol == symbol).FirstOrDefault();
@@ -104,7 +105,7 @@ namespace SharpTrader
                                 var trade = new Trade(
                                     market: this.Name,
                                     symbol: feed.Symbol,
-                                    time: feed.Ticks.Tick.Time,
+                                    time: feed.Ticks.Tick.OpenTime,
                                     price: order.Rate,
                                     amount: order.Amount,
                                     type: order.TradeType,
@@ -117,7 +118,7 @@ namespace SharpTrader
                     }
             }
 
-            internal void AddNewCandle(SymbolFeed feed, Candle tick)
+            internal void AddNewCandle(SymbolFeed feed, Candlestick tick)
             {
                 Time = tick.CloseTime;
                 feed.AddNewCandle(tick);
@@ -152,7 +153,7 @@ namespace SharpTrader
 
             }
 
-            internal TimeSerie<Candle> Ticks { get; private set; } = new TimeSerie<Candle>(100000);
+            internal TimeSerie<Candlestick> Ticks { get; private set; } = new TimeSerie<Candlestick>(100000);
 
             public event Action<ISymbolFeed> OnNewCandle;
             public event Action<ISymbolFeed> OnTick;
@@ -171,28 +172,28 @@ namespace SharpTrader
 
             public double Volume24H { get; private set; }
 
-            public Candle[] GetChartData(TimeSpan timeframe)
+            public Candlestick[] GetChartData(TimeSpan timeframe)
             {
                 throw new NotImplementedException();
             }
 
-            internal void AddNewCandle(Candle c)
+            internal void AddNewCandle(Candlestick c)
             {
-                var previousTime = Ticks.Tick.Time;
+                var previousTime = Ticks.Tick.OpenTime;
 
                 //let's calculate the volume
                 Volume24H += c.Volume;
-                var delta = c.Time - previousTime;
+                var delta = c.OpenTime - previousTime;
                 var timeAt24 = c.CloseTime - TimeSpan.FromHours(24);
 
                 Ticks.SeekNearestPreceding(timeAt24 - delta);
-                while (Ticks.Tick.Time < timeAt24)
+                while (Ticks.Tick.OpenTime < timeAt24)
                 {
                     Volume24H -= Ticks.Tick.Volume;
                     Ticks.Next();
                 }
 
-                Ticks.AddRecord(c.Time, c);
+                Ticks.AddRecord(c.OpenTime, c);
                 Ticks.SeekLast();
                 Bid = c.Close;
                 Ask = Bid + Spread;

@@ -41,7 +41,7 @@ namespace SharpTrader
         double Bid { get; }
         double Ask { get; }
         double Volume24H { get; }
-        Candle[] GetChartData(TimeSpan timeframe);
+        Candlestick[] GetChartData(TimeSpan timeframe);
 
     }
 

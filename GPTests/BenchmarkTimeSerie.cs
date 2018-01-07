@@ -4,12 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PoloniexMiner
+namespace GPTests
 {
-    class Program
+    class BenchmarkTimeSerie
     {
-        static void Main(string[] args)
-        {
-        }
     }
 }

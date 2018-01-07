@@ -10,7 +10,7 @@ namespace SharpTrader
     {
         public static readonly DateTime BaseUnixTime = new DateTime(1970, 1, 1);
         public static long ToEpoch(this DateTime date)
-        { 
+        {
             return (long)Math.Round((date - Extensions.BaseUnixTime).TotalSeconds);
         }
 
@@ -18,14 +18,31 @@ namespace SharpTrader
         {
             return Extensions.BaseUnixTime.AddSeconds(epoch);
         }
+        public static DateTime ToDatetimeMilliseconds(this long epoch)
+        {
+            return Extensions.BaseUnixTime.AddMilliseconds(epoch);
+        }
         public static DateTime ToDatetime(this int epoch)
         {
             return Extensions.BaseUnixTime.AddSeconds(epoch);
         }
 
-        
-    }
 
+    }
+    public class CandlestickTimeComparer<Tc> : IComparer<Tc> where Tc : ICandlestick
+    {
+        public int Compare(Tc x, Tc y)
+        {
+            //return (int)(x.OpenTime.Ticks - y.OpenTime.Ticks);
+            var val = x.OpenTime.Ticks - y.OpenTime.Ticks;
+            if (val > int.MaxValue)
+                return int.MaxValue;
+            else if (val < int.MinValue)
+                return int.MinValue;
+            else
+                return (int)val;
+        }
+    }
     public class Utils
     {
         public static void GetAssets(string symbol, out string asset, out string counterAsset)

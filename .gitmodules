@@ -1,0 +1,3 @@
+[submodule "Binance.API.Csharp.Client"]
+	path = Binance.API.Csharp.Client
+	url = https://github.com/N4rk0/Binance.API.Csharp.Client.git
