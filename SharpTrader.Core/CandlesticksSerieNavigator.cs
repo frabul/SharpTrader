@@ -6,26 +6,22 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-    public interface ITimeRecord
-    {
-        DateTime Time { get; }
-    }
-
-    public class TimeSerie<T> where T : ITimeRecord
+    public class CandlesticksSerieNavigator
     {
         private Stack<int> PositionSaveStack = new Stack<int>();
+        private static CandlestickTimeComparer CandlestickTimeComparer = new CandlestickTimeComparer();
+        private IList<ICandlestick> Records;
+
         private int _Cursor = 0;
-
-        internal List<T> Records { get; set; }
-
         public int Count { get { return Records.Count; } }
+
 
         public DateTime NextTickTime
         {
             get
             {
                 if (_Cursor < Records.Count - 1)
-                    return Records[_Cursor + 1].Time;
+                    return Records[_Cursor + 1].OpenTime;
                 else
                     return DateTime.MaxValue;
             }
@@ -36,64 +32,45 @@ namespace SharpTrader
             get
             {
                 if (_Cursor > 0)
-                    return Records[_Cursor - 1].Time;
+                    return Records[_Cursor - 1].OpenTime;
                 else
                     return DateTime.MinValue;
             }
         }
 
-        public DateTime Time { get { return Records[_Cursor].Time; } }
+        public DateTime Time { get { return Records[_Cursor].OpenTime; } }
 
         public int Position { get { return _Cursor; } }
+        public ICandlestick Tick { get { return Records[_Cursor]; } }
+        public ICandlestick NextTick { get { return Records[_Cursor + 1]; } }
+        public ICandlestick PreviousTick { get { return Records[_Cursor - 1]; } }
+        public DateTime LastTickTime { get { return Records[Records.Count - 1].OpenTime; } }
+        public DateTime FirstTickTime { get { return Records[0].OpenTime; } }
 
-        public T Tick { get { return Records[_Cursor]; } }
-        public T NextTick { get { return Records[_Cursor + 1]; } }
-        public T PreviousTick { get { return Records[_Cursor - 1]; } }
-        public DateTime LastTickTime { get { return Records[Records.Count - 1].Time; } }
-        public DateTime FirstTickTime { get { return Records[0].Time; } }
-
-
-        /// <summary>
-        /// the smallest difference in seconds
-        /// </summary>
-        /// <param name="smallestFrame"></param>
-        public TimeSerie(int capacity)
+        public CandlesticksSerieNavigator(IList<Candlestick> list)
         {
-            Records = new List<T>(capacity);
+            Records = (IList<ICandlestick>)list;
         }
 
-        struct DummyRecord : ITimeRecord
+        public bool TryGetRecord(DateTime time, out ICandlestick record)
         {
-            public DummyRecord(DateTime time)
-            {
-                _Time = time;
-            }
-            DateTime _Time;
-            public DateTime Time => _Time;
-        }
-
-        public bool TryGetRecord(DateTime time, out T record)
-        {
-
-            int ind = BinarySearchByTime(time);
+            record = null;
+          
+            int ind = BinarySearchByOpenTime(time);
             if (ind > -1)
             {
                 record = Records[ind];
                 return true;
             }
             else
-            {
-                record = default(T);
                 return false;
-            }
-
         }
 
-        public T GetLast(Func<T, bool> criteria)
+        public ICandlestick GetLast(Func<ICandlestick, bool> criteria)
         {
             this.PositionPush();
             this.SeekNearestPreceding(LastTickTime);
-            var res = default(T);
+            ICandlestick res = null;
             while (this.Previous())
                 if (criteria(this.Tick))
                 {
@@ -104,22 +81,6 @@ namespace SharpTrader
             return res;
         }
 
-    
-        public void AddRecord(DateTime time, T historyRecord)
-        {
-           
-            if (Records.Count > 0 && LastTickTime > time)
-                throw new Exception("you cannot add a tick that's preceding the last one ");
-
-
-            int index = BinarySearchByTime(time);
-            if (index > -1)
-                Records[index] = historyRecord;
-            else
-            {
-                Records.Add(historyRecord); 
-            }
-        }
 
         public void SeekLast()
         {
@@ -143,22 +104,22 @@ namespace SharpTrader
                 _Cursor = Records.Count - 1;
                 return;
             }
-            if (date == Records[_Cursor].Time)
+            if (date == Records[_Cursor].OpenTime)
                 return;
             int lowerLimit = 0;
-            int higherLimit = Records.Count - 1;
+            int upperLimit = Records.Count - 1;
             int midpoint = 0;
-            while (lowerLimit <= higherLimit)
+            while (lowerLimit <= upperLimit)
             {
-                midpoint = lowerLimit + (higherLimit - lowerLimit) / 2;
+                midpoint = lowerLimit + (upperLimit - lowerLimit) / 2;
                 // vediamo se ctime stà tra il punto e quello dopo (visto che dobbiamo prendere il punt appena precedente al ctime)
-                if (date >= Records[midpoint].Time && date < Records[midpoint + 1].Time)
+                if (date >= Records[midpoint].OpenTime && date < Records[midpoint + 1].OpenTime)
                 {
                     _Cursor = midpoint;
                     return;
                 }
-                else if (date < Records[midpoint].Time)
-                    higherLimit = midpoint - 1;
+                else if (date < Records[midpoint].OpenTime)
+                    upperLimit = midpoint - 1;
                 else
                     lowerLimit = midpoint + 1;
             }
@@ -193,8 +154,6 @@ namespace SharpTrader
             return true;
         }
 
-
-
         public void PositionPush()
         {
             PositionSaveStack.Push(_Cursor);
@@ -205,7 +164,8 @@ namespace SharpTrader
             _Cursor = PositionSaveStack.Pop();
         }
 
-        private int BinarySearchByTime(DateTime time)
+
+        private int BinarySearchByOpenTime(DateTime openTime)
         {
             var list = Records;
 
@@ -215,7 +175,7 @@ namespace SharpTrader
             while (lower <= upper)
             {
                 var middle = lower + ((upper - lower) / 2);
-                var compareResult = list[middle].Time.CompareTo(time);
+                var compareResult = list[middle].OpenTime.CompareTo(openTime);
 
                 if (compareResult == 0)
                     return middle;
@@ -227,8 +187,7 @@ namespace SharpTrader
 
             return ~lower;
         }
+
+
     }
-
-
-
 }

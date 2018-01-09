@@ -43,6 +43,21 @@ namespace SharpTrader
                 return (int)val;
         }
     }
+    public class CandlestickTimeComparer : IComparer<ICandlestick>
+    {
+        public int Compare(ICandlestick x, ICandlestick y)
+        {
+            return x.OpenTime.CompareTo(y);
+            //return (int)(x.OpenTime.Ticks - y.OpenTime.Ticks);
+            //var val = x.OpenTime.Ticks - y.OpenTime.Ticks;
+            //if (val > int.MaxValue)
+            //    return int.MaxValue;
+            //else if (val < int.MinValue)
+            //    return int.MinValue;
+            //else
+            //    return (int)val;
+        }
+    }
     public class Utils
     {
         public static void GetAssets(string symbol, out string asset, out string counterAsset)

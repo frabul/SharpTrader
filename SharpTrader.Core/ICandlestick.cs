@@ -2,7 +2,7 @@
 
 namespace SharpTrader
 {
-    public interface ICandlestick
+    public interface ICandlestick : ITimeRecord
     {
         DateTime OpenTime { get; }
         DateTime CloseTime { get; }

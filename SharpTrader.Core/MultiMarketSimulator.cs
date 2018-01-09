@@ -9,15 +9,15 @@ namespace SharpTrader
     public partial class MultiMarketSimulator
     {
         Market[] _Markets;
-        Dictionary<string, SymbolHistory> SymbolsData;
-
+        Dictionary<string, ISymbolHistory> SymbolsData;
+        HistoricalRateDataBase Histories;
 
 
         public DateTime Time { get; private set; }
 
-        public MultiMarketSimulator(string dataDirectory)
+        public MultiMarketSimulator(string dataDirectory, HistoricalRateDataBase historyDb)
         {
-
+            Histories = historyDb;
         }
 
         public IEnumerable<IMarketApi> Markets => _Markets;
@@ -73,15 +73,7 @@ namespace SharpTrader
 
         }
 
-        private class SymbolHistory
-        {
-            public virtual string Market { get; set; }
-            public virtual string Symbol { get; set; }
-            public virtual TimeSpan Timeframe { get; set; }
-            public virtual TimeSerie<Candlestick> Ticks { get; set; }
-            public virtual double Spread { get; set; }
-            public string SymbolKey => Market + "_" + Symbol;
-        }
+        
     }
 
 

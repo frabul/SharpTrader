@@ -118,7 +118,7 @@ namespace SharpTrader
                     }
             }
 
-            internal void AddNewCandle(SymbolFeed feed, Candlestick tick)
+            internal void AddNewCandle(SymbolFeed feed, ICandlestick tick)
             {
                 Time = tick.CloseTime;
                 feed.AddNewCandle(tick);
@@ -153,7 +153,7 @@ namespace SharpTrader
 
             }
 
-            internal TimeSerie<Candlestick> Ticks { get; private set; } = new TimeSerie<Candlestick>(100000);
+            internal TimeSerie<ICandlestick> Ticks { get; private set; } = new TimeSerie<ICandlestick>(100000);
 
             public event Action<ISymbolFeed> OnNewCandle;
             public event Action<ISymbolFeed> OnTick;
@@ -177,7 +177,7 @@ namespace SharpTrader
                 throw new NotImplementedException();
             }
 
-            internal void AddNewCandle(Candlestick c)
+            internal void AddNewCandle(ICandlestick c)
             {
                 var previousTime = Ticks.Tick.OpenTime;
 
