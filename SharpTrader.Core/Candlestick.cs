@@ -7,10 +7,10 @@ using ZeroFormatter;
 using ProtoBuf;
 namespace SharpTrader
 {
-    [ZeroFormattable, ProtoContract] 
+    [ZeroFormattable, ProtoContract]
     public class Candlestick : ICandlestick
     {
-        [Index(0),ProtoMember(1)]
+        [Index(0), ProtoMember(1)]
         public virtual DateTime OpenTime { get; set; }
 
         [Index(1), ProtoMember(2)]
@@ -32,7 +32,10 @@ namespace SharpTrader
         public virtual double Volume { get; set; }
 
         [IgnoreFormat, ProtoIgnore]
-        public virtual TimeSpan Timeframe => CloseTime - OpenTime;
+        public TimeSpan Timeframe => CloseTime - OpenTime;
+
+        [IgnoreFormat, ProtoIgnore]
+        public DateTime Time => OpenTime;
 
         [IgnoreFormat, ProtoIgnore]
         public virtual double Length { get { return this.High - this.Low; } }

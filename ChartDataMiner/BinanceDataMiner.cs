@@ -24,8 +24,6 @@ namespace ChartDataMiner
             ApiClient = new ApiClient("", "");
             Client = new BinanceClient(ApiClient);
             HistoryDB = new HistoricalRateDataBase();
-           
-         
 
             IEnumerable<SymbolPrice> prices = Client.GetAllPrices().Result;
             var symbols = prices.Where(sp => sp.Symbol.EndsWith("BTC")).Select(sp => sp.Symbol);
@@ -41,6 +39,12 @@ namespace ChartDataMiner
 
             //we need to convert all in UTC time 
             var startTime = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
+            //try to get the start time
+            var symbolHistory = HistoryDB.GetSymbolHistory(MarketName, symbol, TimeSpan.FromSeconds(60));
+
+            if (symbolHistory.Ticks.Count > 0)
+                startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc);
+
 
             while (AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime)
             {

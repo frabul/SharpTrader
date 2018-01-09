@@ -59,7 +59,7 @@ namespace SharpTrader
                 if (File.Exists(BaseDirectory + fileName))
                 {
                     using (var fs = File.Open(BaseDirectory + fileName, FileMode.Open))
-                        sdata = ZeroFormatterSerializer.Deserialize<SymbolHistoryRaw>(fs);
+                        sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
                 }
                 else
                 {
@@ -146,6 +146,8 @@ namespace SharpTrader
                 throw new Exception("symbol history not found");
 
             Save(sdata);
+
+            this.SymbolsData.Remove(sdata);
         }
 
         private void Save(SymbolHistoryRaw sdata) => SaveProtobuf(sdata);
@@ -225,7 +227,7 @@ namespace SharpTrader
             public virtual double Spread { get; set; }
 
             [IgnoreFormat, ProtoIgnore]
-            CandlesticksSerieNavigator ISymbolHistory.Ticks => throw new NotImplementedException();
+            CandlesticksSerieNavigator ISymbolHistory.Ticks => TicksNavigator;
         }
     }
 

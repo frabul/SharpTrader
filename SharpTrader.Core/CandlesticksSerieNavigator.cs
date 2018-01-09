@@ -10,17 +10,17 @@ namespace SharpTrader
     {
         private Stack<int> PositionSaveStack = new Stack<int>();
         private static CandlestickTimeComparer CandlestickTimeComparer = new CandlestickTimeComparer();
-        private IList<ICandlestick> Records;
+        private ICandlestick[] Records;
 
         private int _Cursor = 0;
-        public int Count { get { return Records.Count; } }
+        public int Count { get { return Records.Length; } }
 
 
         public DateTime NextTickTime
         {
             get
             {
-                if (_Cursor < Records.Count - 1)
+                if (_Cursor < Records.Length - 1)
                     return Records[_Cursor + 1].OpenTime;
                 else
                     return DateTime.MaxValue;
@@ -44,12 +44,12 @@ namespace SharpTrader
         public ICandlestick Tick { get { return Records[_Cursor]; } }
         public ICandlestick NextTick { get { return Records[_Cursor + 1]; } }
         public ICandlestick PreviousTick { get { return Records[_Cursor - 1]; } }
-        public DateTime LastTickTime { get { return Records[Records.Count - 1].OpenTime; } }
+        public DateTime LastTickTime { get { return Records[Records.Length - 1].OpenTime; } }
         public DateTime FirstTickTime { get { return Records[0].OpenTime; } }
 
-        public CandlesticksSerieNavigator(IList<Candlestick> list)
+        public CandlesticksSerieNavigator(IList<Candlestick> list) 
         {
-            Records = (IList<ICandlestick>)list;
+            Records =list.Cast<ICandlestick>().ToArray();
         }
 
         public bool TryGetRecord(DateTime time, out ICandlestick record)
@@ -84,7 +84,7 @@ namespace SharpTrader
 
         public void SeekLast()
         {
-            _Cursor = Records.Count - 1;
+            _Cursor = Records.Length - 1;
         }
 
         /// <summary>
@@ -93,7 +93,7 @@ namespace SharpTrader
         /// </summary> 
         public void SeekNearestPreceding(DateTime date)
         {
-            if (Records.Count < 1)
+            if (Records.Length < 1)
                 throw new Exception();
             if (date < FirstTickTime)
             {
@@ -101,13 +101,13 @@ namespace SharpTrader
             }
             if (date >= LastTickTime)
             {
-                _Cursor = Records.Count - 1;
+                _Cursor = Records.Length - 1;
                 return;
             }
             if (date == Records[_Cursor].OpenTime)
                 return;
             int lowerLimit = 0;
-            int upperLimit = Records.Count - 1;
+            int upperLimit = Records.Length - 1;
             int midpoint = 0;
             while (lowerLimit <= upperLimit)
             {
@@ -136,7 +136,7 @@ namespace SharpTrader
         /// </summary>
         public bool Next()
         {
-            if (_Cursor == Records.Count - 1)
+            if (_Cursor == Records.Length - 1)
                 return false;
             _Cursor++;
             return true;
@@ -170,7 +170,7 @@ namespace SharpTrader
             var list = Records;
 
             var lower = 0;
-            var upper = list.Count - 1;
+            var upper = list.Length - 1;
 
             while (lower <= upper)
             {
