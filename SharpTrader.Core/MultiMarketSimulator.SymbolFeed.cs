@@ -18,25 +18,24 @@ namespace SharpTrader
             private List<Order> PendingOrders = new List<Order>();
             private List<Order> ClosedOrders = new List<Order>();
 
-            public string Name { get; private set; }
+            public string MarketName { get; private set; }
             public double MakerFee { get; private set; } = 0.0015;
             public double TakerFee { get; private set; } = 0.0025;
             public DateTime Time { get; internal set; }
 
-            public IEnumerable<SymbolFeed> Feeds => SymbolsFeed.Values;
-            public IEnumerable<SymbolFeed> ActiveFeeds { get { lock (locker) return SymbolsFeed.Values; } }
+            public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
+
 
             public Market(string name, double makerFee, double takerFee)
             {
-                Name = name;
+                MarketName = name;
                 MakerFee = makerFee;
                 TakerFee = takerFee;
             }
 
             public ISymbolFeed GetSymbolFeed(string symbol)
             {
-                SymbolFeed sf;
-                var feedFound = SymbolsFeed.TryGetValue(symbol, out sf);
+                var feedFound = SymbolsFeed.TryGetValue(symbol, out SymbolFeed feed);
                 if (!feedFound)
                 {
                     //TODO request feed creation
@@ -48,17 +47,17 @@ namespace SharpTrader
                     string asset;
                     string counterAsset;
                     Utils.GetAssets(symbol, out asset, out counterAsset);
-                    sf = new SymbolFeed(this.Name, asset, counterAsset);
+                    feed = new SymbolFeed(this.MarketName, asset, counterAsset);
                     lock (locker)
-                        SymbolsFeed.Add(symbol, sf);
+                        SymbolsFeed.Add(symbol, feed);
                 }
-                return sf;
+                return feed;
             }
 
             public IMarketOperation LimitOrder(string symbol, TradeType type, double amount, double rate)
             {
 
-                var order = new Order(this.Name, symbol, type, OrderType.Limit, amount, rate);
+                var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, rate);
                 lock (locker)
                     this.PendingOrders.Add(order);
                 return new MarketOperation() { Status = MarketOperationStatus.Completed };
@@ -71,9 +70,9 @@ namespace SharpTrader
                 {
                     var feed = SymbolsFeed[symbol];
                     var rate = type == TradeType.Buy ? feed.Ask : feed.Bid;
-                    var order = new Order(this.Name, symbol, type, OrderType.Market, amount, rate);
+                    var order = new Order(this.MarketName, symbol, type, OrderType.Market, amount, rate);
 
-                    var trade = new Trade(this.Name, symbol, this.Time, type, rate, amount, this.TakerFee * amount * rate);
+                    var trade = new Trade(this.MarketName, symbol, this.Time, type, rate, amount, this.TakerFee * amount * rate);
                     RegisterTrade(feed, trade);
                     this.ClosedOrders.Add(order);
                 }
@@ -103,7 +102,7 @@ namespace SharpTrader
                             if (willBuy || willSell)
                             {
                                 var trade = new Trade(
-                                    market: this.Name,
+                                    market: this.MarketName,
                                     symbol: feed.Symbol,
                                     time: feed.Ticks.Tick.OpenTime,
                                     price: order.Rate,
@@ -118,7 +117,7 @@ namespace SharpTrader
                     }
             }
 
-            internal void AddNewCandle(SymbolFeed feed, ICandlestick tick)
+            internal void AddNewCandle(SymbolFeed feed, Candlestick tick)
             {
                 Time = tick.CloseTime;
                 feed.AddNewCandle(tick);
@@ -146,17 +145,20 @@ namespace SharpTrader
 
         class SymbolFeed : ISymbolFeed
         {
-            private bool onNewCandPending = false;
+            public event Action<ISymbolFeed> OnTick;
+            private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
+            public List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)> NewCandleSubscribers =
+                new List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)>();
+
             private bool onTickPending = false;
+            public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>(100000);
+            private List<(TimeSpan Timeframe, TimeSerie<ICandlestick> Ticks)> DerivedTicks = new List<(TimeSpan Timeframe, TimeSerie<ICandlestick> Ticks)>(30);
+            private object Locker = new object();
+
             public SymbolFeed(string market, string asset, string counterAsset)
             {
 
             }
-
-            internal TimeSerie<ICandlestick> Ticks { get; private set; } = new TimeSerie<ICandlestick>(100000);
-
-            public event Action<ISymbolFeed> OnNewCandle;
-            public event Action<ISymbolFeed> OnTick;
 
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
@@ -172,18 +174,48 @@ namespace SharpTrader
 
             public double Volume24H { get; private set; }
 
-            public Candlestick[] GetChartData(TimeSpan timeframe)
+            public TimeSerie<ICandlestick> GetChartData(TimeSpan timeframe)
             {
-                throw new NotImplementedException();
+                if (BaseTimeframe == timeframe)
+                {
+                    return Ticks;
+                }
+                else
+                {
+                    (var tf, var derived) = DerivedTicks.Where(dt => dt.Timeframe == timeframe).FirstOrDefault();
+                    if (derived == null)
+                    {
+
+                        derived = new TimeSerie<ICandlestick>(100000);
+                        //we need to initialize it with all the data that we have
+                        var tticks = new TimeSerie<ICandlestick>(Ticks);
+                        while (tticks.Next())
+                        {
+                            var newCandle = tticks.Tick;
+                            AddTickToDerivedTimeframe(timeframe, derived, newCandle);
+                        } 
+                        DerivedTicks.Add((timeframe, derived));
+                    }
+                    return derived;
+                }
+
             }
 
-            internal void AddNewCandle(ICandlestick c)
+            private static void AddTickToDerivedTimeframe(TimeSpan timeframe, TimeSerie<ICandlestick> derived, ICandlestick newCandle)
             {
-                var previousTime = Ticks.Tick.OpenTime;
+                if (derived.LastTick.CloseTime >= newCandle.CloseTime)
+                    ((Candlestick)derived.Tick).Merge(newCandle);
+                else
+                    derived.AddRecord(new Candlestick(newCandle, timeframe));
+            }
+
+            internal void AddNewCandle(Candlestick c)
+            {
+                var previousTime = Ticks.Tick.CloseTime;
 
                 //let's calculate the volume
                 Volume24H += c.Volume;
-                var delta = c.OpenTime - previousTime;
+                var delta = c.CloseTime - previousTime;
                 var timeAt24 = c.CloseTime - TimeSpan.FromHours(24);
 
                 Ticks.SeekNearestPreceding(timeAt24 - delta);
@@ -193,22 +225,51 @@ namespace SharpTrader
                     Ticks.Next();
                 }
 
-                Ticks.AddRecord(c.OpenTime, c);
-                Ticks.SeekLast();
+                Ticks.AddRecord(c);
+
                 Bid = c.Close;
                 Ask = Bid + Spread;
 
-                onNewCandPending = true;
+                foreach (var serie in DerivedTicks)
+                {
+                    if (serie.Ticks.LastTick.CloseTime <= c.CloseTime)
+                        ((Candlestick)serie.Ticks.Tick).Merge(c);
+                    else
+                        serie.Ticks.AddRecord(c);
+                }
             }
 
             internal void RaisePendingEvents()
             {
-                if (onNewCandPending)
+                if (onTickPending)
                 {
-                    OnNewCandle?.Invoke(this);
-                    onNewCandPending = false;
+                    OnTick?.Invoke(this);
+                    onTickPending = false;
                 }
             }
+
+            public void SubscribeToNewCandle(IChartDataListener subscriber, TimeSpan timeframe)
+            {
+                lock (Locker)
+                {
+                    var (_, subs) = NewCandleSubscribers.FirstOrDefault(el => el.Timeframe == timeframe);
+                    if (subs == null)
+                        NewCandleSubscribers.Add((timeframe, subs = new List<WeakReference<IChartDataListener>>()));
+
+                    for (int i = 0; i < subs.Count; i++)
+                    {
+                        if (!subs[i].TryGetTarget(out var obj))
+                            subs.RemoveAt(i--);
+                    }
+
+                    if (!subs.Any(it => it.TryGetTarget(out var sub) && sub.Equals(subscriber)))
+                    {
+                        subs.Add(new WeakReference<IChartDataListener>(subscriber));
+                    }
+                }
+            }
+
+
         }
 
         class Order : IOrder
@@ -269,6 +330,21 @@ namespace SharpTrader
         {
             public MarketOperationStatus Status { get; internal set; }
         }
+
+        class MarketConfiguration
+        {
+            public string MarketName { get; set; }
+            public double MakerFee { get; set; }
+            public double TakerFee { get; set; }
+        }
+
+        class SymbolConfiguration
+        {
+            public string SymbolName { get; set; }
+            public string MarketName { get; set; }
+            public string Spread { get; set; }
+        }
+
     }
 
 

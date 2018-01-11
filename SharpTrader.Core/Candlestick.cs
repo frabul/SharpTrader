@@ -40,10 +40,19 @@ namespace SharpTrader
         [IgnoreFormat, ProtoIgnore]
         public virtual double Length { get { return this.High - this.Low; } }
 
-        public Candlestick()
-        {
+        public Candlestick() { }
 
+        public Candlestick(ICandlestick toCopy, TimeSpan duration)
+        {
+            Open = toCopy.Open;
+            Close = toCopy.Close;
+            High = toCopy.High;
+            Low = toCopy.Low;
+            Volume = toCopy.Volume;
+            OpenTime = toCopy.OpenTime;
+            CloseTime = toCopy.CloseTime + duration;
         }
+
         public Candlestick(ICandlestick toCopy)
         {
             Open = toCopy.Open;
@@ -54,6 +63,7 @@ namespace SharpTrader
             OpenTime = toCopy.OpenTime;
             CloseTime = toCopy.CloseTime;
         }
+
         public Candlestick Clone()
         {
             return new Candlestick()
@@ -68,6 +78,9 @@ namespace SharpTrader
             };
         }
 
-
+        internal void Merge(ICandlestick c)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

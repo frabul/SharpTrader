@@ -13,8 +13,10 @@ namespace SharpTrader
 
     public class TimeSerie<T> where T : ITimeRecord
     {
+        //TODO make threadsafe
         private Stack<int> PositionSaveStack = new Stack<int>();
-        private int _Cursor = 0;
+        private int _Cursor = -1;
+        private TimeSerie<ICandlestick> ticks;
 
         internal List<T> Records { get; set; }
 
@@ -42,15 +44,17 @@ namespace SharpTrader
             }
         }
 
-        public DateTime Time { get { return Records[_Cursor].Time; } }
+        public DateTime Time => _Cursor > -1 ? Records[_Cursor].Time : DateTime.MinValue;
 
-        public int Position { get { return _Cursor; } }
+        public int Position => _Cursor;
 
-        public T Tick { get { return Records[_Cursor]; } }
-        public T NextTick { get { return Records[_Cursor + 1]; } }
-        public T PreviousTick { get { return Records[_Cursor - 1]; } }
-        public DateTime LastTickTime { get { return Records[Records.Count - 1].Time; } }
-        public DateTime FirstTickTime { get { return Records[0].Time; } }
+        public T Tick => Records[_Cursor];
+        public T NextTick => Records[_Cursor + 1];
+        public T PreviousTick => Records[_Cursor - 1];
+        public DateTime LastTickTime => Records[Records.Count - 1].Time;
+        public DateTime FirstTickTime => Records[0].Time;
+
+        public T LastTick => Records[Records.Count - 1];
 
 
         /// <summary>
@@ -60,6 +64,13 @@ namespace SharpTrader
         public TimeSerie(int capacity)
         {
             Records = new List<T>(capacity);
+        }
+        /// <summary>
+        /// Create a timeserie using the internal buffer of the provieded one
+        /// </summary> 
+        public TimeSerie(TimeSerie<T> toCopy)
+        {
+            Records = toCopy.Records;
         }
 
         struct DummyRecord : ITimeRecord
@@ -104,10 +115,10 @@ namespace SharpTrader
             return res;
         }
 
-    
-        public void AddRecord(DateTime time, T historyRecord)
+
+        public void AddRecord(T historyRecord)
         {
-           
+            var time = historyRecord.Time;
             if (Records.Count > 0 && LastTickTime > time)
                 throw new Exception("you cannot add a tick that's preceding the last one ");
 
@@ -117,7 +128,7 @@ namespace SharpTrader
                 Records[index] = historyRecord;
             else
             {
-                Records.Add(historyRecord); 
+                Records.Add(historyRecord);
             }
         }
 
