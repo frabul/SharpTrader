@@ -193,7 +193,7 @@ namespace SharpTrader
                         {
                             var newCandle = tticks.Tick;
                             AddTickToDerivedTimeframe(timeframe, derived, newCandle);
-                        } 
+                        }
                         DerivedTicks.Add((timeframe, derived));
                     }
                     return derived;
@@ -211,6 +211,7 @@ namespace SharpTrader
 
             internal void AddNewCandle(Candlestick c)
             {
+                BaseTimeframe = c.CloseTime - c.OpenTime;
                 var previousTime = Ticks.Tick.CloseTime;
 
                 //let's calculate the volume
@@ -232,10 +233,7 @@ namespace SharpTrader
 
                 foreach (var serie in DerivedTicks)
                 {
-                    if (serie.Ticks.LastTick.CloseTime <= c.CloseTime)
-                        ((Candlestick)serie.Ticks.Tick).Merge(c);
-                    else
-                        serie.Ticks.AddRecord(c);
+                    AddTickToDerivedTimeframe(BaseTimeframe, serie.Ticks, c);
                 }
             }
 
