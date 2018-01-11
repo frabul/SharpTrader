@@ -14,11 +14,12 @@ namespace SharpTrader
     {
 
         private static readonly CandlestickTimeComparer<Candlestick> CandlestickTimeComparer = new CandlestickTimeComparer<Candlestick>();
-        string BaseDirectory = ".\\RatesDB\\";
+        string BaseDirectory;
         List<SymbolHistoryRaw> SymbolsData = new List<SymbolHistoryRaw>();
 
-        public HistoricalRateDataBase()
+        public HistoricalRateDataBase(string dataDir)
         {
+            BaseDirectory = dataDir + "\\RatesDB\\";
             if (!Directory.Exists(BaseDirectory))
                 Directory.CreateDirectory(BaseDirectory);
         }

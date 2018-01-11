@@ -23,7 +23,7 @@ namespace ChartDataMiner
         {
             ApiClient = new ApiClient("", "");
             Client = new BinanceClient(ApiClient);
-            HistoryDB = new HistoricalRateDataBase();
+            HistoryDB = new HistoricalRateDataBase(".\\Data\\");
 
             IEnumerable<SymbolPrice> prices = Client.GetAllPrices().Result;
             var symbols = prices.Where(sp => sp.Symbol.EndsWith("BTC")).Select(sp => sp.Symbol);
