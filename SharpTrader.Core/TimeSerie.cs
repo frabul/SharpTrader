@@ -16,7 +16,6 @@ namespace SharpTrader
         //TODO make threadsafe
         private Stack<int> PositionSaveStack = new Stack<int>();
         private int _Cursor = -1;
-        private TimeSerie<ICandlestick> ticks;
 
         internal List<T> Records { get; set; }
 
@@ -103,7 +102,7 @@ namespace SharpTrader
         public T GetLast(Func<T, bool> criteria)
         {
             this.PositionPush();
-            this.SeekNearestPreceding(LastTickTime);
+            this.SeekNearestBefore(LastTickTime);
             var res = default(T);
             while (this.Previous())
                 if (criteria(this.Tick))
@@ -141,7 +140,7 @@ namespace SharpTrader
         /// Sets the cursor to the nearest tick before  or exacty at provided time.
         /// If the provided time is higher or lower than the know prices range it will be set to the last tick or first tick
         /// </summary> 
-        public void SeekNearestPreceding(DateTime date)
+        public void SeekNearestBefore(DateTime date)
         {
             if (Records.Count < 1)
                 throw new Exception();
@@ -176,9 +175,18 @@ namespace SharpTrader
 
         }
 
-        public void SeekNearestPreceding(int unixTime)
+        public void SeekNearestBefore(int unixTime)
         {
-            SeekNearestPreceding(unixTime.ToDatetime());
+            SeekNearestBefore(unixTime.ToDatetime());
+        }
+
+        public void SeekNearestAfter(DateTime time)
+        {
+            var ind = BinarySearchByTime(time);
+            if (ind > -1)
+                _Cursor = ind;
+            else
+                _Cursor = ~ind;
         }
 
         /// <summary>
@@ -237,6 +245,13 @@ namespace SharpTrader
             }
 
             return ~lower;
+        }
+
+        internal void SeekFirst()
+        {
+            if (Count < 1)
+                throw new InvalidOperationException("The serie has no elements.");
+            _Cursor = 0;
         }
     }
 

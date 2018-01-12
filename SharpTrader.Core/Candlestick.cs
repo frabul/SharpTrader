@@ -35,7 +35,7 @@ namespace SharpTrader
         public TimeSpan Timeframe => CloseTime - OpenTime;
 
         [IgnoreFormat, ProtoIgnore]
-        public DateTime Time => OpenTime;
+        public DateTime Time => CloseTime;
 
         [IgnoreFormat, ProtoIgnore]
         public virtual double Length { get { return this.High - this.Low; } }

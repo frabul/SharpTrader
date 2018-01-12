@@ -11,7 +11,7 @@ namespace SharpTrader
     {
         private static string ConfigFile = "MarketsSimulator.json";
         private Market[] _Markets;
-        private Dictionary<string, ISymbolHistory> SymbolsData;
+        private Dictionary<string, ISymbolHistory> SymbolsData = new Dictionary<string, ISymbolHistory>();
         private HistoricalRateDataBase HistoryDb;
         private Configuration Config;
 
@@ -29,7 +29,7 @@ namespace SharpTrader
             int i = 0;
             foreach (var mc in Config.Markets)
             {
-                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee);
+                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory);
                 _Markets[i++] = market;
             }
         }
@@ -48,20 +48,34 @@ namespace SharpTrader
             return market;
         }
 
-        public void Run()
+        public void Run(DateTime startTime, DateTime endTime, DateTime historyStart)
+        {
+            while (NextTick(startTime >= this.Time) && this.Time < endTime)
+            {
+
+            }
+        }
+
+        public bool NextTick(bool raiseEvents)
         {
             //find the nearest candle of all SymbolsData between the symbols that have been requested
             DateTime nextTick = DateTime.MaxValue;
             foreach (var market in _Markets)
                 foreach (var feed in market.Feeds)
                 {
-                    var sdata = SymbolsData[feed.Market + "_" + feed.Symbol];
+                    var key = market.MarketName + "_" + feed.Symbol;
+                    SymbolsData.TryGetValue(key, out var sdata);
+                    if (sdata == null)
+                    {
+                        sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60));
+                        SymbolsData.Add(key, sdata);
+                    }
                     if (nextTick > sdata.Ticks.NextTick.CloseTime)
                         nextTick = sdata.Ticks.NextTick.CloseTime;
                 }
 
             if (nextTick == DateTime.MaxValue)
-                return;
+                return false;
 
             //update market time
             this.Time = nextTick;
@@ -78,13 +92,14 @@ namespace SharpTrader
                     }
                 }
 
-            //raise orders/trades events
-            foreach (var market in _Markets)
-                market.RaisePendingEvents();
-
-            //raise symbol feeds events
+            if (raiseEvents)
+            {
+                //raise orders/trades events
+                foreach (var market in _Markets)
+                    market.RaisePendingEvents();
+            }
+            return true;
         }
-
 
         class Configuration
         {
@@ -92,12 +107,7 @@ namespace SharpTrader
             public SymbolConfiguration[] Symbols { get; set; }
         }
 
-        public class MarketInfo
-        {
-            string Name;
-            double Fee;
 
-        }
 
 
     }

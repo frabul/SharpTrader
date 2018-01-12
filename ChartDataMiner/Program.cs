@@ -13,7 +13,8 @@ namespace ChartDataMiner
     {
         static void Main(string[] args)
         {
-            BinanceDataMiner dm = new BinanceDataMiner();
+            BinanceDataMiner dm = new BinanceDataMiner(".\\Data\\");
+            dm.CreateSymbolsTable();
             dm.MineAllBTC();
 
         }

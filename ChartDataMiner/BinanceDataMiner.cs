@@ -13,17 +13,23 @@ namespace ChartDataMiner
     class BinanceDataMiner
     {
         private const string MarketName = "Binance";
+
+
         private ApiClient ApiClient;
         private BinanceClient Client;
         private HistoricalRateDataBase HistoryDB;
-
-
+        private string DataDir;
+        public BinanceDataMiner(string dataDir)
+        {
+            DataDir = dataDir;
+            ApiClient = new ApiClient("", "");
+            Client = new BinanceClient(ApiClient, false);
+            HistoryDB = new HistoricalRateDataBase(DataDir);
+        }
 
         public void MineAllBTC()
         {
-            ApiClient = new ApiClient("", "");
-            Client = new BinanceClient(ApiClient);
-            HistoryDB = new HistoricalRateDataBase(".\\Data\\");
+
 
             IEnumerable<SymbolPrice> prices = Client.GetAllPrices().Result;
             var symbols = prices.Where(sp => sp.Symbol.EndsWith("BTC")).Select(sp => sp.Symbol);
@@ -71,5 +77,20 @@ namespace ChartDataMiner
             HistoryDB.AddCandlesticks(MarketName, symbol, AllCandles);
             HistoryDB.Save(MarketName, symbol, AllCandles.First().Timeframe);
         }
+
+        internal void CreateSymbolsTable()
+        {
+            Dictionary<string, (string Asset, string Quote)> dict = new Dictionary<string, (string Asset, string Quote)>();
+            var tradingRules = Client.GetTradingRulesAsync().Result;
+            foreach (var symb in tradingRules.Symbols)
+            {
+                dict.Add(symb.SymbolName, (symb.BaseAsset, symb.QuoteAsset));
+
+            }
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict);
+            var deserialized = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, (string Asset, string Quote)>>(json);
+            System.IO.File.WriteAllText(DataDir + "BinanceSymbolsTable.json",json);
+        }
+
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
+using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset, string Quote)>;
 namespace SharpTrader
 {
     public partial class MultiMarketSimulator
@@ -12,25 +12,31 @@ namespace SharpTrader
         {
             object locker = new object();
             private Dictionary<string, double> Balances = new Dictionary<string, double>();
-            private bool OnTradePending = true;
             private List<Trade> Trades = new List<Trade>();
             private Dictionary<string, SymbolFeed> SymbolsFeed = new Dictionary<string, SymbolFeed>();
             private List<Order> PendingOrders = new List<Order>();
             private List<Order> ClosedOrders = new List<Order>();
+            private List<ITrade> TradesToSignal = new List<ITrade>();
+            private SymbolsTable SymbolsTable;
 
             public string MarketName { get; private set; }
             public double MakerFee { get; private set; } = 0.0015;
             public double TakerFee { get; private set; } = 0.0025;
             public DateTime Time { get; internal set; }
 
+
+            public event Action<IMarketApi, ITrade> OnNewTrade;
+
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
 
 
-            public Market(string name, double makerFee, double takerFee)
+            public Market(string name, double makerFee, double takerFee, string dataDir)
             {
                 MarketName = name;
                 MakerFee = makerFee;
                 TakerFee = takerFee;
+                var text = System.IO.File.ReadAllText(dataDir + "BinanceSymbolsTable.json");
+                SymbolsTable = Newtonsoft.Json.JsonConvert.DeserializeObject<SymbolsTable>(text);
             }
 
             public ISymbolFeed GetSymbolFeed(string symbol)
@@ -44,10 +50,9 @@ namespace SharpTrader
                     //if (symbolData == null)
                     //    throw new Exception($"Symbol {symbol} data not found for market {market}");
                     ////todo create symbol feed, add the data up to current date and 
-                    string asset;
-                    string counterAsset;
-                    Utils.GetAssets(symbol, out asset, out counterAsset);
-                    feed = new SymbolFeed(this.MarketName, asset, counterAsset);
+
+                    (var asset, var counterAsset) = SymbolsTable[symbol];
+                    feed = new SymbolFeed(this.MarketName, symbol, asset, counterAsset);
                     lock (locker)
                         SymbolsFeed.Add(symbol, feed);
                 }
@@ -82,6 +87,17 @@ namespace SharpTrader
 
             internal void RaisePendingEvents()
             {
+                List<ITrade> trades;
+                lock (locker)
+                {
+                    trades = new List<ITrade>(TradesToSignal);
+                    TradesToSignal.Clear();
+                }
+                foreach (var trade in TradesToSignal)
+                {
+                    this.OnNewTrade?.Invoke(this, trade);
+                }
+
                 foreach (var feed in SymbolsFeed.Values)
                     feed.RaisePendingEvents();
             }
@@ -128,16 +144,15 @@ namespace SharpTrader
                 if (trade.Type == TradeType.Buy)
                 {
                     Balances[feed.Asset] += trade.Amount;
-                    Balances[feed.CounterAsset] -= trade.Amount * trade.Price;
+                    Balances[feed.QuoteAsset] -= trade.Amount * trade.Price;
                 }
                 if (trade.Type == TradeType.Sell)
                 {
                     Balances[feed.Asset] -= trade.Amount;
-                    Balances[feed.CounterAsset] += trade.Amount * trade.Price;
+                    Balances[feed.QuoteAsset] += trade.Amount * trade.Price;
                 }
-                Balances[feed.CounterAsset] -= trade.Fee;
+                Balances[feed.QuoteAsset] -= trade.Fee;
 
-                OnTradePending = true;
                 lock (locker)
                     this.Trades.Add(trade);
             }
@@ -151,28 +166,29 @@ namespace SharpTrader
                 new List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)>();
 
             private bool onTickPending = false;
-            public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>(100000);
+
             private List<(TimeSpan Timeframe, TimeSerie<ICandlestick> Ticks)> DerivedTicks = new List<(TimeSpan Timeframe, TimeSerie<ICandlestick> Ticks)>(30);
             private object Locker = new object();
 
-            public SymbolFeed(string market, string asset, string counterAsset)
-            {
-
-            }
+            public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>(100000);
 
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
-            public string CounterAsset { get; private set; }
-
+            public string QuoteAsset { get; private set; }
             public double Ask { get; private set; }
             public double Bid { get; private set; }
-
             public string Market { get; private set; }
-
-            public double Spread { get; private set; }
-
-
+            public double Spread { get; set; }
             public double Volume24H { get; private set; }
+
+            public SymbolFeed(string market, string symbol, string asset, string quoteAsset)
+            {
+                this.Symbol = symbol;
+                this.Market = market;
+                this.QuoteAsset = quoteAsset;
+                this.Asset = asset;
+            }
+
 
             public TimeSerie<ICandlestick> GetChartData(TimeSpan timeframe)
             {
@@ -212,18 +228,29 @@ namespace SharpTrader
             internal void AddNewCandle(Candlestick c)
             {
                 BaseTimeframe = c.CloseTime - c.OpenTime;
-                var previousTime = Ticks.Tick.CloseTime;
 
-                //let's calculate the volume
+                var previousTime = c.OpenTime;
                 Volume24H += c.Volume;
-                var delta = c.CloseTime - previousTime;
-                var timeAt24 = c.CloseTime - TimeSpan.FromHours(24);
-
-                Ticks.SeekNearestPreceding(timeAt24 - delta);
-                while (Ticks.Tick.OpenTime < timeAt24)
+                //let's calculate the volume
+                if (Ticks.Count > 0)
                 {
-                    Volume24H -= Ticks.Tick.Volume;
-                    Ticks.Next();
+                    Ticks.PositionPush();
+                    Ticks.SeekLast();
+                    previousTime = Ticks.Tick.CloseTime;
+                    var delta = c.CloseTime - previousTime;
+                    var timeAt24 = c.CloseTime - TimeSpan.FromHours(24);
+                    var removeStart = timeAt24 - delta;
+                    if (removeStart < Ticks.FirstTickTime)
+                        Ticks.SeekFirst();
+                    else
+                        Ticks.SeekNearestBefore(timeAt24 - delta);
+
+                    while (Ticks.Tick.OpenTime < timeAt24)
+                    {
+                        Volume24H -= Ticks.Tick.Volume;
+                        Ticks.Next();
+                    }
+                    Ticks.PositionPop();
                 }
 
                 Ticks.AddRecord(c);

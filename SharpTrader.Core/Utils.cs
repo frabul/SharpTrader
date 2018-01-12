@@ -58,11 +58,5 @@ namespace SharpTrader
             //    return (int)val;
         }
     }
-    public class Utils
-    {
-        public static void GetAssets(string symbol, out string asset, out string counterAsset)
-        {
-            throw new NotImplementedException();
-        }
-    }
+  
 }
