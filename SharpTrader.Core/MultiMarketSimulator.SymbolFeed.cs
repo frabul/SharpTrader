@@ -11,7 +11,7 @@ namespace SharpTrader
         class Market : IMarketApi
         {
             object locker = new object();
-            private Dictionary<string, double> Balances = new Dictionary<string, double>();
+            private Dictionary<string, double> _Balances = new Dictionary<string, double>();
             private List<Trade> Trades = new List<Trade>();
             private Dictionary<string, SymbolFeed> SymbolsFeed = new Dictionary<string, SymbolFeed>();
             private List<Order> PendingOrders = new List<Order>();
@@ -28,7 +28,7 @@ namespace SharpTrader
             public event Action<IMarketApi, ITrade> OnNewTrade;
 
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
-
+            public IEnumerable<ISymbolFeed> ActiveFeeds => SymbolsFeed.Values;
 
             public Market(string name, double makerFee, double takerFee, string dataDir)
             {
@@ -44,13 +44,6 @@ namespace SharpTrader
                 var feedFound = SymbolsFeed.TryGetValue(symbol, out SymbolFeed feed);
                 if (!feedFound)
                 {
-                    //TODO request feed creation
-
-                    //var symbolData = SymbolsData.Where(sd => sd.Market == market && sd.Symbol == symbol).FirstOrDefault();
-                    //if (symbolData == null)
-                    //    throw new Exception($"Symbol {symbol} data not found for market {market}");
-                    ////todo create symbol feed, add the data up to current date and 
-
                     (var asset, var counterAsset) = SymbolsTable[symbol];
                     feed = new SymbolFeed(this.MarketName, symbol, asset, counterAsset);
                     lock (locker)
@@ -84,6 +77,13 @@ namespace SharpTrader
 
                 return new MarketOperation() { Status = MarketOperationStatus.Completed };
             }
+            public double GetBalance(string asset)
+            {
+                _Balances.TryGetValue(asset, out double res);
+                return res;
+            }
+
+            public (string Symbol, double balance)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
 
             internal void RaisePendingEvents()
             {
@@ -141,17 +141,21 @@ namespace SharpTrader
 
             private void RegisterTrade(SymbolFeed feed, Trade trade)
             {
+                if (!_Balances.ContainsKey(feed.Asset))
+                    _Balances.Add(feed.Asset, 0);
+                if (!_Balances.ContainsKey(feed.QuoteAsset))
+                    _Balances.Add(feed.QuoteAsset, 0);
                 if (trade.Type == TradeType.Buy)
                 {
-                    Balances[feed.Asset] += trade.Amount;
-                    Balances[feed.QuoteAsset] -= trade.Amount * trade.Price;
+                    _Balances[feed.Asset] += trade.Amount;
+                    _Balances[feed.QuoteAsset] -= trade.Amount * trade.Price;
                 }
                 if (trade.Type == TradeType.Sell)
                 {
-                    Balances[feed.Asset] -= trade.Amount;
-                    Balances[feed.QuoteAsset] += trade.Amount * trade.Price;
+                    _Balances[feed.Asset] -= trade.Amount;
+                    _Balances[feed.QuoteAsset] += trade.Amount * trade.Price;
                 }
-                Balances[feed.QuoteAsset] -= trade.Fee;
+                _Balances[feed.QuoteAsset] -= trade.Fee;
 
                 lock (locker)
                     this.Trades.Add(trade);
@@ -167,10 +171,10 @@ namespace SharpTrader
 
             private bool onTickPending = false;
 
-            private List<(TimeSpan Timeframe, TimeSerie<ICandlestick> Ticks)> DerivedTicks = new List<(TimeSpan Timeframe, TimeSerie<ICandlestick> Ticks)>(30);
+            private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
             private object Locker = new object();
 
-            public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>(100000);
+            public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>();
 
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
@@ -181,6 +185,13 @@ namespace SharpTrader
             public double Spread { get; set; }
             public double Volume24H { get; private set; }
 
+            private class DerivedChart
+            {
+                public TimeSpan Timeframe;
+                public TimeSerie<ICandlestick> Ticks;
+                public Candlestick FormingCandle;
+            }
+
             public SymbolFeed(string market, string symbol, string asset, string quoteAsset)
             {
                 this.Symbol = symbol;
@@ -190,7 +201,7 @@ namespace SharpTrader
             }
 
 
-            public TimeSerie<ICandlestick> GetChartData(TimeSpan timeframe)
+            public TimeSerieNavigator<ICandlestick> GetNavigator(TimeSpan timeframe)
             {
                 if (BaseTimeframe == timeframe)
                 {
@@ -198,31 +209,53 @@ namespace SharpTrader
                 }
                 else
                 {
-                    (var tf, var derived) = DerivedTicks.Where(dt => dt.Timeframe == timeframe).FirstOrDefault();
-                    if (derived == null)
+                    var der = DerivedTicks.Where(dt => dt.Timeframe == timeframe).FirstOrDefault();
+                    if (der == null)
                     {
+                        der = new DerivedChart()
+                        {
+                            Timeframe = timeframe,
+                            FormingCandle = null,
+                            Ticks = new TimeSerie<ICandlestick>()
+                        };
 
-                        derived = new TimeSerie<ICandlestick>(100000);
                         //we need to initialize it with all the data that we have
-                        var tticks = new TimeSerie<ICandlestick>(Ticks);
+                        var tticks = new TimeSerieNavigator<ICandlestick>(this.Ticks);
                         while (tticks.Next())
                         {
                             var newCandle = tticks.Tick;
-                            AddTickToDerivedTimeframe(timeframe, derived, newCandle);
+                            AddTickToDerivedChart(der, newCandle);
+
                         }
-                        DerivedTicks.Add((timeframe, derived));
+                        DerivedTicks.Add(der);
                     }
-                    return derived;
+                    return new TimeSerieNavigator<ICandlestick>(der.Ticks);
                 }
 
             }
 
-            private static void AddTickToDerivedTimeframe(TimeSpan timeframe, TimeSerie<ICandlestick> derived, ICandlestick newCandle)
+            private void AddTickToDerivedChart(DerivedChart der, ICandlestick newCandle)
             {
-                if (derived.LastTick.CloseTime >= newCandle.CloseTime)
-                    ((Candlestick)derived.Tick).Merge(newCandle);
+                if (der.FormingCandle == null)
+                    der.FormingCandle = new Candlestick(newCandle, der.Timeframe);
+
+                if (der.FormingCandle.CloseTime <= newCandle.OpenTime)
+                {
+                    //old candle is formed
+                    der.Ticks.AddRecord(der.FormingCandle);
+                    der.FormingCandle = new Candlestick(newCandle, der.Timeframe);
+                }
                 else
-                    derived.AddRecord(new Candlestick(newCandle, timeframe));
+                {
+                    der.FormingCandle.Merge(newCandle);
+                    if (der.FormingCandle.CloseTime < newCandle.CloseTime)
+                    {
+
+                        der.Ticks.AddRecord(der.FormingCandle);
+                        der.FormingCandle = null;
+
+                    }
+                }
             }
 
             internal void AddNewCandle(Candlestick c)
@@ -258,10 +291,11 @@ namespace SharpTrader
                 Bid = c.Close;
                 Ask = Bid + Spread;
 
-                foreach (var serie in DerivedTicks)
+                foreach (var derived in DerivedTicks)
                 {
-                    AddTickToDerivedTimeframe(BaseTimeframe, serie.Ticks, c);
+                    AddTickToDerivedChart(derived, c);
                 }
+                onTickPending = true;
             }
 
             internal void RaisePendingEvents()

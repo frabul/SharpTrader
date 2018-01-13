@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-    public partial class MultiMarketSimulator
+    public partial class MultiMarketSimulator : IMarketsManager
     {
         private static string ConfigFile = "MarketsSimulator.json";
         private Market[] _Markets;
@@ -50,9 +50,10 @@ namespace SharpTrader
 
         public void Run(DateTime startTime, DateTime endTime, DateTime historyStart)
         {
-            while (NextTick(startTime >= this.Time) && this.Time < endTime)
+            bool raiseEvents = false;
+            while (NextTick(raiseEvents) && this.Time < endTime)
             {
-
+                raiseEvents = startTime <= this.Time;
             }
         }
 

@@ -80,7 +80,12 @@ namespace SharpTrader
 
         internal void Merge(ICandlestick c)
         {
-            throw new NotImplementedException();
+            if (this.High < c.High)
+                this.High = c.High;
+            if (this.Low < c.Low)
+                this.Low = c.Low;
+            this.Close = c.Close;
+            this.Volume += c.Volume;
         }
     }
 }

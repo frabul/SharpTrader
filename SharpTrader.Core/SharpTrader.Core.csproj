@@ -61,9 +61,14 @@
     <Compile Include="HistoricalRateDataBase.cs" />
     <Compile Include="ICandlestick.cs" />
     <Compile Include="IMarketApi.cs" />
+    <Compile Include="IMarketsManager.cs" />
+    <Compile Include="Indicators\BollingerBands.cs" />
+    <Compile Include="Indicators\Indicator.cs" />
+    <Compile Include="Indicators\Variance.cs" />
     <Compile Include="MultiMarketSimulator.cs" />
     <Compile Include="MultiMarketSimulator.SymbolFeed.cs" />
     <Compile Include="TimeSerie.cs" />
+    <Compile Include="TimeSerieNavigator.cs" />
     <Compile Include="Transactions.cs" />
     <Compile Include="Candlestick.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

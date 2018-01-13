@@ -8,7 +8,7 @@ namespace SharpTrader
 {
     public interface IMarketApi
     {
-         string MarketName { get; }
+        string MarketName { get; }
         /// <summary>
         /// Current date and time
         /// </summary>
@@ -29,12 +29,16 @@ namespace SharpTrader
         /// </summary> 
         ISymbolFeed GetSymbolFeed(string symbol);
 
+        IEnumerable<ISymbolFeed> ActiveFeeds { get; }
+        double GetBalance(string asset);
+        (string Symbol, double balance)[] Balances { get; }
+
     }
 
     public interface ISymbolFeed
     {
         event Action<ISymbolFeed> OnTick;
-        
+
         string Symbol { get; }
         string Market { get; }
 
@@ -42,7 +46,9 @@ namespace SharpTrader
         double Bid { get; }
         double Ask { get; }
         double Volume24H { get; }
-        TimeSerie<ICandlestick> GetChartData(TimeSpan timeframe);
+        string Asset { get; }
+        string QuoteAsset { get; }
+        TimeSerieNavigator<ICandlestick> GetNavigator(TimeSpan timeframe);
         void SubscribeToNewCandle(IChartDataListener subscriber, TimeSpan timeframe);
     }
 

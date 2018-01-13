@@ -4,20 +4,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpTrader.Core
+namespace SharpTrader
 {
 
 
-    public abstract class TraderBot
+    public abstract class TraderBot : IChartDataListener
     {
         public bool Active { get; set; }
-        public IMarketApi Market { get;  }
+        public IMarketsManager MarketsManager { get;  }
 
-        public TraderBot(IMarketApi marketApi)
+        public TraderBot(IMarketsManager marketApi)
         {
-            Market = marketApi;
+            MarketsManager = marketApi;
         }
         public abstract void Start();
+
+        public abstract void OnNewCandle(ISymbolFeed sender, ICandlestick newCandle);
     }
 
 
