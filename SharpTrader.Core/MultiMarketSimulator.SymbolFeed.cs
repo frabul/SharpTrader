@@ -12,7 +12,7 @@ namespace SharpTrader
         {
             object locker = new object();
             private Dictionary<string, double> _Balances = new Dictionary<string, double>();
-            private List<Trade> Trades = new List<Trade>();
+            private List<Trade> _Trades = new List<Trade>();
             private Dictionary<string, SymbolFeed> SymbolsFeed = new Dictionary<string, SymbolFeed>();
             private List<Order> PendingOrders = new List<Order>();
             private List<Order> ClosedOrders = new List<Order>();
@@ -29,7 +29,7 @@ namespace SharpTrader
 
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
             public IEnumerable<ISymbolFeed> ActiveFeeds => SymbolsFeed.Values;
-
+            public IEnumerable<ITrade> Trades => this._Trades;
             public Market(string name, double makerFee, double takerFee, string dataDir)
             {
                 MarketName = name;
@@ -158,7 +158,7 @@ namespace SharpTrader
                 _Balances[feed.QuoteAsset] -= trade.Fee;
 
                 lock (locker)
-                    this.Trades.Add(trade);
+                    this._Trades.Add(trade);
             }
         }
 

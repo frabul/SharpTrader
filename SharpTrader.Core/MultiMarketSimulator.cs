@@ -71,7 +71,7 @@ namespace SharpTrader
                         sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60));
                         SymbolsData.Add(key, sdata);
                     }
-                    if (nextTick > sdata.Ticks.NextTick.CloseTime)
+                    if (sdata.Ticks.Count > 0 && nextTick > sdata.Ticks.NextTick.CloseTime)
                         nextTick = sdata.Ticks.NextTick.CloseTime;
                 }
 
@@ -86,11 +86,12 @@ namespace SharpTrader
                 foreach (var feed in market.Feeds)
                 {
                     var data = SymbolsData[market.MarketName + "_" + feed.Symbol];
-                    while (data.Ticks.NextTickTime <= this.Time)
-                    {
-                        data.Ticks.Next();
-                        market.AddNewCandle(feed as SymbolFeed, new Candlestick(data.Ticks.Tick));
-                    }
+                    if (data.Ticks.Count > 0)
+                        while (data.Ticks.NextTickTime <= this.Time)
+                        {
+                            data.Ticks.Next();
+                            market.AddNewCandle(feed as SymbolFeed, new Candlestick(data.Ticks.Tick));
+                        }
                 }
 
             if (raiseEvents)

@@ -30,6 +30,9 @@ namespace SharpTrader
         ISymbolFeed GetSymbolFeed(string symbol);
 
         IEnumerable<ISymbolFeed> ActiveFeeds { get; }
+
+        IEnumerable<ITrade> Trades { get; }
+
         double GetBalance(string asset);
         (string Symbol, double balance)[] Balances { get; }
 
