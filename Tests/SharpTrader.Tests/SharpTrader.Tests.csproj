@@ -30,6 +30,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="MvvmFoundation.Wpf, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\MvvmFoundation.Wpf.1.0.0\lib\net40\MvvmFoundation.Wpf.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.ValueTuple, Version=4.0.2.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -54,6 +57,10 @@
     <ProjectReference Include="..\..\SharpTrader.Core\SharpTrader.Core.csproj">
       <Project>{320b1902-461a-4b88-8852-d881dc4e5293}</Project>
       <Name>SharpTrader.Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\SharpTrader.Plotting\SharpTrader.Plotting.csproj">
+      <Project>{6f67b4ab-53fb-4665-9116-c14f9256c0fa}</Project>
+      <Name>SharpTrader.Plotting</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

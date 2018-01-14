@@ -26,6 +26,9 @@ namespace SharpTrader.Bots
         BotStatus Status = BotStatus.SearchEnter;
 
 
+        public ISymbolFeed GraphFeed { get; private set; }
+        public List<Indicator> GraphIndicators { get; private set; } = new List<Indicator>();
+
         TimeSerieNavigator<BollingerBands.Record> BollNavigator;
 
 
@@ -40,7 +43,7 @@ namespace SharpTrader.Bots
             TfExit.frame = TimeframeExit;
 
             Binance = MarketsManager.GetMarketApi("Binance");
-            OMGBTC = Binance.GetSymbolFeed("TNBBTC");
+            GraphFeed = OMGBTC = Binance.GetSymbolFeed("XMRBTC");
             OMGBTC.OnTick += OMGBTC_OnTick;
             OMGBTC.SubscribeToNewCandle(this, TfEnter.frame);
             OMGBTC.SubscribeToNewCandle(this, TfExit.frame);
@@ -52,6 +55,8 @@ namespace SharpTrader.Bots
 
             MeanAndVariance = new MeanAndVariance(100, TfEnter.ticks);
             MeanNavigator = MeanAndVariance.GetNavigator();
+
+            Drawer.Candles = new TimeSerieNavigator<ICandlestick>(TfEnter.ticks);
         }
 
         bool FirstPass = true;
@@ -60,6 +65,9 @@ namespace SharpTrader.Bots
         {
             BollingerBands.Calculate();
             MeanAndVariance.Calculate();
+
+            bool newTfEnter = TfEnter.ticks.Next();
+
             if (FirstPass)
             {
                 FirstPass = false;
@@ -76,7 +84,7 @@ namespace SharpTrader.Bots
             if (Status == BotStatus.SearchEnter)
             {
 
-                if (TfEnter.ticks.Next())
+                if (newTfEnter)
                     SearchEnter();
             }
             else if (Status == BotStatus.SearchExit)
@@ -106,7 +114,7 @@ namespace SharpTrader.Bots
                 MeanNavigator.SeekLast();
                 var bollTick = BollNavigator.Tick;
                 var bollTick1 = BollNavigator.GetFromCursor(1);
-                var candle = TfExit.ticks.LastTick;
+                var candle = TfEnter.ticks.LastTick;
 
                 var growing = (MeanNavigator.Tick.Mean - MeanNavigator.PreviousTick.Mean) / MeanNavigator.Tick.Mean > 0.001;
                 var closeUnderDev = candle.Close < bollTick.Bottom;
@@ -138,7 +146,7 @@ namespace SharpTrader.Bots
                 var topLowerThanEnter = bollTick.Top < this.EnterPrice;
                 if (closeOnTop)
                 {
-                    
+
                     Binance.MarketOrder(OMGBTC.Symbol, TradeType.Sell, Binance.GetBalance(OMGBTC.Asset));
                     Status = BotStatus.SearchEnter;
                 }

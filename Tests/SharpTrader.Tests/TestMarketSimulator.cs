@@ -18,9 +18,6 @@ namespace SharpTrader.Tests
 
         public void Test()
         {
-
-
-
             HistoryDB = new HistoricalRateDataBase(DataDir);
             MultiMarketSimulator simulator = new MultiMarketSimulator(DataDir, HistoryDB);
             var binanceMarket = simulator.GetMarketApi("Binance");
@@ -44,10 +41,13 @@ namespace SharpTrader.Tests
             var lostInFee = binanceMarket.Trades.Select(tr => tr.Fee).Sum();
             Console.WriteLine($"Trades:{binanceMarket.Trades.Count()} - lost in fee:{lostInFee}");
             foreach (var (Symbol, balance) in binanceMarket.Balances)
-            { 
+            {
                 Console.WriteLine($"{Symbol }: {balance}");
             }
+            SharpTrader.Plotting.TraderBotResultsPlotViewModel vm = new Plotting.TraderBotResultsPlotViewModel(tester);
 
+            vm.RunWindow();
+            vm.UpdateChart();
             Console.ReadLine();
         }
 
@@ -68,5 +68,10 @@ namespace SharpTrader.Tests
                 }
             }
         }
+
+
+
     }
+
+
 }

@@ -4,14 +4,15 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpTrader.Core
+namespace SharpTrader
 {
     public class GraphDrawer
     {
-        public List<Tuple<int, double>> Points { get; }
-        public List<Line> Lines { get; }
-        public List<double> HorizontalLines { get; }
-        public List<double> VerticalLines { get; }
+        public List<(DateTime Time, double Value)> Points { get; set; } = new List<(DateTime Time, double Value)>();
+        public List<Line> Lines { get; set; } = new List<Line>();
+        public List<double> HorizontalLines { get; set; } = new List<double>();
+        public List<double> VerticalLines { get; set; } = new List<double>();
+        public TimeSerieNavigator<ICandlestick> Candles { get; set; } = new TimeSerieNavigator<ICandlestick>();
     }
     public class Line
     {

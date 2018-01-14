@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestConsole", "Tests\TestCo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Tests", "Tests\SharpTrader.Tests\SharpTrader.Tests.csproj", "{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Plotting", "SharpTrader.Plotting\SharpTrader.Plotting.csproj", "{6F67B4AB-53FB-4665-9116-C14F9256C0FA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -61,6 +63,10 @@ Global
 		{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6F67B4AB-53FB-4665-9116-C14F9256C0FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F67B4AB-53FB-4665-9116-C14F9256C0FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F67B4AB-53FB-4665-9116-C14F9256C0FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F67B4AB-53FB-4665-9116-C14F9256C0FA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
