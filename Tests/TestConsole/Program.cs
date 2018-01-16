@@ -9,7 +9,8 @@ namespace TestConsole
     class Program
     {
         static void Main(string[] args)
-        {
+        { 
+            //------
             TestMarketSimulator tms = new TestMarketSimulator();
             tms.Test();
         }

@@ -15,7 +15,7 @@ namespace ChartDataMiner
         {
             BinanceDataMiner dm = new BinanceDataMiner(".\\Data\\");
             dm.CreateSymbolsTable();
-            dm.MineAllBTC();
+            dm.MineBinance();
 
         }
 

@@ -33,14 +33,7 @@ namespace SharpTrader
     {
         public int Compare(Tc x, Tc y)
         {
-            //return (int)(x.OpenTime.Ticks - y.OpenTime.Ticks);
-            var val = x.OpenTime.Ticks - y.OpenTime.Ticks;
-            if (val > int.MaxValue)
-                return int.MaxValue;
-            else if (val < int.MinValue)
-                return int.MinValue;
-            else
-                return (int)val;
+            return x.Time.CompareTo(y.Time);
         }
     }
     public class CandlestickTimeComparer : IComparer<ICandlestick>
@@ -58,5 +51,5 @@ namespace SharpTrader
             //    return (int)val;
         }
     }
-  
+
 }

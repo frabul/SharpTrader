@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,6 +39,8 @@ namespace SharpTrader
 
         public T LastTick => Records[Records.Count - 1];
 
+        public bool EndOfSerie => _Cursor >= Records.Count - 1;
+
 
         public TimeSerieNavigator()
         {
@@ -47,6 +50,10 @@ namespace SharpTrader
         public TimeSerieNavigator(TimeSerieNavigator<T> items)
         {
             Records = items.Records;
+        }
+        public TimeSerieNavigator(IEnumerable<T> items)
+        {
+            Records = new TimeRecordCollection<T>(items);
         }
         public T GetFromCursor(int count)
         {
@@ -190,6 +197,11 @@ namespace SharpTrader
         public TimeRecordCollection(int capacity)
         {
             Items = new List<T>(capacity);
+        }
+
+        public TimeRecordCollection(IEnumerable<T> items)
+        {
+            Items = items.ToList();
         }
 
         public T this[int index]

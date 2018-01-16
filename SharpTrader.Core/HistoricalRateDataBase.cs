@@ -19,9 +19,33 @@ namespace SharpTrader
 
         public HistoricalRateDataBase(string dataDir)
         {
-            BaseDirectory = dataDir + "\\RatesDB\\";
+            BaseDirectory = dataDir + "RatesDB\\";
             if (!Directory.Exists(BaseDirectory))
                 Directory.CreateDirectory(BaseDirectory);
+        }
+
+        public void ValidateData(string market, string symbol, TimeSpan time)
+        {
+            var data = this.GetHistoryRaw(market, symbol, time);
+            for (int i = 1; i < data.Ticks.Count; i++)
+            {
+                if (data.Ticks[i].Time < data.Ticks[i - 1].Time)
+                {
+                    Console.WriteLine($"{market} - {symbol} - {time} -> bad data at {i}");
+                }
+            }
+        }
+
+        public void Delete(string market, string symbol, TimeSpan time)
+        {
+            string fileName = GetFileName(market, symbol, time);
+            for (int i = 0; i < SymbolsData.Count; i++)
+            {
+                if (SymbolsData[i].FileName == fileName)
+                    SymbolsData.RemoveAt(i--);
+            }
+            if (File.Exists(BaseDirectory + fileName))
+                File.Delete(BaseDirectory + fileName);
         }
 
         public (string market, string symbol, TimeSpan time)[] ListAvailableData()
@@ -30,7 +54,7 @@ namespace SharpTrader
             List<(string market, string symbol, TimeSpan time)> result = new List<(string market, string symbol, TimeSpan time)>();
             foreach (var file in files)
             {
-                var elem = GetFileInfo(file);
+                var elem = GetFileInfo(Path.GetFileName(file));
                 result.Add(elem);
             }
             return result.ToArray();
@@ -50,6 +74,12 @@ namespace SharpTrader
         }
 
         public ISymbolHistory GetSymbolHistory(string market, string symbol, TimeSpan timeframe)
+        {
+            SymbolHistoryRaw sdata = GetHistoryRaw(market, symbol, timeframe);
+            return new SymbolHistory(sdata);
+        }
+
+        private SymbolHistoryRaw GetHistoryRaw(string market, string symbol, TimeSpan timeframe)
         {
             //check if we already have some records and load them 
             var fileName = GetFileName(market, symbol, timeframe);
@@ -79,10 +109,15 @@ namespace SharpTrader
             }
             else
             {
-                var tf = sdata.Ticks.FirstOrDefault()?.Timeframe;
-                if (tf != timeframe)
-                    throw new InvalidOperationException("Bad timeframe for candle");
+                if (sdata.Ticks.Count > 0)
+                {
+                    var tf = sdata.Ticks.FirstOrDefault()?.Timeframe;
+                    if (tf != timeframe)
+                        throw new InvalidOperationException("Bad timeframe for candle");
+                }
+
             }
+
             return sdata;
         }
 
@@ -90,18 +125,19 @@ namespace SharpTrader
         {
             //check if we already have some records and load them
             var timeframe = candles.First().Timeframe;
-            var sdata = (SymbolHistoryRaw)GetSymbolHistory(market, symbol, timeframe);
+            var sdata = GetHistoryRaw(market, symbol, timeframe);
             //add data 
             lock (sdata.Locker)
             {
-                ICandlestick lastCandle = sdata.Ticks.LastOrDefault();
+
                 foreach (var c in candles)
                 {
+                    ICandlestick lastCandle = sdata.Ticks.Count > 0 ? sdata.Ticks[sdata.Ticks.Count - 1] : null;
                     if (c.Timeframe != timeframe)
                         throw new InvalidOperationException("Bad timeframe for candle");
                     //if this candle open is preceding last candle open we need to insert it in sorted fashion
                     var toAdd = new Candlestick(c);
-                    if (lastCandle?.Close > c.Open)
+                    if (lastCandle?.OpenTime > toAdd.OpenTime)
                     {
                         int index = sdata.Ticks.BinarySearch(toAdd, CandlestickTimeComparer);
                         if (index > -1)
@@ -110,8 +146,7 @@ namespace SharpTrader
                             sdata.Ticks.Insert(~index, toAdd);
                     }
                     else
-                        sdata.Ticks.Add(new Candlestick(c));
-                    lastCandle = c;
+                        sdata.Ticks.Add(toAdd);
                 }
             }
         }
@@ -183,10 +218,9 @@ namespace SharpTrader
 
 
         [ZeroFormattable, ProtoContract]
-        class SymbolHistoryRaw : ISymbolHistory
+        class SymbolHistoryRaw
         {
             private List<Candlestick> _Ticks;
-            private CandlesticksSerieNavigator TicksNavigator;
 
             public SymbolHistoryRaw()
             {
@@ -219,7 +253,6 @@ namespace SharpTrader
                     else
                     {
                         _Ticks = value;
-                        TicksNavigator = new CandlesticksSerieNavigator(value);
                     }
                 }
             }
@@ -227,9 +260,31 @@ namespace SharpTrader
             [Index(4), ProtoMember(5)]
             public virtual double Spread { get; set; }
 
-            [IgnoreFormat, ProtoIgnore]
-            CandlesticksSerieNavigator ISymbolHistory.Ticks => TicksNavigator;
+
         }
+
+        class SymbolHistory : ISymbolHistory
+        {
+            public string Market { get; }
+
+            public string Symbol { get; }
+
+            public TimeSpan Timeframe { get; }
+
+            public TimeSerieNavigator<ICandlestick> Ticks { get; }
+
+            public double Spread { get; }
+
+            public SymbolHistory(SymbolHistoryRaw raw)
+            {
+                Market = raw.Market;
+                Symbol = raw.Symbol;
+                Timeframe = raw.Timeframe;
+                Ticks = new TimeSerieNavigator<ICandlestick>(raw.Ticks);
+                Spread = raw.Spread;
+            }
+        }
+
     }
 
     public interface ISymbolHistory
@@ -237,8 +292,10 @@ namespace SharpTrader
         string Market { get; }
         string Symbol { get; }
         TimeSpan Timeframe { get; }
-        CandlesticksSerieNavigator Ticks { get; }
+        TimeSerieNavigator<ICandlestick> Ticks { get; }
         double Spread { get; }
+
+
     }
 
 

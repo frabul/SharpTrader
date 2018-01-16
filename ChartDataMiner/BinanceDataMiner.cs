@@ -27,19 +27,18 @@ namespace ChartDataMiner
             HistoryDB = new HistoricalRateDataBase(DataDir);
         }
 
-        public void MineAllBTC()
-        {
-
-
+        public void MineBinance()
+        { 
             IEnumerable<SymbolPrice> prices = Client.GetAllPrices().Result;
             var symbols = prices.Where(sp => sp.Symbol.EndsWith("BTC")).Select(sp => sp.Symbol);
-
+            symbols = symbols.Concat(prices.Where(sp => sp.Symbol.EndsWith("USDT")).Select(sp => sp.Symbol));
             foreach (var symbol in symbols)
                 DownloadCompleteSymbolHistory(symbol);
         }
 
         public void DownloadCompleteSymbolHistory(string symbol)
         {
+            Console.WriteLine($"Downloading history for {symbol}");
             DateTime endTime = DateTime.UtcNow.Subtract(TimeSpan.FromSeconds(60));
             List<SharpTrader.Candlestick> AllCandles = new List<SharpTrader.Candlestick>();
 
@@ -54,7 +53,7 @@ namespace ChartDataMiner
 
             while (AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime)
             {
-
+                Console.WriteLine($"Downloading history for {symbol} - {startTime}");
                 var candles = Client.GetCandleSticks(symbol, TimeInterval.Minutes_1, startTime).Result;
                 System.Threading.Thread.Sleep(60);
                 var batch = candles.Select(
@@ -71,7 +70,7 @@ namespace ChartDataMiner
 
                 AllCandles.AddRange(batch);
                 startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime + TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
-
+              
             }
             //---
             HistoryDB.AddCandlesticks(MarketName, symbol, AllCandles);
