@@ -13,7 +13,7 @@ namespace SharpTrader.Indicators
     {
         private double _rollingSum;
         private double _rollingSumOfSquares;
-        private int Period { get; set; }
+        public int Period { get; private set; }
         private TimeSerie<Record> Records = new TimeSerie<Record>();
         private TimeSerieNavigator<ICandlestick> Chart;
 

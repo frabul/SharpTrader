@@ -43,7 +43,7 @@ namespace SharpTrader.Bots
             TfExit.frame = TimeframeExit;
 
             Binance = MarketsManager.GetMarketApi("Binance");
-            GraphFeed = OMGBTC = Binance.GetSymbolFeed("XMRBTC");
+            GraphFeed = OMGBTC = Binance.GetSymbolFeed("SNGLSBTC");
             OMGBTC.OnTick += OMGBTC_OnTick;
             OMGBTC.SubscribeToNewCandle(this, TfEnter.frame);
             OMGBTC.SubscribeToNewCandle(this, TfExit.frame);
@@ -53,10 +53,12 @@ namespace SharpTrader.Bots
             BollingerBands = new BollingerBands("Boll5m", Boll_Period, Boll_Dev, TfEnter.ticks);
             BollNavigator = BollingerBands.GetNavigator();
 
-            MeanAndVariance = new MeanAndVariance(100, TfEnter.ticks);
+            MeanAndVariance = new MeanAndVariance(130, TfEnter.ticks);
             MeanNavigator = MeanAndVariance.GetNavigator();
 
             Drawer.Candles = new TimeSerieNavigator<ICandlestick>(TfEnter.ticks);
+
+            Drawer.Lines.AddRange(new[] { LineBollBot, LineBollMid, LineBollTop });
         }
 
         bool FirstPass = true;
@@ -106,27 +108,53 @@ namespace SharpTrader.Bots
 
         }
 
+        Line TradeLine;
+        Line LineBollTop = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
+        Line LineBollMid = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
+        Line LineBollBot = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
+
         private void SearchEnter()
         {
             if (BollingerBands.IsReady)
             {
+
+                var newBollinger = BollNavigator.Next();
+
                 BollNavigator.SeekLast();
                 MeanNavigator.SeekLast();
-                var bollTick = BollNavigator.Tick;
-                var bollTick1 = BollNavigator.GetFromCursor(1);
-                var candle = TfEnter.ticks.LastTick;
 
-                var growing = (MeanNavigator.Tick.Mean - MeanNavigator.PreviousTick.Mean) / MeanNavigator.Tick.Mean > 0.001;
-                var closeUnderDev = candle.Close < bollTick.Bottom;
-                var stdvHi = bollTick.Deviation / candle.Close > 0.02;
-
-                if (growing && closeUnderDev && stdvHi)
+                try
                 {
-                    Binance.MarketOrder(OMGBTC.Symbol, TradeType.Buy, GetAmountToTrade());
-                    Status = BotStatus.SearchExit;
-                    EnterPrice = candle.Close;
-                }
 
+                    ICandlestick candle = TfEnter.ticks.LastTick;
+                    var bollTick = BollNavigator.Tick;
+                    var bollback = BollNavigator.GetFromCursor(BollingerBands.Period);
+               
+                    var tickToAdd = BollNavigator.Tick;
+                     
+                    if (newBollinger)
+                    {
+                        LineBollTop.Points.Add(new Point(tickToAdd.Time, tickToAdd.Top));
+                        LineBollMid.Points.Add(new Point(tickToAdd.Time, tickToAdd.Main));
+                        LineBollBot.Points.Add(new Point(tickToAdd.Time, tickToAdd.Bottom));
+                    }
+
+
+                    var growing = (MeanNavigator.Tick.Mean - MeanNavigator.GetFromCursor(MeanAndVariance.Period).Mean)
+                        / MeanNavigator.Tick.Mean > -0.0001;
+                    var closeUnderDev = candle.Close < bollTick.Bottom;
+                    //var stdvHi = bollTick.Deviation / candle.Close > 0.02;
+                    var stdvHi = (bollTick.Main - candle.Close) / candle.Close > 0.035;
+                    if (closeUnderDev && stdvHi && growing)
+                    {
+                        Binance.MarketOrder(OMGBTC.Symbol, TradeType.Buy, GetAmountToTrade());
+                        Status = BotStatus.SearchExit;
+                        EnterPrice = candle.Close;
+                        TradeLine = new Line();
+                        TradeLine.Points.Add(new Point(candle.CloseTime, candle.Close));
+                    }
+                }
+                catch { }
             }
         }
 
@@ -144,11 +172,16 @@ namespace SharpTrader.Bots
                 var closeOnTop = candle.Close >= bollTick.Top;
                 var meanLowerThanEnter = bollTick.Main < this.EnterPrice;
                 var topLowerThanEnter = bollTick.Top < this.EnterPrice;
-                if (closeOnTop)
+                var closeOnMidway = candle.Close >= bollTick.Main + bollTick.Deviation / 2;
+                if (closeOnMidway || topLowerThanEnter)
                 {
 
                     Binance.MarketOrder(OMGBTC.Symbol, TradeType.Sell, Binance.GetBalance(OMGBTC.Asset));
                     Status = BotStatus.SearchEnter;
+                    TradeLine.Points.Add(new Point(candle.CloseTime, candle.Close));
+                    TradeLine.Color = this.EnterPrice > candle.Close ?
+                        new ColorARGB(255, 255, 10, 10) : new ColorARGB(255, 10, 10, 255);
+                    Drawer.Lines.Add(TradeLine);
                 }
 
             }

@@ -71,7 +71,7 @@ namespace SharpTrader
                         sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60));
                         SymbolsData.Add(key, sdata);
                     }
-                    if (sdata.Ticks.Count > 0 && nextTick > sdata.Ticks.NextTick.CloseTime)
+                    if (!sdata.Ticks.EndOfSerie && nextTick > sdata.Ticks.NextTick.CloseTime)
                         nextTick = sdata.Ticks.NextTick.CloseTime;
                 }
 

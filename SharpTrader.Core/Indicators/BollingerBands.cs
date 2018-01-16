@@ -12,7 +12,7 @@ namespace SharpTrader.Indicators
         MeanAndVariance MeanAndVariance;
         TimeSerieNavigator<MeanAndVariance.Record> MeanAndVarianceValues;
 
-        public double Period { get; set; }
+        public int Period { get; set; }
         public double Deviation { get; set; }
 
         public override bool IsReady => Ticks.Count >= Period;
@@ -48,7 +48,7 @@ namespace SharpTrader.Indicators
             public double Main { get; }
             public DateTime Time { get; }
             public double Top => Main + Deviation;
-            public double Bottom => Main + Deviation;
+            public double Bottom => Main - Deviation;
 
             public Record(double mean, double deviation, DateTime time)
             {

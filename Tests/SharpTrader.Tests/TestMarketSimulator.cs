@@ -1,5 +1,6 @@
 ﻿using SharpTrader.Bots;
 using SharpTrader.Indicators;
+using SharpTrader.Plotting;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -27,8 +28,8 @@ namespace SharpTrader.Tests
             TestBot tester = new TestBot(simulator);
             tester.Start();
             simulator.Run(
-                new DateTime(2017, 7, 01),
-                new DateTime(2018, 1, 01),
+                new DateTime(2017, 08, 01),
+                new DateTime(2018, 1, 1),
                 DateTime.MinValue
                 );
 
@@ -44,9 +45,9 @@ namespace SharpTrader.Tests
             {
                 Console.WriteLine($"{Symbol }: {balance}");
             }
-            SharpTrader.Plotting.TraderBotResultsPlotViewModel vm = new Plotting.TraderBotResultsPlotViewModel(tester);
 
-            vm.RunWindow();
+
+            var vm = TraderBotResultsPlotViewModel.RunWindow(tester);
             vm.UpdateChart();
             Console.ReadLine();
         }

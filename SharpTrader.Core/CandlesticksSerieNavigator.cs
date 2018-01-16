@@ -47,15 +47,17 @@ namespace SharpTrader
         public DateTime LastTickTime { get { return Records[Records.Length - 1].OpenTime; } }
         public DateTime FirstTickTime { get { return Records[0].OpenTime; } }
 
-        public CandlesticksSerieNavigator(IList<Candlestick> list) 
+        public bool EndOfSerie => _Cursor >= Records.Length - 1;
+
+        public CandlesticksSerieNavigator(IList<Candlestick> list)
         {
-            Records =list.Cast<ICandlestick>().ToArray();
+            Records = list.Cast<ICandlestick>().ToArray();
         }
 
         public bool TryGetRecord(DateTime time, out ICandlestick record)
         {
             record = null;
-          
+
             int ind = BinarySearchByOpenTime(time);
             if (ind > -1)
             {

@@ -28,37 +28,58 @@ namespace SharpTrader.Plotting
     {
         private string _BiasSign;
         private string _CurrentPositionString;
-        public int ChartCandleWidth;
-        public int ChartCandleStep;
-        public int ChartWidth { get; set; }
-        bool StopOnBar = true;
-        bool StopOnPosition = true;
-
-        TraderBot Robot;
-        IMarketApi market;
+        private TraderBot Robot;
         CandleStickSeries CandlesChart;
+        private System.Timers.Timer timer;
+
+        public int ChartCandleWidth { get; set; } = 2;
+        public int ChartCandleStep { get; set; } = 255;
+        public int ChartWidth { get; set; } = 50;
+
+
 
 
         public TraderBotResultsPlotViewModel(TraderBot roboto)
         {
             Robot = roboto;
-            StopOnBar = true;
-            StopOnPosition = true;
 
             this.PlotViewModel = new PlotModel { Title = "Tradings" };
-            ChartWidth = 100;
-            ChartCandleWidth = 2;
-            ChartCandleStep = 225;
-            CandlesChart = new CandleStickSeries() { IsVisible = true, /*CandleWidth = ChartCandleWidth * 0.5,*/ };
+            CandlesChart = new CandleStickSeries()
+            {
+                IsVisible = true,
+                //CandleWidth = ChartCandleWidth * 0.5, 
+            };
             CandlesChart.TrackerFormatString = "{0}\n{1}: {2}\nHigh: {3:0.#####}\nLow: {4:0.#####}\nOpen: {5:0.#####}\nClose: {6:0.#####}";
-
 
             PlotViewModel.Axes.Add(new DateTimeAxis() { Position = AxisPosition.Bottom });
             PlotViewModel.Axes.Add(new LinearAxis() { Position = AxisPosition.Left, MajorStep = 0.0050, MinorStep = 0.0010 });
 
-            PlotViewModel.InvalidatePlot(true);
+            timer = new System.Timers.Timer()
+            {
+                Interval = 1500,
+                AutoReset = true,
+
+            };
+            timer.Elapsed += UpdateOnTimerTick;
+
+            PlotViewModel.Updated += PlotViewModel_Updated;
+            PlotViewModel.TouchCompleted += PlotViewModel_TouchCompleted;
         }
 
+        private void PlotViewModel_TouchCompleted(object sender, OxyTouchEventArgs e)
+        {
+
+        }
+
+        private void UpdateOnTimerTick(object sender, EventArgs e)
+        {
+            AdjustYAxisZoom();
+        }
+        private void PlotViewModel_Updated(object sender, EventArgs e)
+        {
+             
+            timer.Start();
+        }
         public PlotModel PlotViewModel { get; private set; }
         public bool Continue { get; set; }
 
@@ -74,8 +95,9 @@ namespace SharpTrader.Plotting
             set { _CurrentPositionString = value; RaisePropertyChanged("CurrentPositionString"); }
         }
 
-        public void RunWindow()
+        public static TraderBotResultsPlotViewModel RunWindow(TraderBot bot)
         {
+            SharpTrader.Plotting.TraderBotResultsPlotViewModel vm = new Plotting.TraderBotResultsPlotViewModel(bot);
             Thread newWindowThread = new Thread(new ThreadStart(() =>
             {
                 // Create our context, and install it:
@@ -83,9 +105,9 @@ namespace SharpTrader.Plotting
                     new DispatcherSynchronizationContext(
                         Dispatcher.CurrentDispatcher));
 
-                Window = new TraderBotResultsPlot
+                var Window = new TraderBotResultsPlot
                 {
-                    DataContext = this
+                    DataContext = vm
                 };
                 Window.Show();
                 // When the window closes, shut down the dispatcher
@@ -101,70 +123,10 @@ namespace SharpTrader.Plotting
             newWindowThread.IsBackground = true;
             // Start the thread
             newWindowThread.Start();
-            //TimeSerie<ICandlestick> ts;
-            //using (var file = File.Open("D:\\progettiBck\\Forex\\Data\\EurUsdData.protobuf", FileMode.Open))
-            //{
 
-            //    var res = Serializer.Deserialize<List<Candle>>(file);
-            //    ts = new SharpForex4.TimeSerie<SharpForex4.ICandlestick>(60, res.Count);
-            //    foreach (var cand in res)
-            //    {
-            //        ts.AddRecord(cand.Date, cand);
-            //    }
-
-            //}
-            //Robot = new SharpForex4.Strategies.Strategy_PriceActionAtSupportLevel();
-            //var act = new ThreadStart(() =>
-            //{
-            //    Simulator = new SharpForex4.Simulator.MarketSimulator(ts, 10000);
-            //    Simulator.NewBar += simulator_NewBar;
-            //    Simulator.NewPosition += simulator_NewPosition;
-            //    Simulator.PositionClosed += Simulator_PositionClosed;
-            //    Simulator.Simulate(Robot, new DateTime(2014, 01, 1));
-            //});
-            //Thread t = new Thread(act);
-            //t.IsBackground = true;
-            //t.Start();
+            return vm;
         }
 
-        ChartBar CurBar = null;
-        int StepCounter = 0;
-        private TraderBotResultsPlot Window;
-
-        private void Simulator_NewBar(ICandlestick c)
-        {
-            //CurBar = new ChartBar(Simulator.CurrentBarPosition, c);
-            //CandlesChart.Append(CurBar);
-            if (CurBar == null || c.Time - CurBar.Time >= new TimeSpan(0, ChartCandleWidth, 0))
-            {
-                CurBar = new ChartBar(c);
-                CandlesChart.Items.Add(CurBar);
-                //blocchiamo solo se è stata aggiunta una nuova
-                if (StopOnBar && Robot.Active)
-                {
-                    if (StepCounter++ == ChartCandleStep)
-                    {
-                        StepCounter = 0;
-                        UpdateChart();
-                        while (!Continue)
-                            System.Threading.Thread.Sleep(100);
-                        Continue = false;
-                    }
-                }
-            }
-            else
-            {
-                CurBar.Close = c.Close;
-
-                if (CurBar.High < c.High)
-                    CurBar.High = c.High;
-
-                if (CurBar.Low > c.Low)
-                    CurBar.Low = c.Low;
-            }
-
-
-        }
 
         public void UpdateChart()
         {
@@ -173,36 +135,23 @@ namespace SharpTrader.Plotting
             while (Robot.Drawer.Candles.Next())
             {
                 this.CandlesChart.Items.Add(new ChartBar(Robot.Drawer.Candles.Tick));
-
             }
-
+            if (this.CandlesChart.Items.Count < 1)
+                return;
             PlotViewModel.Series.Add(CandlesChart);
-            //BiasSign = Robot.MovingAverage900.Value - Robot.MovingAverage900.Previous > 0 ? "Positive" : "Negative";
             var lastTick = Robot.Drawer.Candles.Tick;
+
             //---------- ADJUST X
-            PlotViewModel.Axes[0].Minimum = Robot.Drawer.Candles.Tick.Time.Subtract(TimeSpan.FromDays(2)).ToAxisDouble();
-            //- new TimeSpan(lastTick.Timeframe.Ticks * ChartWidth).ToAxisDouble();
+
+            PlotViewModel.Axes[0].Minimum = 
+                Robot.Drawer.Candles.Tick.Time.Subtract(new TimeSpan(ChartWidth * lastTick.Timeframe.Ticks)).ToAxisDouble();
+       
             PlotViewModel.Axes[0].Maximum = Robot.Drawer.Candles.Tick.Time.ToAxisDouble();
             PlotViewModel.Axes[0].Reset();
-
             //--------- ADJUST Y
-            Candlestick range = new Candlestick(Robot.Drawer.Candles.Tick);
-            var items = CandlesChart.Items;
-            int i = items.Count;
+            AdjustYAxisZoom();
 
-            while ((i > -1) && (items[--i].X >= PlotViewModel.Axes[0].Minimum))
-
-            {
-                if (range.High < items[i].High)
-                    range.High = (float)items[i].High;
-                if (range.Low > items[i].Low)
-                    range.Low = (float)items[i].Low;
-            }
-
-            PlotViewModel.Axes[1].Minimum = range.Low;
-            PlotViewModel.Axes[1].Maximum = range.High;
-            PlotViewModel.Axes[1].Reset();
-            //----------------- lines
+            //-----------------  HORIZONTAL LINES --------------
             int linesAdded = 0;
             var levels = new List<double>(Robot.Drawer.HorizontalLines);
             levels.Sort();
@@ -228,29 +177,26 @@ namespace SharpTrader.Plotting
                     linesAdded++;
                 }
             }
-
+            //----------------- lines ----------------------
             foreach (var line in Robot.Drawer.Lines)
             {
                 LineSeries lineserie = new LineSeries()
                 {
                     MarkerStrokeThickness = 1,
                     LineStyle = LineStyle.Solid,
-                    Color = OxyColor.FromArgb(line.ColorArgb[0], line.ColorArgb[1], line.ColorArgb[2], line.ColorArgb[3]),
-                    StrokeThickness = 0.5f,
+                    Color = OxyColor.FromArgb(line.Color.A, line.Color.R, line.Color.G, line.Color.B),
+                    StrokeThickness = 2f,
                 };
 
                 lineserie.Points.AddRange(
-                    line.Points.Where(dot => ((int)dot.X) % 2 == 0).Select(dot => new DataPoint(dot.X, dot.Y))
-                    );
+                    line.Points.Select(dot => new DataPoint(dot.X.ToAxisDouble(), dot.Y)));
                 PlotViewModel.Series.Add(lineserie);
                 linesAdded++;
             }
 
 
 
-            //-------punti
-
-
+            //-------plot points ---------------
             var pointsSerie = new OxyPlot.Series.ScatterSeries() { MarkerSize = 15, MarkerType = MarkerType.Circle };
             for (int p = 0; p < Robot.Drawer.Points.Count; p++)
                 pointsSerie.Points.Add(
@@ -258,9 +204,38 @@ namespace SharpTrader.Plotting
             PlotViewModel.Series.Add(pointsSerie);
 
             PlotViewModel.InvalidatePlot(true);
+
+            //-------- plot lines 
         }
 
+        private void AdjustYAxisZoom()
+        {
+            if (Robot.Drawer.Candles.Count < 1)
+                return;
+        
+            var items = CandlesChart.Items;
+            int i = items.Count;
+            while (items[--i].X >= PlotViewModel.Axes[0].ActualMaximum)
+                ;
+            Candlestick range = new Candlestick()
+            {
+                 High = items[i].High,
+                 Low = items[i].Low
+            };
+            while ((i > -1) && (items[i].X >= PlotViewModel.Axes[0].ActualMinimum))
 
+            {
+                if (range.High < items[i].High)
+                    range.High = (float)items[i].High;
+                if (range.Low > items[i].Low)
+                    range.Low = (float)items[i].Low;
+                i--;
+            }
+
+            PlotViewModel.Axes[1].Minimum = range.Low - (range.High - range.Low) * 0.1;
+            PlotViewModel.Axes[1].Maximum = range.High + (range.High - range.Low) * 0.1;
+            PlotViewModel.Axes[1].Reset();
+        }
     }
 
     static class Extensions

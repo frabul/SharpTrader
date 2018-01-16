@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -116,7 +117,7 @@ namespace SharpTrader
                 else
                     lowerLimit = midpoint + 1;
             }
-
+            Debug.Assert(_Cursor > -1);
         }
 
         public void SeekNearestBefore(int unixTime)
@@ -131,6 +132,7 @@ namespace SharpTrader
                 _Cursor = ind;
             else
                 _Cursor = ~ind;
+            Debug.Assert(_Cursor > -1);
         }
 
         /// <summary>
@@ -141,6 +143,7 @@ namespace SharpTrader
             if (_Cursor == Records.Count - 1)
                 return false;
             _Cursor++;
+            Debug.Assert(_Cursor > -1);
             return true;
         }
 
@@ -150,9 +153,10 @@ namespace SharpTrader
         /// <returns></returns>
         public bool Previous()
         {
-            if (_Cursor == 0)
+            if (_Cursor < 1)
                 return false;
             _Cursor--;
+            Debug.Assert(_Cursor > -1);
             return true;
         }
 

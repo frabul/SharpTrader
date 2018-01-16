@@ -239,7 +239,6 @@ namespace SharpTrader
         TimeSpan Timeframe { get; }
         CandlesticksSerieNavigator Ticks { get; }
         double Spread { get; }
-
     }
 
 

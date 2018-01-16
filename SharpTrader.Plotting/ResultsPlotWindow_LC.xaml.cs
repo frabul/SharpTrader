@@ -1,4 +1,6 @@
-﻿using System;
+﻿using LiveCharts;
+using LiveCharts.Defaults;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,13 +17,18 @@ using System.Windows.Shapes;
 namespace SharpTrader.Plotting
 {
     /// <summary>
-    /// Logica di interazione per TraderBotResultsPlot.xaml
+    /// Logica di interazione per ResultsPlotWindow_LC.xaml
     /// </summary>
-    public partial class TraderBotResultsPlot : Window
+    public partial class ResultsPlotWindow_LC : Window
     {
-        public TraderBotResultsPlot()
+        private string[] _labels;
+
+        public ResultsPlotWindow_LC()
         {
             InitializeComponent();
+
+
+            
         }
     }
 }

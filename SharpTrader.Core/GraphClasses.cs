@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -17,13 +18,34 @@ namespace SharpTrader
     public class Line
     {
         public List<Point> Points = new List<Point>();
-        public byte[] ColorArgb = new byte[4];
+        public ColorARGB Color;
     }
+    [StructLayout(LayoutKind.Explicit)]
+    public struct ColorARGB
+    {
+        [FieldOffset(0)]
+        public byte A;
+        [FieldOffset(1)]
+        public byte R;
+        [FieldOffset(2)]
+        public byte G;
+        [FieldOffset(3)]
+        public byte B;
+        [FieldOffset(0)]
+        public uint Value;
 
+        public ColorARGB(byte a, byte r, byte g, byte b) : this()
+        {
+            A = a;
+            R = r;
+            G = g;
+            B = b;
+        }
+    }
     public struct Point
     {
-        public Point(double x, double y) { X = x; Y = y; }
-        public double X;
-        public double Y;
+        public Point(DateTime x, double y) { X = x; Y = y; }
+        public DateTime X { get; }
+        public double Y { get; }
     }
 }

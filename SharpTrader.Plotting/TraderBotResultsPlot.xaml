@@ -17,7 +17,8 @@
             <Label Content="{Binding BiasSign}" ContentStringFormat="Bias: {0}"></Label>
             <Label Content="{Binding CurrentPositionString}" ContentStringFormat="Current Position {0}"></Label>
         </StackPanel>
-        <oxy:PlotView Grid.Row="1"  HorizontalAlignment="Stretch" Model="{Binding PlotViewModel}" />
+        <oxy:PlotView Name="Plot1" Grid.Row="1"  HorizontalAlignment="Stretch" Model="{Binding PlotViewModel}"
+                      ManipulationCompleted="PlotView_ManipulationCompleted"   />
 
     </Grid>
 </Window>
