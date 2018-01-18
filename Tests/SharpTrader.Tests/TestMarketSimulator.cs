@@ -25,18 +25,21 @@ namespace SharpTrader.Tests
 
             //var ETHBTC = binanceMarket.GetSymbolFeed("ETHBTC");
             //var XMRBTC = binanceMarket.GetSymbolFeed("XMRBTC");
-            TestBot tester = new TestBot(simulator);
+            TestBot2 tester = new TestBot2(simulator);
             tester.Start();
             simulator.Run(
-                new DateTime(2017, 08, 01),
+                new DateTime(2017, 08, 28),
                 new DateTime(2018, 1, 1),
                 DateTime.MinValue
                 );
 
+            //save DATASET
+            tester.DataSetCreator.Data.SaveToDisk("d:\\dataset.json");
+
             foreach (var feed in binanceMarket.ActiveFeeds)
             {
                 var balance = binanceMarket.GetBalance(feed.Asset);
-                if (balance > 0)
+                if (balance > 0 && feed.QuoteAsset == "BTC")
                     binanceMarket.MarketOrder(feed.Symbol, TradeType.Sell, balance);
             }
             var lostInFee = binanceMarket.Trades.Select(tr => tr.Fee).Sum();

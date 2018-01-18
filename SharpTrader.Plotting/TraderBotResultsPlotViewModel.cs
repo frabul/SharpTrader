@@ -177,6 +177,7 @@ namespace SharpTrader.Plotting
                     linesAdded++;
                 }
             }
+
             //----------------- lines ----------------------
             foreach (var line in Robot.Drawer.Lines)
             {
@@ -193,9 +194,7 @@ namespace SharpTrader.Plotting
                 PlotViewModel.Series.Add(lineserie);
                 linesAdded++;
             }
-
-
-
+             
             //-------plot points ---------------
             var pointsSerie = new OxyPlot.Series.ScatterSeries() { MarkerSize = 15, MarkerType = MarkerType.Circle };
             for (int p = 0; p < Robot.Drawer.Points.Count; p++)
