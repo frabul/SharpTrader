@@ -29,7 +29,7 @@ namespace SharpTrader
             int i = 0;
             foreach (var mc in Config.Markets)
             {
-                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory);
+                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, 1);
                 _Markets[i++] = market;
             }
         }

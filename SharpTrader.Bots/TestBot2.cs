@@ -1,6 +1,7 @@
 ﻿using SharpTrader.Indicators;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -35,14 +36,15 @@ namespace SharpTrader.Bots
 
         class Position
         {
+            public DateTime Time;
             public int FeaturesId;
             public double EnterPrice;
         }
         List<Position> OpenPositions = new List<Position>();
 
-        public TestBot2(IMarketsManager markets) : base(markets)
+        public TestBot2(IMarketsManager markets, DataSetCreator ds) : base(markets)
         {
-
+            DataSetCreator = ds;
         }
 
         public override void Start()
@@ -74,13 +76,13 @@ namespace SharpTrader.Bots
 
             Drawer.Lines.AddRange(new[] { LineBollBot, LineBollMid, LineBollTop });
 
-            DataSetCreator = new DataSetCreator();
             DataSetCreator.Navigators = new TimeSerieNavigator<ICandlestick>[]
             {
                 RefSymbolFeed.GetNavigator(TimeSpan.FromMinutes(5)),
                 TradeSymbolFeed.GetNavigator(TimeSpan.FromMinutes(5)),
                 TradeSymbolFeed.GetNavigator(TimeSpan.FromMinutes(120)),
             };
+
             DataSetCreator.Means = new(TimeSerieNavigator<MeanAndVariance.Record> data, int steps)[]
             {
                (MeanAndVariance.GetNavigator(), MeanAndVariance.Period),
@@ -125,8 +127,12 @@ namespace SharpTrader.Bots
 
         private double GetAmountToTrade()
         {
+            //double portFolioValue = Binance.GetBtcPortfolioValue();
             var price = TfEnter.ticks.Tick.Close;
-            return 1 / price;
+            if (OpenPositions.Count >= 30)
+                return Binance.GetBalance("BTC");
+            else
+                return (Binance.GetBalance("BTC") / (30 - OpenPositions.Count)) / price;
         }
 
         public override void OnNewCandle(ISymbolFeed sender, ICandlestick newCandle)
@@ -134,7 +140,7 @@ namespace SharpTrader.Bots
 
         }
 
-        Line TradeLine;
+
         Line LineBollTop = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
         Line LineBollMid = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
         Line LineBollBot = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
@@ -154,6 +160,10 @@ namespace SharpTrader.Bots
 
                     ICandlestick candle = TfEnter.ticks.LastTick;
                     var bollTick = BollNavigator.Tick;
+
+
+                    if (BollNavigator.Count < BollingerBands.Period + 1)
+                        return;
                     var bollback = BollNavigator.GetFromCursor(BollingerBands.Period);
 
                     var tickToAdd = BollNavigator.Tick;
@@ -165,26 +175,28 @@ namespace SharpTrader.Bots
                         LineBollBot.Points.Add(new Point(tickToAdd.Time, tickToAdd.Bottom));
                     }
 
-
+                    if (MeanNavigator.Count < MeanAndVariance.Period + 1)
+                        return;
                     var growing = (MeanNavigator.Tick.Mean - MeanNavigator.GetFromCursor(MeanAndVariance.Period).Mean)
                         / MeanNavigator.Tick.Mean > -0.0001;
                     var closeUnderDev = candle.Close < bollTick.Bottom;
                     //var stdvHi = bollTick.Deviation / candle.Close > 0.02;
-                    var stdvHi = (bollTick.Main - candle.Close) / candle.Close > 0.02;
+                    var stdvHi = (bollTick.Main - candle.Close) / candle.Close > 0.04;
                     if (closeUnderDev && stdvHi)
                     {
                         try
                         {
                             var featuresID = DataSetCreator.CalculateFeatures();
-                            Binance.MarketOrder(TradeSymbolFeed.Symbol, TradeType.Buy, GetAmountToTrade());
+                            var toTrade = GetAmountToTrade() ;
+                            if (toTrade <= 0)
+                                return;
+                            Binance.MarketOrder(TradeSymbolFeed.Symbol, TradeType.Buy,toTrade);
                             OpenPositions.Add(new Position()
                             {
+                                Time = candle.Time,
                                 EnterPrice = candle.Close,
                                 FeaturesId = featuresID
                             });
-
-                            TradeLine = new Line();
-                            TradeLine.Points.Add(new Point(candle.CloseTime, candle.Close));
                         }
                         catch
                         {
@@ -216,15 +228,23 @@ namespace SharpTrader.Bots
 
                     foreach (var op in OpenPositions)
                     {
-                        if (op.EnterPrice > candle.Close)
-                            DataSetCreator.SetLabel(op.FeaturesId, new float[] { 1 });
-                        else
-                            DataSetCreator.SetLabel(op.FeaturesId, new float[] { 0 });
+                        var tradeLine = new Line();
+                        tradeLine.Points.Add(new Point(op.Time, op.EnterPrice));
+                        var btcWon = (1d / op.EnterPrice) * (candle.Close - op.EnterPrice);
 
-                        TradeLine.Points.Add(new Point(candle.CloseTime, candle.Close));
-                        TradeLine.Color = op.EnterPrice > candle.Close ?
-                            new ColorARGB(255, 255, 10, 10) : new ColorARGB(255, 10, 10, 255);
-                        Drawer.Lines.Add(TradeLine);
+                        if ((op.EnterPrice * 1.003) > candle.Close)
+                        {
+                            tradeLine.Color = new ColorARGB(255, 255, 10, 10);
+                            DataSetCreator.SetLabel(op.FeaturesId, new float[] { 0, (float)btcWon });
+                        }
+
+                        else
+                        {
+                            tradeLine.Color = new ColorARGB(255, 10, 10, 255);
+                            DataSetCreator.SetLabel(op.FeaturesId, new float[] { 1, (float)btcWon });
+                        }
+                        tradeLine.Points.Add(new Point(candle.CloseTime, candle.Close));
+                        Drawer.Lines.Add(tradeLine);
                     }
                     OpenPositions.Clear();
                 }
@@ -232,39 +252,47 @@ namespace SharpTrader.Bots
             }
 
         }
-
-
     }
 
 
     public class DataSetCreator
     {
         public MLDataSet Data { get; set; } = new MLDataSet();
-
-        
-
-
-        public int CandlesCount { get; set; } = 25;
+        public int CandlesCount { get; set; } = 20;
 
         public TimeSerieNavigator<ICandlestick>[] Navigators { get; set; }
         public (TimeSerieNavigator<MeanAndVariance.Record> data, int steps)[] Means { get; set; }
 
-        double CurrentPrice = 1;
 
-        float Normalize(float val)
+
+        //float Normalize(float val)
+        //{
+        //    return (float)(val / CurrentPrice);
+        //}
+
+        float Normalize(double val, double price)
         {
-            return (float)(val / CurrentPrice);
+            return (float)(val / price);
         }
-        float Normalize(double val)
-        {
-            return (float)(val / CurrentPrice);
-        }
+
         public int CalculateFeatures()
         {
+            //find the smaller timeFrame 
             foreach (var m in Means)
+            {
                 m.data.SeekLast();
+                if (m.data.Count < m.steps + 1)
+                    return -1;
+            }
             foreach (var n in Navigators)
+            {
                 n.SeekLast();
+                if (n.Count < 50)
+                    return -1;
+            }
+
+            Navigators = Navigators.OrderBy(nav => nav.Tick.Timeframe).ToArray();
+
 
             var record = new MLDataSet.Record(Data.GetNextId());
 
@@ -280,10 +308,16 @@ namespace SharpTrader.Bots
             int it = 0;
             foreach (var nav in Navigators)
             {
-                var cand = new List<ICandlestick>();
-                float[][] mat = new float[CandlesCount + Means.Length][];
+                //se il timeframe non è il più basso, lo portiamo un passo indietro rispetto al tempo corrente
+                if (Navigators[0].Tick.Timeframe != nav.Tick.Timeframe)
+                {
+                    if (Navigators[0].Tick.Time <= nav.Tick.Time)
+                        nav.Previous();
+                }
 
-                CurrentPrice = nav.Tick.Close;
+                float[][] mat = new float[CandlesCount + Means.Length * 3][];
+
+                double CurrentPrice = nav.Tick.Close;
                 int i = 0;
                 //-------- add the means
                 foreach (var m in Means)
@@ -291,21 +325,25 @@ namespace SharpTrader.Bots
                     var m1 = m.data.Tick.Mean;
                     var m2 = m.data.GetFromCursor(m.steps).Mean;
                     float[] arr = new float[] {
-                        Normalize(m1) ,
-                        Normalize(m2),
-                        Normalize(m1 - m2)
+                        Normalize(m1, CurrentPrice) ,
+                        Normalize(m2,CurrentPrice),
+                        Normalize(m1 - m2,CurrentPrice)
                     };
-                    mat[i++] = arr;
+                    //mat[i++] = arr;
+                    mat[i++] = new float[] { arr[0], 0, 0 };
+                    mat[i++] = new float[] { arr[1], 0, 0 };
+                    mat[i++] = new float[] { arr[2], 0, 0 };
                 }
                 //add candles data
+                var cand = new List<ICandlestick>();
                 while (cand.Count < CandlesCount)
                 {
                     var candle = nav.Tick;
                     mat[i++] = new[]
                     {
-                       Normalize(candle.Open  ),
-                       Normalize(candle.High ),
-                       Normalize(candle.Low ),
+                       Normalize(candle.Open,CurrentPrice  ),
+                       Normalize(candle.High,CurrentPrice ),
+                       Normalize(candle.Low,CurrentPrice ),
                     };
 
                     cand.Add(nav.Tick);
@@ -315,13 +353,16 @@ namespace SharpTrader.Bots
                 inputTensor[it++] = mat;
             }
             record.Features = inputTensor;
+            record.Id = Data.Records.Count;
             Data.Records.Add(record);
+            Debug.Assert(Data.Records.Count == record.Id + 1);
             return record.Id;
         }
 
         public void SetLabel(int id, float[] label)
         {
-            Data.Records[id].Labels = label;
+            if (id > -1)
+                Data.Records[id].Labels = label;
         }
 
 

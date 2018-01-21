@@ -30,13 +30,14 @@ namespace SharpTrader
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
             public IEnumerable<ISymbolFeed> ActiveFeeds => SymbolsFeed.Values;
             public IEnumerable<ITrade> Trades => this._Trades;
-            public Market(string name, double makerFee, double takerFee, string dataDir)
+            public Market(string name, double makerFee, double takerFee, string dataDir, double initialBTC = 0)
             {
                 MarketName = name;
                 MakerFee = makerFee;
                 TakerFee = takerFee;
                 var text = System.IO.File.ReadAllText(dataDir + "BinanceSymbolsTable.json");
                 SymbolsTable = Newtonsoft.Json.JsonConvert.DeserializeObject<SymbolsTable>(text);
+                _Balances.Add("BTC", initialBTC);
             }
 
             public ISymbolFeed GetSymbolFeed(string symbol)
@@ -160,6 +161,22 @@ namespace SharpTrader
                 lock (locker)
                     this._Trades.Add(trade);
             }
+
+            public double GetBtcPortfolioValue()
+            {
+                double val = 0;
+                foreach (var kv in _Balances)
+                {
+                    if (kv.Key == "BTC")
+                        val += kv.Value;
+                    else if (kv.Value > 0)
+                    {
+                        var feed = SymbolsFeed[kv.Key + "BTC"];
+                        val += feed.Ask * kv.Value;
+                    }
+                }
+                return val;
+            }
         }
 
         class SymbolFeed : ISymbolFeed
@@ -278,11 +295,12 @@ namespace SharpTrader
                     else
                         Ticks.SeekNearestBefore(timeAt24 - delta);
 
-                    while (Ticks.Tick.OpenTime < timeAt24)
-                    {
-                        Volume24H -= Ticks.Tick.Volume;
-                        Ticks.Next();
-                    }
+                    //todo 
+                    //while (Ticks.Tick.OpenTime < timeAt24)
+                    //{
+                    //    Volume24H -= Ticks.Tick.Volume;
+                    //    Ticks.Next();
+                    //}
                     Ticks.PositionPop();
                 }
 

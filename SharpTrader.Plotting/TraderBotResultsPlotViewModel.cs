@@ -4,6 +4,7 @@ using OxyPlot.Axes;
 using OxyPlot.Series;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -32,12 +33,9 @@ namespace SharpTrader.Plotting
         CandleStickSeries CandlesChart;
         private System.Timers.Timer timer;
 
-        public int ChartCandleWidth { get; set; } = 2;
-        public int ChartCandleStep { get; set; } = 255;
-        public int ChartWidth { get; set; } = 50;
-
-
-
+        public int ChartWidth { get; set; } = 80;
+        public PlotModel PlotViewModel { get; private set; }
+        public bool Continue { get; set; }
 
         public TraderBotResultsPlotViewModel(TraderBot roboto)
         {
@@ -56,11 +54,12 @@ namespace SharpTrader.Plotting
 
             timer = new System.Timers.Timer()
             {
-                Interval = 1500,
+                Interval = 250,
                 AutoReset = true,
 
-            };
+            }; 
             timer.Elapsed += UpdateOnTimerTick;
+            timer.Start();
 
             PlotViewModel.Updated += PlotViewModel_Updated;
             PlotViewModel.TouchCompleted += PlotViewModel_TouchCompleted;
@@ -71,28 +70,21 @@ namespace SharpTrader.Plotting
 
         }
 
+        Stopwatch yRangeUpdateWD = new Stopwatch();
         private void UpdateOnTimerTick(object sender, EventArgs e)
         {
-            AdjustYAxisZoom();
+            if(yRangeUpdateWD.ElapsedMilliseconds > 500)
+            {
+                yRangeUpdateWD.Stop();
+                yRangeUpdateWD.Reset();
+                AdjustYAxisZoom();
+            } 
         }
+
         private void PlotViewModel_Updated(object sender, EventArgs e)
         {
-             
-            timer.Start();
-        }
-        public PlotModel PlotViewModel { get; private set; }
-        public bool Continue { get; set; }
 
-        public string BiasSign
-        {
-            get { return _BiasSign; }
-            set { _BiasSign = value; RaisePropertyChanged("BiasSign"); }
-        }
-
-        public string CurrentPositionString
-        {
-            get { return _CurrentPositionString; }
-            set { _CurrentPositionString = value; RaisePropertyChanged("CurrentPositionString"); }
+            yRangeUpdateWD.Restart(); 
         }
 
         public static TraderBotResultsPlotViewModel RunWindow(TraderBot bot)
@@ -127,7 +119,6 @@ namespace SharpTrader.Plotting
             return vm;
         }
 
-
         public void UpdateChart()
         {
             PlotViewModel.Series.Clear();
@@ -143,9 +134,9 @@ namespace SharpTrader.Plotting
 
             //---------- ADJUST X
 
-            PlotViewModel.Axes[0].Minimum = 
+            PlotViewModel.Axes[0].Minimum =
                 Robot.Drawer.Candles.Tick.Time.Subtract(new TimeSpan(ChartWidth * lastTick.Timeframe.Ticks)).ToAxisDouble();
-       
+
             PlotViewModel.Axes[0].Maximum = Robot.Drawer.Candles.Tick.Time.ToAxisDouble();
             PlotViewModel.Axes[0].Reset();
             //--------- ADJUST Y
@@ -194,7 +185,7 @@ namespace SharpTrader.Plotting
                 PlotViewModel.Series.Add(lineserie);
                 linesAdded++;
             }
-             
+
             //-------plot points ---------------
             var pointsSerie = new OxyPlot.Series.ScatterSeries() { MarkerSize = 15, MarkerType = MarkerType.Circle };
             for (int p = 0; p < Robot.Drawer.Points.Count; p++)
@@ -209,17 +200,18 @@ namespace SharpTrader.Plotting
 
         private void AdjustYAxisZoom()
         {
-            if (Robot.Drawer.Candles.Count < 1)
-                return;
-        
             var items = CandlesChart.Items;
+            if (items.Count < 1)
+                return;
+
+
             int i = items.Count;
             while (items[--i].X >= PlotViewModel.Axes[0].ActualMaximum)
                 ;
             Candlestick range = new Candlestick()
             {
-                 High = items[i].High,
-                 Low = items[i].Low
+                High = items[i].High,
+                Low = items[i].Low
             };
             while ((i > -1) && (items[i].X >= PlotViewModel.Axes[0].ActualMinimum))
 

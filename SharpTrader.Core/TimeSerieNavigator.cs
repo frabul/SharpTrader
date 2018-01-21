@@ -24,7 +24,7 @@ namespace SharpTrader
         public DateTime NextTickTime => _Cursor < Records.Count - 1 ?
                                             Records[_Cursor + 1].Time : DateTime.MaxValue;
 
-        public DateTime PreviousTickTime => _Cursor < Records.Count - 1 ?
+        public DateTime PreviousTickTime => _Cursor > 0 ?
                                             Records[_Cursor - 1].Time : DateTime.MinValue;
 
         public DateTime Time => _Cursor > -1 ? Records[_Cursor].Time : DateTime.MinValue;

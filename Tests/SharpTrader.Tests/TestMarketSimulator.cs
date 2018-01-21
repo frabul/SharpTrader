@@ -25,16 +25,44 @@ namespace SharpTrader.Tests
 
             //var ETHBTC = binanceMarket.GetSymbolFeed("ETHBTC");
             //var XMRBTC = binanceMarket.GetSymbolFeed("XMRBTC");
-            TestBot2 tester = new TestBot2(simulator);
-            tester.Start();
-            simulator.Run(
-                new DateTime(2017, 08, 28),
-                new DateTime(2018, 1, 1),
-                DateTime.MinValue
-                );
+            DataSetCreator ds = new DataSetCreator();
+            TestBot2[] bots = new TestBot2[]
+            {
+                new TestBot2(simulator, ds){TradeSymbol = "OMGBTC"},
+                new TestBot2(simulator, ds){TradeSymbol = "QTUMBTC"},
+                new TestBot2(simulator, ds){TradeSymbol = "YOYOBTC"},
+                new TestBot2(simulator, ds){TradeSymbol = "ZRXBTC"},
+                new TestBot2(simulator, ds){TradeSymbol = "LTCBTC"},
+            };
+
+            foreach (var bot in bots)
+                bot.Start();
+
+            var simStart = new DateTime(2017, 09, 1);
+            var simEnd = new DateTime(2018, 1, 20);
+            //simulator.Run(
+            //    new DateTime(2017, 12, 28),
+            //    new DateTime(2018, 1, 20),
+            //    DateTime.MinValue
+            //    );
+            //TraderBotResultsPlotViewModel chartVM = null;
+            bool raiseEvents = false;
+            int steps = 1;
+            while (simulator.NextTick(raiseEvents) && simulator.Time < simEnd)
+            {
+                raiseEvents = simStart <= simulator.Time; 
+                if (steps % 240 == 0 && raiseEvents)
+                { 
+                    //if (chartVM == null) 
+                    //    chartVM = TraderBotResultsPlotViewModel.RunWindow(bots[0]);  
+                    //chartVM.UpdateChart();
+                    //Console.ReadLine();
+                }
+                steps++;
+            }
 
             //save DATASET
-            tester.DataSetCreator.Data.SaveToDisk("d:\\dataset.json");
+            ds.Data.SaveToDisk("d:\\dataset.json");
 
             foreach (var feed in binanceMarket.ActiveFeeds)
             {
@@ -49,9 +77,11 @@ namespace SharpTrader.Tests
                 Console.WriteLine($"{Symbol }: {balance}");
             }
 
-
-            var vm = TraderBotResultsPlotViewModel.RunWindow(tester);
-            vm.UpdateChart();
+            foreach (var bot in bots)
+            {
+                var vm = TraderBotResultsPlotViewModel.RunWindow(bot);
+                vm.UpdateChart();
+            }
             Console.ReadLine();
         }
 

@@ -36,6 +36,7 @@ namespace SharpTrader
         double GetBalance(string asset);
         (string Symbol, double balance)[] Balances { get; }
 
+        double GetBtcPortfolioValue();
     }
 
     public interface ISymbolFeed
