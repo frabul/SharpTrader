@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Binance.API.Csharp.Client;
 using Binance.API.Csharp.Client.Models.Market;
+using SharpTrader.Utils;
 
 namespace ChartDataMiner
 {
@@ -13,8 +14,8 @@ namespace ChartDataMiner
     {
         static void Main(string[] args)
         {
-            BinanceDataMiner dm = new BinanceDataMiner(".\\Data\\");
-            dm.CreateSymbolsTable();
+            BinanceDataDownloader dm = new BinanceDataDownloader(".\\Data\\");
+            dm.SynchSymbolsTable();
             dm.MineBinance();
 
         }

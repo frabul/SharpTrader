@@ -8,9 +8,9 @@ using System.Text;
 using System.Threading.Tasks;
 using SharpTrader;
 
-namespace ChartDataMiner
+namespace SharpTrader.Utils
 {
-    class BinanceDataMiner
+    public class BinanceDataDownloader
     {
         private const string MarketName = "Binance";
 
@@ -19,14 +19,20 @@ namespace ChartDataMiner
         private BinanceClient Client;
         private HistoricalRateDataBase HistoryDB;
         private string DataDir;
-        public BinanceDataMiner(string dataDir)
+        public BinanceDataDownloader(string dataDir)
         {
             DataDir = dataDir;
             ApiClient = new ApiClient("", "");
             Client = new BinanceClient(ApiClient, false);
             HistoryDB = new HistoricalRateDataBase(DataDir);
         }
-
+        public BinanceDataDownloader(HistoricalRateDataBase db)
+        {
+           
+            ApiClient = new ApiClient("", "");
+            Client = new BinanceClient(ApiClient, false);
+            HistoryDB = db;
+        }
         public void MineBinance()
         { 
             IEnumerable<SymbolPrice> prices = Client.GetAllPrices().Result;
@@ -77,7 +83,7 @@ namespace ChartDataMiner
             HistoryDB.Save(MarketName, symbol, AllCandles.First().Timeframe);
         }
 
-        internal void CreateSymbolsTable()
+        public void SynchSymbolsTable()
         {
             Dictionary<string, (string Asset, string Quote)> dict = new Dictionary<string, (string Asset, string Quote)>();
             var tradingRules = Client.GetTradingRulesAsync().Result;

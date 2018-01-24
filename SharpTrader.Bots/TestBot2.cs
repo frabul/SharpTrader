@@ -22,8 +22,12 @@ namespace SharpTrader.Bots
         private TimeSerieNavigator<MeanAndVariance.Record> MeanNavigator;
         private MeanAndVariance MeanAndVarianceShort;
         private TimeSerieNavigator<BollingerBands.Record> BollNavigator;
-        public DataSetCreator DataSetCreator { get; set; }
 
+        private Line LineBollTop = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
+        private Line LineBollMid = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
+        private Line LineBollBot = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
+
+        public DataSetCreator DataSetCreator { get; set; }
         public TimeSpan TimeframeEnter { get; set; } = TimeSpan.FromMinutes(5);
         public TimeSpan TimeframeExit { get; set; } = TimeSpan.FromMinutes(1);
         public int Boll_Period { get; set; } = 45;
@@ -33,6 +37,7 @@ namespace SharpTrader.Bots
         public string TradeSymbol = "ETHBTC";
         public string Market = "Binance";
 
+        
 
         class Position
         {
@@ -141,9 +146,6 @@ namespace SharpTrader.Bots
         }
 
 
-        Line LineBollTop = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
-        Line LineBollMid = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
-        Line LineBollBot = new Line() { Color = new ColorARGB(255, 0, 150, 150) };
         private ISymbolFeed RefSymbolFeed;
 
         private void SearchEnter()
@@ -185,11 +187,11 @@ namespace SharpTrader.Bots
                     if (closeUnderDev && stdvHi)
                     {
                         try
-                        {
-                            var featuresID = DataSetCreator.CalculateFeatures();
+                        { 
                             var toTrade = GetAmountToTrade() ;
                             if (toTrade <= 0)
                                 return;
+                            var featuresID = DataSetCreator.CalculateFeatures();
                             Binance.MarketOrder(TradeSymbolFeed.Symbol, TradeType.Buy,toTrade);
                             OpenPositions.Add(new Position()
                             {

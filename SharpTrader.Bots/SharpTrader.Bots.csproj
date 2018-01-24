@@ -47,6 +47,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BollBot.cs" />
     <Compile Include="DataSet.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestBot.cs" />

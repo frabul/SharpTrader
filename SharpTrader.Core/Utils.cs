@@ -8,7 +8,7 @@ namespace SharpTrader
 {
     public static class Extensions
     {
-        public static readonly DateTime BaseUnixTime = new DateTime(1970, 1, 1);
+        public static readonly DateTime BaseUnixTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         public static long ToEpoch(this DateTime date)
         {
             return (long)Math.Round((date - Extensions.BaseUnixTime).TotalSeconds);

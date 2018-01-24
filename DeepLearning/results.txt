@@ -1,0 +1,146 @@
+-----------------------------------------------------------Modello #1 ----------
+Picco prof/trade 0.039 con train los circa 0.18
+-->Inputs tutti
+
+model = Sequential()
+model.add(Conv2D(16, (1, 3), padding='valid',
+                 input_shape=xTrain.shape[1:]))
+model.add(Activation('relu'))
+##model.add(Dropout(0.1))
+model.add(Conv2D(32, (2, 1)))
+model.add(Activation('relu'))
+model.add(Dropout(0.2))
+model.add(Flatten())
+model.add(Dense(128))
+model.add(Activation('relu'))
+model.add(Dropout(0.1))
+model.add(Dense(2))
+model.add(Activation('softmax'))
+
+#----- INIT OPTIMIZER
+#opt = keras.optimizers.rmsprop(lr=0.0005, decay=1e-9)
+opt = keras.optimizers.Adam(lr=0.004, decay=1e-6)
+
+model.compile(loss='categorical_crossentropy',
+              optimizer=opt,
+              metrics=['accuracy']) 
+
+
+//-------------------------------
+picco 0.39
+
+model = Sequential()
+model.add(Conv2D(16, (1, 3), padding='valid',
+                 input_shape=xTrain.shape[1:]))
+model.add(Activation('relu'))
+##model.add(Dropout(0.1))
+#model.add(Conv2D(32, (2, 3)))
+#model.add(Activation('relu'))
+model.add(Dropout(0.1))
+model.add(Flatten())
+model.add(Dense(128))
+model.add(Activation('relu'))
+#model.add(Dropout(0.1))
+model.add(Dense(2))
+model.add(Activation('softmax'))
+ 
+#opt = keras.optimizers.rmsprop(lr=0.0005, decay=1e-9)
+opt = keras.optimizers.Adam(lr=0.001, decay=1e-8)
+
+model.compile(loss='categorical_crossentropy',
+              optimizer=opt,
+              metrics=['accuracy']) 
+//-----------
+Converge a 0.037 escludendo tradeSymbol(5) 
+ 
+model = Sequential()
+model.add(Conv2D(16, (1, 3), padding='valid',
+                 input_shape=xTrain.shape[1:]))
+model.add(Activation('relu'))
+##model.add(Dropout(0.1))
+#model.add(Conv2D(32, (2, 3)))
+#model.add(Activation('relu'))
+model.add(Dropout(0.1))
+model.add(Flatten())
+model.add(Dense(128))
+model.add(Activation('relu'))
+#model.add(Dropout(0.1))
+model.add(Dense(2))
+model.add(Activation('softmax'))
+ 
+#opt = keras.optimizers.rmsprop(lr=0.0005, decay=1e-9)
+opt = keras.optimizers.Adam(lr=0.001, decay=1e-8)
+
+model.compile(loss='categorical_crossentropy',
+              optimizer=opt,
+              metrics=['accuracy']) 
+###### TRAIN #####
+model.fit(xTrain, yTrain,
+          #batch_size=xTrain.shape[0],
+          batch_size=500,
+          epochs=50000,
+          validation_data=(xTest, yTest),
+          shuffle=False,
+          verbose=0,
+          callbacks=[NBatchLogger(10), ]
+         )
+
+--------------------------------------------------------
+picco 0.037 e intacca il draw down, usa solo btc(5) tradeSymbol(5)
+
+model = Sequential()
+model.add(Conv2D(16, (1, 3), padding='valid',
+                 input_shape=xTrain.shape[1:]))
+model.add(Activation('relu'))
+##model.add(Dropout(0.1))
+#model.add(Conv2D(32, (2, 3)))
+#model.add(Activation('relu'))
+model.add(Dropout(0.1))
+model.add(Flatten())
+model.add(Dense(128))
+model.add(Activation('relu'))
+#model.add(Dropout(0.1))
+model.add(Dense(2))
+model.add(Activation('softmax'))
+ 
+#opt = keras.optimizers.rmsprop(lr=0.0005, decay=1e-9)
+opt = keras.optimizers.Adam(lr=0.001, decay=1e-8)
+
+model.compile(loss='categorical_crossentropy',
+              optimizer=opt,
+              metrics=['accuracy']) 
+
+//-----------------------------------------------------
+picco 0.042 e intacca il draw down, usa solo btc(5) tradeSymbol(5)
+
+model = Sequential()
+model.add(Conv2D(16, (1, 3), padding='valid',
+                 input_shape=xTrain.shape[1:]))
+model.add(Activation('relu'))
+model.add(Dropout(0.1))
+model.add(Conv2D(32, (2, 1), padding='same'))
+model.add(Activation('relu'))
+#model.add(Dropout(0.1))
+model.add(Flatten())
+model.add(Dense(128))
+model.add(Activation('relu'))
+#model.add(Dropout(0.1))
+model.add(Dense(2))
+model.add(Activation('softmax'))
+ 
+#opt = keras.optimizers.rmsprop(lr=0.0005, decay=1e-9)
+opt = keras.optimizers.Adam(lr=0.001, decay=1e-8)
+
+model.compile(loss='categorical_crossentropy',
+              optimizer=opt,
+              metrics=['accuracy']) 
+###### TRAIN #####
+model.fit(xTrain, yTrain,
+          #batch_size=xTrain.shape[0],
+          batch_size=500,
+          epochs=50000,
+          validation_data=(xTest, yTest),
+          shuffle=False,
+          verbose=0,
+          callbacks=[NBatchLogger(10), ]
+         )

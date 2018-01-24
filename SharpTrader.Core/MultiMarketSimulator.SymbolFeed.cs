@@ -59,7 +59,7 @@ namespace SharpTrader
                 var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, rate);
                 lock (locker)
                     this.PendingOrders.Add(order);
-                return new MarketOperation() { Status = MarketOperationStatus.Completed };
+                return new MarketOperation(MarketOperationStatus.Completed) { };
 
             }
 
@@ -76,7 +76,7 @@ namespace SharpTrader
                     this.ClosedOrders.Add(order);
                 }
 
-                return new MarketOperation() { Status = MarketOperationStatus.Completed };
+                return new MarketOperation(MarketOperationStatus.Completed) { };
             }
             public double GetBalance(string asset)
             {
@@ -405,6 +405,10 @@ namespace SharpTrader
 
         class MarketOperation : IMarketOperation
         {
+            public MarketOperation(MarketOperationStatus status)
+            {
+                Status = status;
+            }
             public MarketOperationStatus Status { get; internal set; }
         }
 
