@@ -37,6 +37,7 @@ namespace SharpTrader
         (string Symbol, double balance)[] Balances { get; }
 
         double GetBtcPortfolioValue();
+        (double min, double step) GetMinTradable(string tradeSymbol);
     }
 
     public interface ISymbolFeed

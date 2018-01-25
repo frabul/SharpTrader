@@ -52,6 +52,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestBot.cs" />
     <Compile Include="TestBot2.cs" />
+    <Compile Include="TestBot3.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpTrader.Core\SharpTrader.Core.csproj">

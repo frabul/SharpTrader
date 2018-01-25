@@ -28,13 +28,13 @@ namespace SharpTrader.Utils
         }
         public BinanceDataDownloader(HistoricalRateDataBase db)
         {
-           
+
             ApiClient = new ApiClient("", "");
             Client = new BinanceClient(ApiClient, false);
             HistoryDB = db;
         }
         public void MineBinance()
-        { 
+        {
             IEnumerable<SymbolPrice> prices = Client.GetAllPrices().Result;
             var symbols = prices.Where(sp => sp.Symbol.EndsWith("BTC")).Select(sp => sp.Symbol);
             symbols = symbols.Concat(prices.Where(sp => sp.Symbol.EndsWith("USDT")).Select(sp => sp.Symbol));
@@ -54,7 +54,7 @@ namespace SharpTrader.Utils
             var symbolHistory = HistoryDB.GetSymbolHistory(MarketName, symbol, TimeSpan.FromSeconds(60));
 
             if (symbolHistory.Ticks.Count > 0)
-                startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc);
+                startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(TimeSpan.FromSeconds(60));
 
 
             while (AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime)
@@ -75,11 +75,13 @@ namespace SharpTrader.Utils
                     }).ToList();
 
                 AllCandles.AddRange(batch);
-                startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime + TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
+                if (AllCandles.Count > 1)
+                    startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime + TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
               
             }
             //---
             HistoryDB.AddCandlesticks(MarketName, symbol, AllCandles);
+            HistoryDB.ValidateData(MarketName, symbol, TimeSpan.FromSeconds(60));
             HistoryDB.Save(MarketName, symbol, AllCandles.First().Timeframe);
         }
 
@@ -94,7 +96,7 @@ namespace SharpTrader.Utils
             }
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict);
             var deserialized = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, (string Asset, string Quote)>>(json);
-            System.IO.File.WriteAllText(DataDir + "BinanceSymbolsTable.json",json);
+            System.IO.File.WriteAllText(DataDir + "BinanceSymbolsTable.json", json);
         }
 
     }

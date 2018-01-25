@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpTrader.Core
+namespace SharpTrader
 {
-    abstract class SymbolFeedBoilerplate    
+    abstract class SymbolFeedBoilerplate
     {
         public event Action<ISymbolFeed> OnTick;
         private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
@@ -16,12 +17,12 @@ namespace SharpTrader.Core
         private bool onTickPending = false;
         private object Locker = new object();
 
-        protected List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
+        private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
 
 
         public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>();
 
- 
+
 
         public class DerivedChart
         {
@@ -65,37 +66,62 @@ namespace SharpTrader.Core
 
         }
 
-        protected void AddTickToDerivedChart(DerivedChart der, ICandlestick newCandle)
+        private void AddTickToDerivedChart(DerivedChart der, ICandlestick newCandle)
         {
             if (der.FormingCandle == null)
-                der.FormingCandle = new Candlestick(newCandle, der.Timeframe);
-
-            if (der.FormingCandle.CloseTime <= newCandle.OpenTime)
             {
-                //old candle is formed
+                //the open time should be a multiple of der.TimeFrame
+                var opeTime = GetOpenTime(newCandle.OpenTime, der.Timeframe);
+                if (der.Timeframe.Minutes != 0)
+                    Debug.Assert(opeTime.Minute % der.Timeframe.Minutes == 0);
+                der.FormingCandle = new Candlestick(opeTime, newCandle, der.Timeframe);
+            } 
+            else if (der.FormingCandle.CloseTime <= newCandle.OpenTime)
+            {
+                //old candle is ended, the new candle is already part of the next one
                 der.Ticks.AddRecord(der.FormingCandle);
-                der.FormingCandle = new Candlestick(newCandle, der.Timeframe);
+                var opeTime = GetOpenTime(newCandle.OpenTime, der.Timeframe);
+                if (der.Timeframe.Minutes != 0)
+                    Debug.Assert(opeTime.Minute % der.Timeframe.Minutes == 0);
+                der.FormingCandle = new Candlestick(opeTime, newCandle, der.Timeframe);
             }
             else
             {
+                //the new candle is part of the forming candle
                 der.FormingCandle.Merge(newCandle);
-                if (der.FormingCandle.CloseTime < newCandle.CloseTime)
+                if (der.FormingCandle.CloseTime <= newCandle.CloseTime)
                 {
-
                     der.Ticks.AddRecord(der.FormingCandle);
                     der.FormingCandle = null;
-
                 }
             }
         }
 
-        protected void RaisePendingEvents(ISymbolFeed sender)
+
+        private DateTime GetOpenTime(DateTime mid, TimeSpan timeFrame)
+        {
+            long tfMs = (long)Math.Floor(timeFrame.TotalMilliseconds);
+            long timeNowMs = mid.Ticks / 10000;
+            long resto = timeNowMs % tfMs;
+            return new DateTime((timeNowMs - resto + tfMs) * 10000, mid.Kind);
+        }
+
+        protected void UpdateDerivedCharts(ICandlestick newCandle)
+        {
+            foreach (var der in DerivedTicks)
+            {
+                AddTickToDerivedChart(der, newCandle);
+            }
+        }
+
+        public void RaisePendingEvents(ISymbolFeed sender)
         {
             if (onTickPending)
             {
                 OnTick?.Invoke(sender);
                 onTickPending = false;
             }
+            //todo raise NewCandle events
         }
 
         protected void SignalTick()

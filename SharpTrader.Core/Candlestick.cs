@@ -42,15 +42,15 @@ namespace SharpTrader
 
         public Candlestick() { }
 
-        public Candlestick(ICandlestick toCopy, TimeSpan duration)
+        public Candlestick(DateTime openTime, ICandlestick toCopy, TimeSpan duration)
         {
             Open = toCopy.Open;
             Close = toCopy.Close;
             High = toCopy.High;
             Low = toCopy.Low;
             Volume = toCopy.Volume;
-            OpenTime = toCopy.OpenTime;
-            CloseTime = toCopy.CloseTime + duration;
+            OpenTime = openTime;
+            CloseTime = openTime  + duration;
         }
 
         public Candlestick(ICandlestick toCopy)

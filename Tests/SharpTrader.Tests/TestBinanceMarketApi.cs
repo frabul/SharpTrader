@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpTrader.Bots;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,17 +14,30 @@ namespace SharpTrader.Tests
         public static void Test()
         {
             api = new BinanceMarketApi("4b8ZRyZQtZpbtELYgOOKU5PzG7AYgmbnvqAqSC53FkVItNSuf5miouB2iKyCuMjo", "CrFsvWUi0r7SzL6GPxIv63tEZW7WCsGANEKCSD0lmDr4xxdn134j1Id8HlKkCu15");
-            api.Test = true;
-            var omg = api.GetSymbolFeed("ADABTC");
-            omg.OnTick += Omg_OnTick;
-            var result = api.MarketOrder("ADABTC", TradeType.Buy, 20);
+
+
+            api.Test = false;
+            var feed = api.GetSymbolFeed("ADABTC");
+            feed.OnTick += OnTick;
+
+            TestBot3[] bots = new TestBot3[]
+            {
+                new TestBot3(api){TradeSymbol = "OMGBTC"},
+                new TestBot3(api){TradeSymbol = "QTUMBTC"},
+                //new TestBot3(api, null){TradeSymbol = "YOYOBTC"},
+                new TestBot3(api){TradeSymbol = "ADABTC"},
+                //new TestBot3(api){TradeSymbol = "LTCBTC"},
+            };
+            foreach(var bot in bots)
+                bot.Start();
             while (true)
+            {
                 System.Threading.Thread.Sleep(50);
+            }
         }
 
-        private static void Omg_OnTick(ISymbolFeed obj)
+        private static void OnTick(ISymbolFeed obj)
         {
-            Console.WriteLine($"New tick: {obj.Symbol} - Ask: {obj.Ask} - Bid: {obj.Bid} - Spread {obj.Spread / obj.Bid * 100:F2}");
 
         }
     }

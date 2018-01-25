@@ -21,14 +21,10 @@ namespace SharpTrader.Plotting
     /// </summary>
     public partial class ResultsPlotWindow_LC : Window
     {
-        private string[] _labels;
-
+        
         public ResultsPlotWindow_LC()
         {
-            InitializeComponent();
-
-
-            
+            InitializeComponent(); 
         }
     }
 }

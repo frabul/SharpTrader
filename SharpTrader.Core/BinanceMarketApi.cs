@@ -8,11 +8,9 @@ using System.Text;
 using System.Threading.Tasks;
 using Binance.API.Csharp.Client.Models.UserStream;
 using Binance.API.Csharp.Client.Domain.Abstract;
-using Binance.API.Csharp.Client.Models.WebSocket;
-
-using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset, string Quote)>;
-using SharpTrader.Core;
+using Binance.API.Csharp.Client.Models.WebSocket; 
 using Binance.API.Csharp.Client.Models.Market.TradingRules;
+using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset, string Quote)>;
 
 namespace SharpTrader
 {
@@ -22,7 +20,7 @@ namespace SharpTrader
         private BinanceClient Client;
         private TradingRules ExchangeInfo;
         private List<NewOrder> NewOrders = new List<NewOrder>();
-        private UserStreamInfo UserDataStream;
+ 
         private Dictionary<string, double> _Balances = new Dictionary<string, double>();
         private string UserDataListenKey;
         private SymbolsTable SymbolsTable = new SymbolsTable();
@@ -42,6 +40,10 @@ namespace SharpTrader
         public BinanceMarketApi(string secretKey, string apiSecret)
         {
             Client = new BinanceClient(new ApiClient(secretKey, apiSecret));
+            var timeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var time = Client.GetServerTime().Result;
+            Console.WriteLine($"Connected to Binance:\n\t server time {time.ServerTime}\n\t local time  {timeNow} ");
+            Binance.API.Csharp.Client.Utils.Utilities.DeltaTimeAdjustment = (long)((time.ServerTime - timeNow) * 1.5);
             //todo, return error
             //Client.TestConnectivity();
             //UserDataStream = Client.StartUserStream().Result;
@@ -51,6 +53,11 @@ namespace SharpTrader
             {
                 SymbolsTable.Add(symb.SymbolName, (symb.BaseAsset, symb.QuoteAsset));
             }
+            //download account info
+            var accountInfo = Client.GetAccountInfo().Result;
+            foreach (var bal in accountInfo.Balances)
+                this._Balances[bal.Asset] = (double)bal.Free;
+
             UserDataListenKey = Client.ListenUserDataEndpoint(
                 HandleAccountUpdatedMessage,
                 HandleOrderUpdateMsg,
@@ -122,8 +129,21 @@ namespace SharpTrader
             }
             catch (Exception ex)
             {
+                Console.WriteLine("Market operation failed because: " + ex.Message);
                 return new MarketOperation(MarketOperationStatus.Failed);
             }
+        }
+
+        public (double min, double step) GetMinTradable(string tradeSymbol)
+        {
+            var info = ExchangeInfo.Symbols.Where(s => s.SymbolName == tradeSymbol).FirstOrDefault();
+            if (info != null)
+            {
+                var filt = info.Filters.Where(f => f.FilterType == "LOT_SIZE").FirstOrDefault();
+                if (filt != null)
+                    return ((double)filt.MinQty, (double)filt.StepSize);
+            }
+            return (0d, 0d);
         }
 
         class MarketOperation : IMarketOperation
@@ -159,7 +179,7 @@ namespace SharpTrader
                 this.Market = market;
                 this.QuoteAsset = quoteAsset;
                 this.Asset = asset;
-               
+
 
                 //load missing data to hist db
 
@@ -203,11 +223,8 @@ namespace SharpTrader
                         Volume = (double)msg.KlineInfo.Volume
                     };
                     BaseTimeframe = candle.CloseTime - candle.OpenTime;
-                    Ticks.AddRecord(candle);
-                    foreach (var derived in DerivedTicks)
-                    {
-                        AddTickToDerivedChart(derived, candle);
-                    }
+                    Ticks.AddRecord(candle); 
+                    UpdateDerivedCharts(candle); 
                     SignalTick();
                 }
                 RaisePendingEvents(this);

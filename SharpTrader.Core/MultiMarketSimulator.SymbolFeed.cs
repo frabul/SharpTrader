@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset, string Quote)>;
+
 namespace SharpTrader
 {
     public partial class MultiMarketSimulator
@@ -100,7 +101,7 @@ namespace SharpTrader
                 }
 
                 foreach (var feed in SymbolsFeed.Values)
-                    feed.RaisePendingEvents();
+                    feed.RaisePendingEvents(feed);
             }
 
             internal void ResolveOrders()
@@ -177,22 +178,24 @@ namespace SharpTrader
                 }
                 return val;
             }
+
+            public (double min, double step) GetMinTradable(string tradeSymbol)
+            {
+                return (0, 0.000000000001);
+            }
         }
 
-        class SymbolFeed : ISymbolFeed
+        class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
         {
-            public event Action<ISymbolFeed> OnTick;
+           
             private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
             public List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)> NewCandleSubscribers =
                 new List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)>();
-
-            private bool onTickPending = false;
+             
 
             private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
             private object Locker = new object();
-
-            public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>();
-
+             
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
             public string QuoteAsset { get; private set; }
@@ -202,13 +205,7 @@ namespace SharpTrader
             public double Spread { get; set; }
             public double Volume24H { get; private set; }
 
-            private class DerivedChart
-            {
-                public TimeSpan Timeframe;
-                public TimeSerie<ICandlestick> Ticks;
-                public Candlestick FormingCandle;
-            }
-
+    
             public SymbolFeed(string market, string symbol, string asset, string quoteAsset)
             {
                 this.Symbol = symbol;
@@ -216,79 +213,21 @@ namespace SharpTrader
                 this.QuoteAsset = quoteAsset;
                 this.Asset = asset;
             }
-
-
-            public TimeSerieNavigator<ICandlestick> GetNavigator(TimeSpan timeframe)
+             
+            internal void AddNewCandle(Candlestick newCandle)
             {
-                if (BaseTimeframe == timeframe)
-                {
-                    return Ticks;
-                }
-                else
-                {
-                    var der = DerivedTicks.Where(dt => dt.Timeframe == timeframe).FirstOrDefault();
-                    if (der == null)
-                    {
-                        der = new DerivedChart()
-                        {
-                            Timeframe = timeframe,
-                            FormingCandle = null,
-                            Ticks = new TimeSerie<ICandlestick>()
-                        };
+                BaseTimeframe = newCandle.CloseTime - newCandle.OpenTime;
 
-                        //we need to initialize it with all the data that we have
-                        var tticks = new TimeSerieNavigator<ICandlestick>(this.Ticks);
-                        while (tticks.Next())
-                        {
-                            var newCandle = tticks.Tick;
-                            AddTickToDerivedChart(der, newCandle);
-
-                        }
-                        DerivedTicks.Add(der);
-                    }
-                    return new TimeSerieNavigator<ICandlestick>(der.Ticks);
-                }
-
-            }
-
-            private void AddTickToDerivedChart(DerivedChart der, ICandlestick newCandle)
-            {
-                if (der.FormingCandle == null)
-                    der.FormingCandle = new Candlestick(newCandle, der.Timeframe);
-
-                if (der.FormingCandle.CloseTime <= newCandle.OpenTime)
-                {
-                    //old candle is formed
-                    der.Ticks.AddRecord(der.FormingCandle);
-                    der.FormingCandle = new Candlestick(newCandle, der.Timeframe);
-                }
-                else
-                {
-                    der.FormingCandle.Merge(newCandle);
-                    if (der.FormingCandle.CloseTime < newCandle.CloseTime)
-                    {
-
-                        der.Ticks.AddRecord(der.FormingCandle);
-                        der.FormingCandle = null;
-
-                    }
-                }
-            }
-
-            internal void AddNewCandle(Candlestick c)
-            {
-                BaseTimeframe = c.CloseTime - c.OpenTime;
-
-                var previousTime = c.OpenTime;
-                Volume24H += c.Volume;
+                var previousTime = newCandle.OpenTime;
+                Volume24H += newCandle.Volume;
                 //let's calculate the volume
                 if (Ticks.Count > 0)
                 {
                     Ticks.PositionPush();
                     Ticks.SeekLast();
                     previousTime = Ticks.Tick.CloseTime;
-                    var delta = c.CloseTime - previousTime;
-                    var timeAt24 = c.CloseTime - TimeSpan.FromHours(24);
+                    var delta = newCandle.CloseTime - previousTime;
+                    var timeAt24 = newCandle.CloseTime - TimeSpan.FromHours(24);
                     var removeStart = timeAt24 - delta;
                     if (removeStart < Ticks.FirstTickTime)
                         Ticks.SeekFirst();
@@ -304,48 +243,14 @@ namespace SharpTrader
                     Ticks.PositionPop();
                 }
 
-                Ticks.AddRecord(c);
+                Ticks.AddRecord(newCandle);
 
-                Bid = c.Close;
+                Bid = newCandle.Close;
                 Ask = Bid + Spread;
 
-                foreach (var derived in DerivedTicks)
-                {
-                    AddTickToDerivedChart(derived, c);
-                }
-                onTickPending = true;
-            }
-
-            internal void RaisePendingEvents()
-            {
-                if (onTickPending)
-                {
-                    OnTick?.Invoke(this);
-                    onTickPending = false;
-                }
-            }
-
-            public void SubscribeToNewCandle(IChartDataListener subscriber, TimeSpan timeframe)
-            {
-                lock (Locker)
-                {
-                    var (_, subs) = NewCandleSubscribers.FirstOrDefault(el => el.Timeframe == timeframe);
-                    if (subs == null)
-                        NewCandleSubscribers.Add((timeframe, subs = new List<WeakReference<IChartDataListener>>()));
-
-                    for (int i = 0; i < subs.Count; i++)
-                    {
-                        if (!subs[i].TryGetTarget(out var obj))
-                            subs.RemoveAt(i--);
-                    }
-
-                    if (!subs.Any(it => it.TryGetTarget(out var sub) && sub.Equals(subscriber)))
-                    {
-                        subs.Add(new WeakReference<IChartDataListener>(subscriber));
-                    }
-                }
-            }
-
+                UpdateDerivedCharts(newCandle);
+                SignalTick(); 
+            } 
 
         }
 

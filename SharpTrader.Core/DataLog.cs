@@ -10,8 +10,7 @@ namespace SharpTrader
     /// This class can be used to 
     /// </summary>
     class RobotLog
-    {
-
+    { 
         public GraphDrawer Drawer;
     }
 

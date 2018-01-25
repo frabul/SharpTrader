@@ -26,9 +26,7 @@ namespace SharpTrader.Plotting
 
 
     public class TraderBotResultsPlotViewModel : ObservableObject
-    {
-        private string _BiasSign;
-        private string _CurrentPositionString;
+    { 
         private TraderBot Robot;
         CandleStickSeries CandlesChart;
         private System.Timers.Timer timer;
