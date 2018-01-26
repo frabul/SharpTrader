@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Binance.API.Csharp.Client.Models.UserStream;
 using Binance.API.Csharp.Client.Domain.Abstract;
-using Binance.API.Csharp.Client.Models.WebSocket; 
+using Binance.API.Csharp.Client.Models.WebSocket;
 using Binance.API.Csharp.Client.Models.Market.TradingRules;
 using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset, string Quote)>;
 
@@ -20,8 +20,8 @@ namespace SharpTrader
         private BinanceClient Client;
         private TradingRules ExchangeInfo;
         private List<NewOrder> NewOrders = new List<NewOrder>();
- 
-        private Dictionary<string, double> _Balances = new Dictionary<string, double>();
+
+        private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
         private string UserDataListenKey;
         private SymbolsTable SymbolsTable = new SymbolsTable();
         private List<SymbolFeed> Feeds = new List<SymbolFeed>();
@@ -34,16 +34,18 @@ namespace SharpTrader
 
         public IEnumerable<ITrade> Trades => throw new NotImplementedException();
 
-        public (string Symbol, double balance)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
+        public (string Symbol, decimal balance)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
 
 
         public BinanceMarketApi(string secretKey, string apiSecret)
         {
             Client = new BinanceClient(new ApiClient(secretKey, apiSecret));
-            var timeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
             var time = Client.GetServerTime().Result;
+            var timeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             Console.WriteLine($"Connected to Binance:\n\t server time {time.ServerTime}\n\t local time  {timeNow} ");
-            Binance.API.Csharp.Client.Utils.Utilities.DeltaTimeAdjustment = (long)((time.ServerTime - timeNow) * 1.5);
+            if ((time.ServerTime - timeNow) < 0)
+                Binance.API.Csharp.Client.Utils.Utilities.DeltaTimeAdjustment = (long)((time.ServerTime - timeNow) * 1.1);
             //todo, return error
             //Client.TestConnectivity();
             //UserDataStream = Client.StartUserStream().Result;
@@ -56,7 +58,7 @@ namespace SharpTrader
             //download account info
             var accountInfo = Client.GetAccountInfo().Result;
             foreach (var bal in accountInfo.Balances)
-                this._Balances[bal.Asset] = (double)bal.Free;
+                this._Balances[bal.Asset] = bal.Free;
 
             UserDataListenKey = Client.ListenUserDataEndpoint(
                 HandleAccountUpdatedMessage,
@@ -69,7 +71,7 @@ namespace SharpTrader
         {
             foreach (var bal in msg.Balances)
             {
-                this._Balances[bal.Asset] = (double)bal.Free;
+                this._Balances[bal.Asset] = bal.Free;
             }
         }
 
@@ -83,14 +85,14 @@ namespace SharpTrader
 
         }
 
-        public double GetBalance(string asset)
+        public decimal GetBalance(string asset)
         {
             if (_Balances.ContainsKey(asset))
                 return _Balances[asset];
             return 0;
         }
 
-        public double GetBtcPortfolioValue()
+        public decimal GetBtcPortfolioValue()
         {
             throw new NotImplementedException();
         }
@@ -107,12 +109,12 @@ namespace SharpTrader
             return feed;
         }
 
-        public IMarketOperation LimitOrder(string symbol, TradeType type, double amount, double rate)
+        public IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, double rate)
         {
             throw new NotImplementedException();
         }
 
-        public IMarketOperation MarketOrder(string symbol, TradeType type, double amount)
+        public IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount)
         {
             var side = type == TradeType.Buy ? be.OrderSide.BUY : be.OrderSide.SELL;
             try
@@ -134,16 +136,16 @@ namespace SharpTrader
             }
         }
 
-        public (double min, double step) GetMinTradable(string tradeSymbol)
+        public (decimal min, decimal step) GetMinTradable(string tradeSymbol)
         {
             var info = ExchangeInfo.Symbols.Where(s => s.SymbolName == tradeSymbol).FirstOrDefault();
             if (info != null)
             {
                 var filt = info.Filters.Where(f => f.FilterType == "LOT_SIZE").FirstOrDefault();
                 if (filt != null)
-                    return ((double)filt.MinQty, (double)filt.StepSize);
+                    return (filt.MinQty, filt.StepSize);
             }
-            return (0d, 0d);
+            return (0, 0);
         }
 
         class MarketOperation : IMarketOperation
@@ -223,8 +225,8 @@ namespace SharpTrader
                         Volume = (double)msg.KlineInfo.Volume
                     };
                     BaseTimeframe = candle.CloseTime - candle.OpenTime;
-                    Ticks.AddRecord(candle); 
-                    UpdateDerivedCharts(candle); 
+                    Ticks.AddRecord(candle);
+                    UpdateDerivedCharts(candle);
                     SignalTick();
                 }
                 RaisePendingEvents(this);

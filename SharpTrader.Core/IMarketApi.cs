@@ -17,12 +17,12 @@ namespace SharpTrader
         /// <summary>
         /// Put a market order
         /// </summary> 
-        IMarketOperation MarketOrder(string symbol, TradeType type, double amount);
+        IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount);
 
         /// <summary>
         /// Puts a limit order on the market
         /// </summary> 
-        IMarketOperation LimitOrder(string symbol, TradeType type, double amount, double rate);
+        IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, double rate);
 
         /// <summary>
         /// Subscribes to updates from a given symbol in a given market
@@ -33,11 +33,10 @@ namespace SharpTrader
 
         IEnumerable<ITrade> Trades { get; }
 
-        double GetBalance(string asset);
-        (string Symbol, double balance)[] Balances { get; }
-
-        double GetBtcPortfolioValue();
-        (double min, double step) GetMinTradable(string tradeSymbol);
+        decimal GetBalance(string asset);
+        (string Symbol, decimal balance)[] Balances { get; } 
+        decimal GetBtcPortfolioValue();
+        (decimal min, decimal step) GetMinTradable(string tradeSymbol);
     }
 
     public interface ISymbolFeed

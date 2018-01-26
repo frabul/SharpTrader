@@ -34,8 +34,12 @@ namespace SharpTrader.Tests
                 new TestBot2(simulator, ds){TradeSymbol = "ZRXBTC"},
                 new TestBot2(simulator, ds){TradeSymbol = "LTCBTC"},
             };
-
-            foreach (var bot in bots)
+            TestBot3[] botti = new TestBot3[]
+            {
+                new TestBot3(binanceMarket){TradeSymbol = "OMGBTC"},
+                new TestBot3(binanceMarket){TradeSymbol = "QTUMBTC"},
+            };
+            foreach (var bot in botti)
                 bot.Start();
 
             var simStart = new DateTime(2017, 09, 1);
@@ -50,9 +54,9 @@ namespace SharpTrader.Tests
             int steps = 1;
             while (simulator.NextTick(raiseEvents) && simulator.Time < simEnd)
             {
-                raiseEvents = simStart <= simulator.Time; 
+                raiseEvents = simStart <= simulator.Time;
                 if (steps % 240 == 0 && raiseEvents)
-                { 
+                {
                     //if (chartVM == null) 
                     //    chartVM = TraderBotResultsPlotViewModel.RunWindow(bots[0]);  
                     //chartVM.UpdateChart();

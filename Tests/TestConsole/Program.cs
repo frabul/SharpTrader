@@ -10,10 +10,10 @@ namespace TestConsole
     {
         static void Main(string[] args)
         {
-            //TestBinanceMarketApi.Test();
+            TestBinanceMarketApi.Test();
             //------
-            TestMarketSimulator tms = new TestMarketSimulator();
-            tms.Test();
+            //TestMarketSimulator tms = new TestMarketSimulator();
+            //tms.Test();
         }
     }
 }

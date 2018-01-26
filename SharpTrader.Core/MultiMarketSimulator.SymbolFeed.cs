@@ -12,7 +12,7 @@ namespace SharpTrader
         class Market : IMarketApi
         {
             object locker = new object();
-            private Dictionary<string, double> _Balances = new Dictionary<string, double>();
+            private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
             private List<Trade> _Trades = new List<Trade>();
             private Dictionary<string, SymbolFeed> SymbolsFeed = new Dictionary<string, SymbolFeed>();
             private List<Order> PendingOrders = new List<Order>();
@@ -31,7 +31,7 @@ namespace SharpTrader
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
             public IEnumerable<ISymbolFeed> ActiveFeeds => SymbolsFeed.Values;
             public IEnumerable<ITrade> Trades => this._Trades;
-            public Market(string name, double makerFee, double takerFee, string dataDir, double initialBTC = 0)
+            public Market(string name, double makerFee, double takerFee, string dataDir, decimal initialBTC = 0)
             {
                 MarketName = name;
                 MakerFee = makerFee;
@@ -54,7 +54,7 @@ namespace SharpTrader
                 return feed;
             }
 
-            public IMarketOperation LimitOrder(string symbol, TradeType type, double amount, double rate)
+            public IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, double rate)
             {
 
                 var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, rate);
@@ -64,7 +64,7 @@ namespace SharpTrader
 
             }
 
-            public IMarketOperation MarketOrder(string symbol, TradeType type, double amount)
+            public IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount)
             {
                 lock (locker)
                 {
@@ -72,20 +72,20 @@ namespace SharpTrader
                     var rate = type == TradeType.Buy ? feed.Ask : feed.Bid;
                     var order = new Order(this.MarketName, symbol, type, OrderType.Market, amount, rate);
 
-                    var trade = new Trade(this.MarketName, symbol, this.Time, type, rate, amount, this.TakerFee * amount * rate);
+                    var trade = new Trade(this.MarketName, symbol, this.Time, type, rate, amount, amount * (decimal)(this.TakerFee * rate));
                     RegisterTrade(feed, trade);
                     this.ClosedOrders.Add(order);
                 }
 
                 return new MarketOperation(MarketOperationStatus.Completed) { };
             }
-            public double GetBalance(string asset)
+            public decimal GetBalance(string asset)
             {
-                _Balances.TryGetValue(asset, out double res);
+                _Balances.TryGetValue(asset, out decimal res);
                 return res;
             }
 
-            public (string Symbol, double balance)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
+            public (string Symbol, decimal balance)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
 
             internal void RaisePendingEvents()
             {
@@ -126,7 +126,7 @@ namespace SharpTrader
                                     price: order.Rate,
                                     amount: order.Amount,
                                     type: order.TradeType,
-                                    fee: this.MakerFee * order.Amount * order.Rate
+                                    fee: order.Amount * (decimal)(this.MakerFee *  order.Rate)
                                 );
                                 RegisterTrade(feed, trade);
                                 order.Status = OrderStatus.Filled;
@@ -149,23 +149,23 @@ namespace SharpTrader
                     _Balances.Add(feed.QuoteAsset, 0);
                 if (trade.Type == TradeType.Buy)
                 {
-                    _Balances[feed.Asset] += trade.Amount;
-                    _Balances[feed.QuoteAsset] -= trade.Amount * trade.Price;
+                    _Balances[feed.Asset] += (decimal)trade.Amount;
+                    _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
                 }
                 if (trade.Type == TradeType.Sell)
                 {
-                    _Balances[feed.Asset] -= trade.Amount;
-                    _Balances[feed.QuoteAsset] += trade.Amount * trade.Price;
+                    _Balances[feed.Asset] -= Convert.ToDecimal(trade.Amount);
+                    _Balances[feed.QuoteAsset] += Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
                 }
-                _Balances[feed.QuoteAsset] -= trade.Fee;
+                _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Fee);
 
                 lock (locker)
                     this._Trades.Add(trade);
             }
 
-            public double GetBtcPortfolioValue()
+            public decimal GetBtcPortfolioValue()
             {
-                double val = 0;
+                decimal val = 0;
                 foreach (var kv in _Balances)
                 {
                     if (kv.Key == "BTC")
@@ -173,29 +173,29 @@ namespace SharpTrader
                     else if (kv.Value > 0)
                     {
                         var feed = SymbolsFeed[kv.Key + "BTC"];
-                        val += feed.Ask * kv.Value;
+                        val += ((decimal)feed.Ask * kv.Value);
                     }
                 }
                 return val;
             }
 
-            public (double min, double step) GetMinTradable(string tradeSymbol)
+            public (decimal min, decimal step) GetMinTradable(string tradeSymbol)
             {
-                return (0, 0.000000000001);
+                return (0, 0);
             }
         }
 
         class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
         {
-           
+
             private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
             public List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)> NewCandleSubscribers =
                 new List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)>();
-             
+
 
             private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
             private object Locker = new object();
-             
+
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
             public string QuoteAsset { get; private set; }
@@ -205,7 +205,7 @@ namespace SharpTrader
             public double Spread { get; set; }
             public double Volume24H { get; private set; }
 
-    
+
             public SymbolFeed(string market, string symbol, string asset, string quoteAsset)
             {
                 this.Symbol = symbol;
@@ -213,7 +213,7 @@ namespace SharpTrader
                 this.QuoteAsset = quoteAsset;
                 this.Asset = asset;
             }
-             
+
             internal void AddNewCandle(Candlestick newCandle)
             {
                 BaseTimeframe = newCandle.CloseTime - newCandle.OpenTime;
@@ -249,8 +249,8 @@ namespace SharpTrader
                 Ask = Bid + Spread;
 
                 UpdateDerivedCharts(newCandle);
-                SignalTick(); 
-            } 
+                SignalTick();
+            }
 
         }
 
@@ -260,7 +260,7 @@ namespace SharpTrader
             public string Symbol { get; private set; }
             public string Market { get; private set; }
             public double Rate { get; private set; }
-            public double Amount { get; private set; }
+            public decimal Amount { get; private set; }
             public string Id { get; private set; }
 
             public OrderStatus Status { get; internal set; } = OrderStatus.Pending;
@@ -268,7 +268,7 @@ namespace SharpTrader
             public TradeType TradeType { get; private set; }
             public OrderType Type { get; private set; }
 
-            public Order(string market, string symbol, TradeType tradeSide, OrderType orderType, double amount, double rate = 0)
+            public Order(string market, string symbol, TradeType tradeSide, OrderType orderType, decimal amount, double rate = 0)
             {
                 Symbol = symbol;
                 Market = market;
@@ -283,7 +283,7 @@ namespace SharpTrader
 
         class Trade : ITrade
         {
-            public Trade(string market, string symbol, DateTime time, TradeType type, double price, double amount, double fee)
+            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, decimal fee)
             {
                 Market = market;
                 Symbol = symbol;
@@ -293,11 +293,11 @@ namespace SharpTrader
                 Amount = amount;
                 Fee = fee;
             }
-            public double Amount { get; private set; }
+            public decimal Amount { get; private set; }
 
             public DateTime Date { get; private set; }
 
-            public double Fee { get; private set; }
+            public decimal Fee { get; private set; }
 
             public string Market { get; private set; }
 

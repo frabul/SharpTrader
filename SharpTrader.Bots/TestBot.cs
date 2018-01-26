@@ -97,10 +97,10 @@ namespace SharpTrader.Bots
             }
         }
 
-        private double GetAmountToTrade()
+        private decimal GetAmountToTrade()
         {
             var price = TfEnter.ticks.Tick.Close;
-            return 1 / price;
+            return 1 / (decimal)price;
         }
 
         public override void OnNewCandle(ISymbolFeed sender, ICandlestick newCandle)

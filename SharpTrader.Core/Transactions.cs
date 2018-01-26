@@ -76,7 +76,7 @@ namespace SharpTrader
         OrderType Type { get; }
         TradeType TradeType { get; }
         string Id { get; }
-        double Amount { get; }
+        decimal Amount { get; }
         double Rate { get; } 
         string Symbol { get; }
         string Market { get; }
@@ -118,9 +118,9 @@ namespace SharpTrader
     {
         string Market { get; }
         string Symbol { get; }
-        double Amount { get; }
+        decimal Amount { get; }
         double Price { get; }
-        double Fee { get; }
+        decimal Fee { get; }
         TradeType Type { get; }
         DateTime Date { get; }
 

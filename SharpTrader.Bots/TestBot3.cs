@@ -10,7 +10,7 @@ namespace SharpTrader.Bots
     public class TestBot3 : TraderBot
     {
         private bool FirstPass = true;
-         
+
         private IMarketApi MarketApi;
         private ISymbolFeed TradeSymbolFeed;
         private (TimeSpan frame, TimeSerieNavigator<ICandlestick> ticks) TfEnter;
@@ -35,8 +35,7 @@ namespace SharpTrader.Bots
         public List<Indicator> GraphIndicators { get; private set; } = new List<Indicator>();
         public string TradeSymbol = "ETHBTC";
         public string Market = "Binance";
-
-
+         
         class Position
         {
             public DateTime Time;
@@ -52,11 +51,11 @@ namespace SharpTrader.Bots
         }
 
         public override void Start()
-        { 
+        {
             TfEnter.frame = TimeframeEnter;
-            TfExit.frame = TimeframeExit; 
+            TfExit.frame = TimeframeExit;
 
-            GraphFeed = TradeSymbolFeed = MarketApi.GetSymbolFeed(TradeSymbol); 
+            GraphFeed = TradeSymbolFeed = MarketApi.GetSymbolFeed(TradeSymbol);
 
             TfEnter.ticks = TradeSymbolFeed.GetNavigator(TfEnter.frame);
             TfExit.ticks = TradeSymbolFeed.GetNavigator(TfExit.frame);
@@ -70,7 +69,7 @@ namespace SharpTrader.Bots
             Drawer.Candles = new TimeSerieNavigator<ICandlestick>(TfEnter.ticks);
 
             Drawer.Lines.AddRange(new[] { LineBollBot, LineBollMid, LineBollTop });
-             
+
             //----------- subscribe to events
             TradeSymbolFeed.OnTick += OnTickHandle;
             TradeSymbolFeed.SubscribeToNewCandle(this, TfEnter.frame);
@@ -113,21 +112,23 @@ namespace SharpTrader.Bots
             }
         }
 
-        private double GetAmountToTrade()
+        private decimal GetAmountToTrade()
         {
             int maxBuys = 40;
             //double portFolioValue = Binance.GetBtcPortfolioValue();
             var price = TfEnter.ticks.Tick.Close;
-            double tradable = 0;
+            decimal tradable = 0;
             if (OpenPositions.Count >= maxBuys)
-                tradable = MarketApi.GetBalance("BTC");
+                tradable = Convert.ToDecimal(MarketApi.GetBalance("BTC"));
             else
-                tradable = (MarketApi.GetBalance("BTC") / (maxBuys - OpenPositions.Count)) / price;
+                tradable = (MarketApi.GetBalance("BTC") / (maxBuys - OpenPositions.Count)) / (decimal)price;
             var (min, step) = MarketApi.GetMinTradable(TradeSymbol);
 
             if (tradable >= min)
             {
-                var nearestMultiple = NearestRound(tradable, step);
+                var nearestMultiple = tradable;
+                if (step > 0)
+                    NearestRound(tradable, step);
                 return Math.Max(min, nearestMultiple);
             }
             else
@@ -140,22 +141,10 @@ namespace SharpTrader.Bots
 
         }
 
-        private double NearestRound(double x, double delX)
-        {
-            if (delX < 1)
-            {
-                double i = Math.Floor(x);
-                double x2 = i;
-                while ((x2 += delX) < x) ;
-                double x1 = x2 - delX;
-                return (Math.Abs(x - x1) < Math.Abs(x - x2)) ? x1 : x2;
-            }
-            else
-            {
-                return (float)Math.Round(x / delX, MidpointRounding.AwayFromZero) * delX;
-            }
+        private decimal NearestRound(decimal x, decimal d)
+        { 
+            return x - x % d; 
         }
-
 
         private void SearchEnter()
         {
@@ -169,7 +158,7 @@ namespace SharpTrader.Bots
                 {
                     ICandlestick candle = TfEnter.ticks.LastTick;
                     var bollTick = BollNavigator.Tick;
-
+                    var askPrice = TradeSymbolFeed.Ask;
                     if (BollNavigator.Count < BollingerBands.Period + 1)
                         return;
                     var bollback = BollNavigator.GetFromCursor(BollingerBands.Period);
@@ -190,22 +179,22 @@ namespace SharpTrader.Bots
 
                     var closeUnderDev = candle.Close < bollTick.Bottom;
                     //var stdvHi = bollTick.Deviation / candle.Close > 0.02;
-                    var stdvHi = (bollTick.Main - candle.Close) / candle.Close > 0.04;
-                    var askPrice = TradeSymbolFeed.Ask;
+                    var stdvHi = (bollTick.Main - askPrice) / askPrice > 0.04;
+                 
                     if (closeUnderDev && stdvHi)
                     {
                         try
                         {
                             var toTrade = GetAmountToTrade();
                             if (toTrade <= 0)
-                                return; 
+                                return;
 
                             Console.WriteLine($"Buying {TradeSymbol} - {toTrade}@{askPrice} - last close {candle.Close}");
                             MarketApi.MarketOrder(TradeSymbolFeed.Symbol, TradeType.Buy, toTrade);
                             OpenPositions.Add(new Position()
                             {
                                 Time = candle.Time,
-                                EnterPrice = candle.Close, 
+                                EnterPrice = candle.Close,
                             });
                         }
                         catch (Exception ex)
@@ -244,12 +233,12 @@ namespace SharpTrader.Bots
 
                         if ((op.EnterPrice * 1.003) > candle.Close)
                         {
-                            tradeLine.Color = new ColorARGB(255, 255, 10, 10); 
+                            tradeLine.Color = new ColorARGB(255, 255, 10, 10);
                         }
 
                         else
                         {
-                            tradeLine.Color = new ColorARGB(255, 10, 10, 255); 
+                            tradeLine.Color = new ColorARGB(255, 10, 10, 255);
                         }
                         tradeLine.Points.Add(new Point(candle.CloseTime, candle.Close));
                         Drawer.Lines.Add(tradeLine);

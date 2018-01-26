@@ -11,7 +11,7 @@ namespace SharpTrader.Bots
     public class TestBot2 : TraderBot
     {
         private bool FirstPass = true;
-         
+
         private IMarketApi Binance;
         private ISymbolFeed TradeSymbolFeed;
         private (TimeSpan frame, TimeSerieNavigator<ICandlestick> ticks) TfEnter;
@@ -36,7 +36,7 @@ namespace SharpTrader.Bots
         public string TradeSymbol = "ETHBTC";
         public string Market = "Binance";
 
-        
+
 
         class Position
         {
@@ -52,7 +52,7 @@ namespace SharpTrader.Bots
         }
 
         public override void Start()
-        { 
+        {
             TfEnter.frame = TimeframeEnter;
             TfExit.frame = TimeframeExit;
 
@@ -128,14 +128,14 @@ namespace SharpTrader.Bots
             }
         }
 
-        private double GetAmountToTrade()
+        private decimal GetAmountToTrade()
         {
             //double portFolioValue = Binance.GetBtcPortfolioValue();
             var price = TfEnter.ticks.Tick.Close;
             if (OpenPositions.Count >= 30)
                 return Binance.GetBalance("BTC");
             else
-                return (Binance.GetBalance("BTC") / (30 - OpenPositions.Count)) / price;
+                return (Binance.GetBalance("BTC") / (30 - OpenPositions.Count)) / (decimal)price;
         }
 
         public override void OnNewCandle(ISymbolFeed sender, ICandlestick newCandle)
@@ -185,12 +185,12 @@ namespace SharpTrader.Bots
                     if (closeUnderDev && stdvHi)
                     {
                         try
-                        { 
-                            var toTrade = GetAmountToTrade() ;
+                        {
+                            var toTrade = GetAmountToTrade();
                             if (toTrade <= 0)
                                 return;
                             var featuresID = DataSetCreator.CalculateFeatures();
-                            Binance.MarketOrder(TradeSymbolFeed.Symbol, TradeType.Buy,toTrade);
+                            Binance.MarketOrder(TradeSymbolFeed.Symbol, TradeType.Buy, toTrade);
                             OpenPositions.Add(new Position()
                             {
                                 Time = candle.Time,
