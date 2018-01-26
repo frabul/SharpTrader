@@ -17,16 +17,14 @@ namespace SharpTrader.Tests
 
 
             api.Test = false;
-            var feed = api.GetSymbolFeed("ADABTC");
-            feed.OnTick += OnTick;
-
+       
             TestBot3[] bots = new TestBot3[]
             {
                 new TestBot3(api){TradeSymbol = "OMGBTC"},
                 new TestBot3(api){TradeSymbol = "QTUMBTC"},
-                //new TestBot3(api, null){TradeSymbol = "YOYOBTC"},
+                new TestBot3(api){TradeSymbol = "YOYOBTC"},
                 new TestBot3(api){TradeSymbol = "ADABTC"},
-                //new TestBot3(api){TradeSymbol = "LTCBTC"},
+                new TestBot3(api){TradeSymbol = "LTCBTC"},
             };
             foreach(var bot in bots)
                 bot.Start();

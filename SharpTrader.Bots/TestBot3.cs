@@ -35,7 +35,7 @@ namespace SharpTrader.Bots
         public List<Indicator> GraphIndicators { get; private set; } = new List<Indicator>();
         public string TradeSymbol = "ETHBTC";
         public string Market = "Binance";
-         
+
         class Position
         {
             public DateTime Time;
@@ -142,8 +142,8 @@ namespace SharpTrader.Bots
         }
 
         private decimal NearestRound(decimal x, decimal d)
-        { 
-            return x - x % d; 
+        {
+            return x - x % d;
         }
 
         private void SearchEnter()
@@ -174,13 +174,16 @@ namespace SharpTrader.Bots
 
                     if (MeanNavigator.Count < MeanAndVariance.Period + 1)
                         return;
+
                     var growing = (MeanNavigator.Tick.Mean - MeanNavigator.GetFromCursor(MeanAndVariance.Period).Mean)
                         / MeanNavigator.Tick.Mean > -0.0001;
 
                     var closeUnderDev = candle.Close < bollTick.Bottom;
                     //var stdvHi = bollTick.Deviation / candle.Close > 0.02;
                     var stdvHi = (bollTick.Main - askPrice) / askPrice > 0.04;
-                 
+                    var stdvHiCandle = (bollTick.Main - askPrice) / askPrice > 0.04;
+                    Console.WriteLine($"{DateTime.Now} - Trying to enter {TradeSymbol} - ask: {askPrice} - cclose: {candle.Close} " +
+                                        $"\n\tstdvHi: {stdvHi} - stdvHiCandle: {stdvHiCandle}");
                     if (closeUnderDev && stdvHi)
                     {
                         try

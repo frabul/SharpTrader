@@ -75,7 +75,7 @@ namespace SharpTrader
                 if (der.Timeframe.Minutes != 0)
                     Debug.Assert(opeTime.Minute % der.Timeframe.Minutes == 0);
                 der.FormingCandle = new Candlestick(opeTime, newCandle, der.Timeframe);
-            } 
+            }
             else if (der.FormingCandle.CloseTime <= newCandle.OpenTime)
             {
                 //old candle is ended, the new candle is already part of the next one
@@ -103,7 +103,8 @@ namespace SharpTrader
             long tfMs = (long)Math.Floor(timeFrame.TotalMilliseconds);
             long timeNowMs = mid.Ticks / 10000;
             long resto = timeNowMs % tfMs;
-            return new DateTime((timeNowMs - resto + tfMs) * 10000, mid.Kind);
+            var toAdd = resto > 0 ? tfMs - resto : 0;
+            return new DateTime((timeNowMs + toAdd) * 10000, mid.Kind);
         }
 
         protected void UpdateDerivedCharts(ICandlestick newCandle)
