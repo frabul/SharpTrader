@@ -147,7 +147,7 @@ model.add(Conv2D(16, (1, 3), padding='valid',
                  input_shape=xTrain.shape[1:]))
 model.add(Activation('relu'))
 model.add(Dropout(0.1))
-model.add(Conv2D(32, (2, 2), padding='same'))
+model.add(Conv2D(32, (2, 1), padding='same'))
 model.add(Activation('relu'))
 #model.add(Dropout(0.1))
 model.add(Flatten())

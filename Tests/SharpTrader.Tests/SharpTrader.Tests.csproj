@@ -46,16 +46,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="TestBinanceMarketApi.cs" />
     <Compile Include="TestHistoryDB.cs" />
-    <Compile Include="TestMarketSimulator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TestMarketSimulator.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\SharpTrader.Bots\SharpTrader.Bots.csproj">
-      <Project>{5EF889ED-D02A-450D-87E1-63DD42056DB8}</Project>
-      <Name>SharpTrader.Bots</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\SharpTrader.Core\SharpTrader.Core.csproj">
       <Project>{320b1902-461a-4b88-8852-d881dc4e5293}</Project>
       <Name>SharpTrader.Core</Name>

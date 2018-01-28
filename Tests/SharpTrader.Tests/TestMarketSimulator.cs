@@ -1,5 +1,4 @@
-﻿using SharpTrader.Bots;
-using SharpTrader.Indicators;
+﻿using SharpTrader.Indicators;
 using SharpTrader.Plotting;
 using System;
 using System.Collections.Generic;
@@ -8,10 +7,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpTrader.Tests
+namespace SharpTrader
 {
     public class TestMarketSimulator
     {
+
         private const string MarketName = "Binance";
         private HistoricalRateDataBase HistoryDB;
 
@@ -19,41 +19,31 @@ namespace SharpTrader.Tests
 
         public void Test()
         {
+            List<(DateTime date, decimal bal)> BalancePerDay = new List<(DateTime, decimal)>();
             HistoryDB = new HistoricalRateDataBase(DataDir);
             MultiMarketSimulator simulator = new MultiMarketSimulator(DataDir, HistoryDB);
-            var binanceMarket = simulator.GetMarketApi("Binance");
+            var api = simulator.GetMarketApi("Binance");
 
-            //var ETHBTC = binanceMarket.GetSymbolFeed("ETHBTC");
-            //var XMRBTC = binanceMarket.GetSymbolFeed("XMRBTC");
-            DataSetCreator ds = new DataSetCreator();
-            TestBot2[] bots = new TestBot2[]
+
+            TraderBot[] bots = new TraderBot[]
             {
-                new TestBot2(simulator, ds){TradeSymbol = "OMGBTC"},
-                new TestBot2(simulator, ds){TradeSymbol = "QTUMBTC"},
-                new TestBot2(simulator, ds){TradeSymbol = "YOYOBTC"},
-                new TestBot2(simulator, ds){TradeSymbol = "ZRXBTC"},
-                new TestBot2(simulator, ds){TradeSymbol = "LTCBTC"},
             };
-            TestBot3[] botti = new TestBot3[]
-            {
-                new TestBot3(binanceMarket){TradeSymbol = "OMGBTC"},
-                new TestBot3(binanceMarket){TradeSymbol = "QTUMBTC"},
-            };
-            foreach (var bot in botti)
+
+            foreach (var bot in bots)
                 bot.Start();
 
-            var simStart = new DateTime(2017, 09, 1);
-            var simEnd = new DateTime(2018, 1, 20);
-            //simulator.Run(
-            //    new DateTime(2017, 12, 28),
-            //    new DateTime(2018, 1, 20),
-            //    DateTime.MinValue
-            //    );
-            //TraderBotResultsPlotViewModel chartVM = null;
+            var simStart = new DateTime(2017, 09, 10);
+            var simEnd = new DateTime(2018, 01, 28);
+
             bool raiseEvents = false;
             int steps = 1;
+            decimal MaxDrawDown = 0;
+            decimal BalancePeak = 0;
+            decimal MaxDDPrc = 0;
             while (simulator.NextTick(raiseEvents) && simulator.Time < simEnd)
             {
+                //var lastDay = BalancePerDay[BalancePerDay.Count - 1];
+
                 raiseEvents = simStart <= simulator.Time;
                 if (steps % 240 == 0 && raiseEvents)
                 {
@@ -63,24 +53,24 @@ namespace SharpTrader.Tests
                     //Console.ReadLine();
                 }
                 steps++;
+
+                var balance = api.GetBtcPortfolioValue();
+                BalancePeak = balance > BalancePeak ? balance : BalancePeak;
+                if (BalancePeak - balance > MaxDrawDown)
+                {
+                    MaxDrawDown = BalancePeak - balance;
+                    MaxDDPrc = MaxDrawDown / BalancePeak;
+                }
             }
 
             //save DATASET
-            ds.Data.SaveToDisk("d:\\dataset.json");
 
-            foreach (var feed in binanceMarket.ActiveFeeds)
-            {
-                var balance = binanceMarket.GetBalance(feed.Asset);
-                if (balance > 0 && feed.QuoteAsset == "BTC")
-                    binanceMarket.MarketOrder(feed.Symbol, TradeType.Sell, balance);
-            }
-            var lostInFee = binanceMarket.Trades.Select(tr => tr.Fee).Sum();
-            Console.WriteLine($"Trades:{binanceMarket.Trades.Count()} - lost in fee:{lostInFee}");
-            foreach (var (Symbol, balance) in binanceMarket.Balances)
-            {
-                Console.WriteLine($"{Symbol }: {balance}");
-            }
 
+            var totalBal = api.GetBtcPortfolioValue();
+            var lostInFee = api.Trades.Select(tr => tr.Fee).Sum();
+            Console.WriteLine($"Balance: {totalBal} - Trades:{api.Trades.Count()} - Lost in fee:{lostInFee}");
+
+            Console.WriteLine($"Profit/oper: {(totalBal - 1) / api.Trades.Count()} MaxDrawDown:{MaxDrawDown} - Max DD %:{MaxDDPrc * 100}");
             foreach (var bot in bots)
             {
                 var vm = TraderBotResultsPlotViewModel.RunWindow(bot);
@@ -88,6 +78,10 @@ namespace SharpTrader.Tests
             }
             Console.ReadLine();
         }
+
+
+
+
 
         public void TestMeanAndVarianceIndicator()
         {
@@ -109,7 +103,6 @@ namespace SharpTrader.Tests
 
 
 
+
     }
-
-
 }
