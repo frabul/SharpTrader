@@ -78,11 +78,7 @@ namespace SharpTrader
             }
             Console.ReadLine();
         }
-
-
-
-
-
+        
         public void TestMeanAndVarianceIndicator()
         {
             TimeSerie<ICandlestick> ts = new TimeSerie<ICandlestick>();

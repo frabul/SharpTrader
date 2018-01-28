@@ -133,7 +133,7 @@ namespace SharpTrader
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Market operation failed because: " + ex.Message);
+                Console.WriteLine("Market operation failed because: " + ex.InnerException.Message);
                 return new MarketOperation(MarketOperationStatus.Failed);
             }
         }

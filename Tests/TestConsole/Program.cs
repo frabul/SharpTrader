@@ -11,6 +11,7 @@ namespace TestConsole
     {
         static void Main(string[] args)
         {
+             
 
             TestMarketSimulator tms = new TestMarketSimulator();
             tms.Test();
