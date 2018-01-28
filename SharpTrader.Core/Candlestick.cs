@@ -82,7 +82,7 @@ namespace SharpTrader
         {
             if (this.High < c.High)
                 this.High = c.High;
-            if (this.Low < c.Low)
+            if (this.Low > c.Low)
                 this.Low = c.Low;
             this.Close = c.Close;
             this.Volume += c.Volume;

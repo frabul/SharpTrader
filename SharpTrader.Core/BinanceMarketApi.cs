@@ -20,7 +20,7 @@ namespace SharpTrader
         private BinanceClient Client;
         private TradingRules ExchangeInfo;
         private List<NewOrder> NewOrders = new List<NewOrder>();
-
+        private long ServerTimeDiff;
         private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
         private string UserDataListenKey;
         private SymbolsTable SymbolsTable = new SymbolsTable();
@@ -28,7 +28,7 @@ namespace SharpTrader
 
         public string MarketName => "Binance";
         public bool Test { get; set; }
-        public DateTime Time => throw new NotImplementedException();
+        public DateTime Time => DateTime.UtcNow.AddMilliseconds(ServerTimeDiff);
 
         public IEnumerable<ISymbolFeed> ActiveFeeds => throw new NotImplementedException();
 
@@ -37,14 +37,16 @@ namespace SharpTrader
         public (string Symbol, decimal balance)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
 
 
-        public BinanceMarketApi(string secretKey, string apiSecret)
+        public BinanceMarketApi(string apiKey, string apiSecret)
         {
-            Client = new BinanceClient(new ApiClient(secretKey, apiSecret));
+            Client = new BinanceClient(new ApiClient(apiKey, apiSecret));
 
             var time = Client.GetServerTime().Result;
             var timeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             Console.WriteLine($"Connected to Binance:\n\t server time {time.ServerTime}\n\t local time  {timeNow} ");
-            if ((time.ServerTime - timeNow) < 0)
+            ServerTimeDiff = time.ServerTime - timeNow;
+
+            if ((ServerTimeDiff) < 0)
                 Binance.API.Csharp.Client.Utils.Utilities.DeltaTimeAdjustment = (long)((time.ServerTime - timeNow) * 1.1);
             //todo, return error
             //Client.TestConnectivity();
