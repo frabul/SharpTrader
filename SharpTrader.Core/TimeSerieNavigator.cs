@@ -15,6 +15,8 @@ namespace SharpTrader
 
     public class TimeSerieNavigator<T> where T : ITimeRecord
     {
+        public event Action<T> OnNewRecord;
+
         private int _Cursor = -1;
         private Stack<int> PositionSaveStack = new Stack<int>();
         protected TimeRecordCollection<T> Records { get; private set; }
@@ -45,20 +47,25 @@ namespace SharpTrader
         public TimeSerieNavigator()
         {
             Records = new TimeRecordCollection<T>();
+            Records.NewRecord += (sender, rec ) => OnNewRecord?.Invoke(rec);
         }
 
         public TimeSerieNavigator(TimeSerieNavigator<T> items)
         {
             Records = items.Records;
+            Records.NewRecord += (sender, rec) => OnNewRecord?.Invoke(rec);
         }
         public TimeSerieNavigator(IEnumerable<T> items)
         {
             Records = new TimeRecordCollection<T>(items);
+            Records.NewRecord += (sender, rec) => OnNewRecord?.Invoke(rec);
         }
+
         public T GetFromCursor(int count)
         {
             return Records[_Cursor - count];
         }
+
         public bool TryGetRecord(DateTime time, out T record)
         {
 
@@ -179,10 +186,10 @@ namespace SharpTrader
 
 
     }
-
-
+     
     public class TimeRecordCollection<T> where T : ITimeRecord
     {
+        public event Action<TimeRecordCollection<T>, T> NewRecord;
         private List<T> Items;
         ReaderWriterLock Lock = new ReaderWriterLock();
 
@@ -276,15 +283,20 @@ namespace SharpTrader
         public void Add(T item)
         {
             WriteOperation(() => Items.Add(item));
+            NewRecord?.Invoke(this, item);
         }
+
         public void AddRange(IEnumerable<T> items)
         {
             WriteOperation(() => Items.AddRange(items));
+            NewRecord?.Invoke(this, items.Last());
         }
+
         public void RemoveAt(int ind)
         {
             throw new NotImplementedException();
         }
+
         public int BinarySearch(DateTime time)
         {
             return ReadOperation<int>(() => BinarySearch_Internal(time));

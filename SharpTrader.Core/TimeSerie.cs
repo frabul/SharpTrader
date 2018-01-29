@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-   
+
     public class TimeSerie<T> : TimeSerieNavigator<T> where T : ITimeRecord
     {
 
@@ -14,7 +14,7 @@ namespace SharpTrader
         /// the smallest difference in seconds
         /// </summary>
         /// <param name="smallestFrame"></param>
-        public TimeSerie()
+        public TimeSerie() : base()
         {
 
         }
@@ -25,7 +25,7 @@ namespace SharpTrader
         {
 
         }
-         
+
         public void AddRecord(T historyRecord)
         {
             var time = historyRecord.Time;
@@ -55,8 +55,6 @@ namespace SharpTrader
                 }
             this.PositionPop();
             return res;
-        }
-
-     
-    } 
+        } 
+    }
 }
