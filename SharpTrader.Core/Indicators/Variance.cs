@@ -28,9 +28,6 @@ namespace SharpTrader.Indicators
                 Variance = variance;
                 Time = time;
             }
-
-
-
         }
 
         public TimeSerieNavigator<Record> GetNavigator()
@@ -42,7 +39,7 @@ namespace SharpTrader.Indicators
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified period.
         /// </summary>  
         public MeanAndVariance(int period, TimeSerieNavigator<ICandlestick> chart) : this("Variance_" + period, period, chart)
-        {
+        { 
         }
 
         /// <summary>
@@ -52,20 +49,15 @@ namespace SharpTrader.Indicators
         {
             Chart = new TimeSerieNavigator<ICandlestick>(chart);
             Period = period;
+            chart.OnNewRecord += rec => this.Calculate();
         }
 
         /// <summary>
         /// Gets a flag indicating when this indicator is ready and fully initialized
         /// </summary>
         public override bool IsReady => Records.Count >= Period;
-
-        /// <summary>
-        /// Computes the next value of this indicator from the given state
-        /// </summary>
-        /// <param name="input">The input given to the indicator</param>
-        /// <param name="window">The window for the input history</param>
-        /// <returns>A new value for this indicator</returns>
-        public void Calculate()
+         
+        private void Calculate()
         {
             while (Chart.Next())
             {

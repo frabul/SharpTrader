@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:SharpTrader.Plotting"
         xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
         mc:Ignorable="d"
-        Title="ResultsPlotWindow_LC" Height="700" Width="900">
+        Title="ResultsPlotWindow_LC" Height="715.801" Width="1298.195">
     <Grid>
         <lvc:CartesianChart Series="{Binding SeriesCollection}">
             <lvc:CartesianChart.AxisX>

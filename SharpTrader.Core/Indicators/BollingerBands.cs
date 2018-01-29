@@ -30,11 +30,11 @@ namespace SharpTrader.Indicators
             Deviation = deviation;
 
             Chart = new TimeSerieNavigator<ICandlestick>(data);
+            MeanAndVarianceValues.OnNewRecord += rec => this.Calculate();
         }
 
-        public void Calculate()
+        private void Calculate()
         {
-            MeanAndVariance.Calculate();
             while (MeanAndVarianceValues.Next())
             {
                 var mav = MeanAndVarianceValues.Tick;
