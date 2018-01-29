@@ -11,7 +11,7 @@ namespace SharpTrader
     {
         class Market : IMarketApi
         {
-            object locker = new object();
+            object LockObject = new object();
             private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
             private List<Trade> _Trades = new List<Trade>();
             private Dictionary<string, SymbolFeed> SymbolsFeed = new Dictionary<string, SymbolFeed>();
@@ -48,7 +48,7 @@ namespace SharpTrader
                 {
                     (var asset, var counterAsset) = SymbolsTable[symbol];
                     feed = new SymbolFeed(this.MarketName, symbol, asset, counterAsset);
-                    lock (locker)
+                    lock (LockObject)
                         SymbolsFeed.Add(symbol, feed);
                 }
                 return feed;
@@ -58,7 +58,7 @@ namespace SharpTrader
             {
 
                 var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, rate);
-                lock (locker)
+                lock (LockObject)
                     this.PendingOrders.Add(order);
                 return new MarketOperation(MarketOperationStatus.Completed) { };
 
@@ -66,13 +66,17 @@ namespace SharpTrader
 
             public IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount)
             {
-                lock (locker)
+                lock (LockObject)
                 {
                     var feed = SymbolsFeed[symbol];
-                    var rate = type == TradeType.Buy ? feed.Ask : feed.Bid;
-                    var order = new Order(this.MarketName, symbol, type, OrderType.Market, amount, rate);
+                    var price = type == TradeType.Buy ? feed.Ask : feed.Bid;
+                    var order = new Order(this.MarketName, symbol, type, OrderType.Market, amount, price);
 
-                    var trade = new Trade(this.MarketName, symbol, this.Time, type, rate, amount, amount * (decimal)(this.TakerFee * rate));
+                    var trade = new Trade(
+                        this.MarketName, symbol, this.Time,
+                        type, price, amount,
+                        amount * (decimal)(this.TakerFee * price));
+
                     RegisterTrade(feed, trade);
                     this.ClosedOrders.Add(order);
                 }
@@ -90,7 +94,7 @@ namespace SharpTrader
             internal void RaisePendingEvents()
             {
                 List<ITrade> trades;
-                lock (locker)
+                lock (LockObject)
                 {
                     trades = new List<ITrade>(TradesToSignal);
                     TradesToSignal.Clear();
@@ -107,7 +111,7 @@ namespace SharpTrader
             internal void ResolveOrders()
             {
                 //resolve orders/trades 
-                lock (locker)
+                lock (LockObject)
                     for (int i = 0; i < PendingOrders.Count; i++)
                     {
                         var order = PendingOrders[i];
@@ -126,7 +130,7 @@ namespace SharpTrader
                                     price: order.Rate,
                                     amount: order.Amount,
                                     type: order.TradeType,
-                                    fee: order.Amount * (decimal)(this.MakerFee *  order.Rate)
+                                    fee: order.Amount * (decimal)(this.MakerFee * order.Rate)
                                 );
                                 RegisterTrade(feed, trade);
                                 order.Status = OrderStatus.Filled;
@@ -149,7 +153,7 @@ namespace SharpTrader
                     _Balances.Add(feed.QuoteAsset, 0);
                 if (trade.Type == TradeType.Buy)
                 {
-                    _Balances[feed.Asset] += (decimal)trade.Amount;
+                    _Balances[feed.Asset] += Convert.ToDecimal(trade.Amount);
                     _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
                 }
                 if (trade.Type == TradeType.Sell)
@@ -159,7 +163,7 @@ namespace SharpTrader
                 }
                 _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Fee);
 
-                lock (locker)
+                lock (LockObject)
                     this._Trades.Add(trade);
             }
 

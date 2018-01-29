@@ -84,7 +84,7 @@ namespace SharpTrader
         {
             lock (LockObject)
             {
-                bool connected = true; 
+                bool connected = true;
                 try
                 {
                     if (UserDataListenKey != null)
@@ -94,17 +94,19 @@ namespace SharpTrader
                     else
                         connected = false;
                 }
-                catch (Exception ex)
+                catch
                 {
                     connected = false;
                 }
                 if (!connected)
                     ListenUserData();
-             
+
                 HearthBeatTimer.Start();
             }
         }
+
         Stopwatch LastListenTry = new Stopwatch();
+
         private void ListenUserData()
         {
             lock (LockObject)
@@ -141,6 +143,7 @@ namespace SharpTrader
             }
 
         }
+
         private void HandleAccountUpdatedMessage(AccountUpdatedMessage msg)
         {
             foreach (var bal in msg.Balances)

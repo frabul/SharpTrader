@@ -87,7 +87,6 @@ namespace SharpTrader
             for (int i = 0; i < 10000; i++)
             {
                 ts.AddRecord(new Candlestick() { Close = i % 5, OpenTime = new DateTime(i), CloseTime = new DateTime(i + 1) });
-                mv.Calculate();
                 if (mv.IsReady)
                 {
                     Debug.Assert(mvnav.LastTick.Mean == 2 && mvnav.LastTick.Variance == 2);
