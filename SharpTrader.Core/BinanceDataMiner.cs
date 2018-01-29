@@ -54,7 +54,7 @@ namespace SharpTrader.Utils
             var symbolHistory = HistoryDB.GetSymbolHistory(MarketName, symbol, TimeSpan.FromSeconds(60));
 
             if (symbolHistory.Ticks.Count > 0)
-                startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(TimeSpan.FromSeconds(60));
+                startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(TimeSpan.FromHours(48));
 
 
             while (AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime)

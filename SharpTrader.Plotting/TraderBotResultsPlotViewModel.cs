@@ -26,7 +26,7 @@ namespace SharpTrader.Plotting
 
 
     public class TraderBotResultsPlotViewModel : ObservableObject
-    { 
+    {
         private TraderBot Robot;
         CandleStickSeries CandlesChart;
         private System.Timers.Timer timer;
@@ -34,28 +34,30 @@ namespace SharpTrader.Plotting
         public int ChartWidth { get; set; } = 80;
         public PlotModel PlotViewModel { get; private set; }
         public bool Continue { get; set; }
+        public string Symbol { get; set; }
 
-        public TraderBotResultsPlotViewModel(TraderBot roboto)
+        public TraderBotResultsPlotViewModel(TraderBot robot)
         {
-            Robot = roboto;
+            Robot = robot;
 
-            this.PlotViewModel = new PlotModel { Title = "Tradings" };
+            this.PlotViewModel = new PlotModel { Title = robot.Drawer.Title };
             CandlesChart = new CandleStickSeries()
             {
                 IsVisible = true,
                 //CandleWidth = ChartCandleWidth * 0.5, 
             };
             CandlesChart.TrackerFormatString = "{0}\n{1}: {2}\nHigh: {3:0.#####}\nLow: {4:0.#####}\nOpen: {5:0.#####}\nClose: {6:0.#####}";
+           
+            PlotViewModel.Axes.Add(new DateTimeAxis() { Position = AxisPosition.Bottom, StringFormat = "yyyy/MM/dd" }  );
 
-            PlotViewModel.Axes.Add(new DateTimeAxis() { Position = AxisPosition.Bottom });
-            PlotViewModel.Axes.Add(new LinearAxis() { Position = AxisPosition.Left, MajorStep = 0.0050, MinorStep = 0.0010 });
+            PlotViewModel.Axes.Add(new LinearAxis() { Position = AxisPosition.Left    });
 
             timer = new System.Timers.Timer()
             {
                 Interval = 250,
                 AutoReset = true,
 
-            }; 
+            };
             timer.Elapsed += UpdateOnTimerTick;
             timer.Start();
 
@@ -69,20 +71,21 @@ namespace SharpTrader.Plotting
         }
 
         Stopwatch yRangeUpdateWD = new Stopwatch();
+
         private void UpdateOnTimerTick(object sender, EventArgs e)
         {
-            if(yRangeUpdateWD.ElapsedMilliseconds > 500)
+            if (yRangeUpdateWD.ElapsedMilliseconds > 500)
             {
                 yRangeUpdateWD.Stop();
                 yRangeUpdateWD.Reset();
                 AdjustYAxisZoom();
-            } 
+            }
         }
 
         private void PlotViewModel_Updated(object sender, EventArgs e)
         {
 
-            yRangeUpdateWD.Restart(); 
+            yRangeUpdateWD.Restart();
         }
 
         public static TraderBotResultsPlotViewModel RunWindow(TraderBot bot)
@@ -238,6 +241,7 @@ namespace SharpTrader.Plotting
             return DateTimeAxis.ToDouble(dt);
         }
     }
+
     public class ChartBar : HighLowItem
     {
         public DateTime Time { get; set; }
