@@ -59,6 +59,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BackTester.cs" />
     <Compile Include="BinanceDataMiner.cs" />
     <Compile Include="BinanceMarketApi.cs" />
     <Compile Include="CandlesticksSerieNavigator.cs" />

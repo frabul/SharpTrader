@@ -6,14 +6,7 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-    /// <summary>
-    /// This class can be used to 
-    /// </summary>
-    class RobotLog
-    { 
-        public GraphDrawer Drawer;
-        public List<RobotOperation> Operations;
-    }
+   
 
     class RobotOperation
     {

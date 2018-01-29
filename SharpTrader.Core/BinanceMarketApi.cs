@@ -12,6 +12,10 @@ using Binance.API.Csharp.Client.Models.WebSocket;
 using Binance.API.Csharp.Client.Models.Market.TradingRules;
 using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset, string Quote)>;
 
+using WebSocketSharp;
+using System.Diagnostics;
+using System.Timers;
+
 namespace SharpTrader
 {
     public class BinanceMarketApi : IMarketApi
@@ -23,8 +27,10 @@ namespace SharpTrader
         private long ServerTimeDiff;
         private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
         private string UserDataListenKey;
+        private System.Timers.Timer HearthBeatTimer;
         private SymbolsTable SymbolsTable = new SymbolsTable();
         private List<SymbolFeed> Feeds = new List<SymbolFeed>();
+        private object LockObject = new object();
 
         public string MarketName => "Binance";
         public bool Test { get; set; }
@@ -62,13 +68,79 @@ namespace SharpTrader
             foreach (var bal in accountInfo.Balances)
                 this._Balances[bal.Asset] = bal.Free;
 
-            UserDataListenKey = Client.ListenUserDataEndpoint(
-                HandleAccountUpdatedMessage,
-                HandleOrderUpdateMsg,
-                HandleTradeUpdateMsg);
+            ListenUserData();
 
+            HearthBeatTimer = new System.Timers.Timer()
+            {
+                Interval = 15000,
+                AutoReset = false,
+                Enabled = true,
+
+            };
+            HearthBeatTimer.Elapsed += HearthBeat;
         }
 
+        private void HearthBeat(object state, ElapsedEventArgs elapsed)
+        {
+            lock (LockObject)
+            {
+                bool connected = true; 
+                try
+                {
+                    if (UserDataListenKey != null)
+                    {
+                        var vari = Client.KeepAliveUserStream(UserDataListenKey).Result;
+                    }
+                    else
+                        connected = false;
+                }
+                catch (Exception ex)
+                {
+                    connected = false;
+                }
+                if (!connected)
+                    ListenUserData();
+             
+                HearthBeatTimer.Start();
+            }
+        }
+        Stopwatch LastListenTry = new Stopwatch();
+        private void ListenUserData()
+        {
+            lock (LockObject)
+            {
+                try
+                {
+                    if (UserDataListenKey != null)
+                    {
+                        var res = Client.CloseUserStream(UserDataListenKey).Result;
+                    }
+                }
+                catch { }
+                UserDataListenKey = null;
+                try
+                {
+                    if (LastListenTry.IsRunning && LastListenTry.ElapsedMilliseconds < 20000)
+                        return;
+
+                    if (UserDataListenKey != null)
+                    {
+                        var res = Client.CloseUserStream(UserDataListenKey).Result;
+                    }
+
+                    UserDataListenKey = Client.ListenUserDataEndpoint(
+                        HandleAccountUpdatedMessage,
+                        HandleOrderUpdateMsg,
+                        HandleTradeUpdateMsg);
+                }
+                catch
+                {
+                    Console.WriteLine("Failed to listen for user data stream.");
+                }
+                LastListenTry.Restart();
+            }
+
+        }
         private void HandleAccountUpdatedMessage(AccountUpdatedMessage msg)
         {
             foreach (var bal in msg.Balances)
@@ -165,6 +237,12 @@ namespace SharpTrader
             private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
             private HistoricalRateDataBase HistoryDb;
             private object Locker = new object();
+            private WebSocket KlineSocket;
+            private WebSocket PartialDepthSocket;
+
+            private Stopwatch KlineWatchdog = new Stopwatch();
+            private Stopwatch PartialDepthWatchDog = new Stopwatch();
+            private Timer HearthBeatTimer;
 
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
@@ -183,10 +261,7 @@ namespace SharpTrader
                 this.Market = market;
                 this.QuoteAsset = quoteAsset;
                 this.Asset = asset;
-
-
-                //load missing data to hist db
-
+                //load missing data to hist db 
                 Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
                 var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb);
                 downloader.DownloadCompleteSymbolHistory(Symbol);
@@ -196,13 +271,63 @@ namespace SharpTrader
                 while (symbolHistory.Ticks.Next())
                     this.Ticks.AddRecord(symbolHistory.Ticks.Tick);
 
-                Client.ListenKlineEndpoint(this.Symbol.ToLower(), be.TimeInterval.Minutes_1, HandleKlineEvent);
-                Client.ListenPartialDepthEndPoint(this.Symbol.ToLower(), 5, HandleDepthUpdate);
+                KlineListen(null);
+                PartialDepthListen(null);
 
+                HearthBeatTimer = new Timer(5000)
+                {
+                    AutoReset = false,
+                    Enabled = true,
+
+                };
+                HearthBeatTimer.Elapsed += HearthBeat;
+            }
+
+
+            void HearthBeat(object state, ElapsedEventArgs args)
+            {
+                if (KlineWatchdog.ElapsedMilliseconds > 60000)
+                {
+                    var res = KlineSocket.Ping();
+                    if (!res)
+                        KlineListen(null);
+                }
+                if (PartialDepthWatchDog.ElapsedMilliseconds > 10000)
+                {
+                    var res = PartialDepthSocket.Ping();
+                    if (!res)
+                        PartialDepthListen(null);
+                }
+                HearthBeatTimer.Start();
+            }
+
+            void KlineListen(CloseEventArgs eventArgs)
+            {
+                try
+                {
+                    if (KlineSocket != null)
+                        KlineSocket.Close();
+                }
+                catch { }
+
+                KlineSocket = Client.ListenKlineEndpoint(this.Symbol.ToLower(), be.TimeInterval.Minutes_1, HandleKlineEvent);
+                KlineWatchdog.Restart();
+            }
+            void PartialDepthListen(CloseEventArgs eventArgs)
+            {
+                try
+                {
+                    if (PartialDepthSocket != null)
+                        KlineSocket.Close();
+                }
+                catch { }
+                PartialDepthSocket = Client.ListenPartialDepthEndPoint(this.Symbol.ToLower(), 5, HandleDepthUpdate);
+                KlineWatchdog.Restart();
             }
 
             private void HandleDepthUpdate(DepthPartialMessage messageData)
             {
+                PartialDepthWatchDog.Restart();
                 this.Bid = (double)messageData.Bids.FirstOrDefault().Price;
                 this.Ask = (double)messageData.Asks.FirstOrDefault().Price;
                 Spread = Ask - Bid;
@@ -211,6 +336,7 @@ namespace SharpTrader
 
             private void HandleKlineEvent(KlineMessage msg)
             {
+                KlineWatchdog.Restart();
                 this.Bid = (double)msg.KlineInfo.Close;
 
                 if (msg.KlineInfo.IsFinal)
