@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-    public class GraphDrawer
+    public class PlotHelper
     {
         public List<(DateTime Time, double Value)> Points { get; set; } = new List<(DateTime Time, double Value)>();
         public List<Line> Lines { get; set; } = new List<Line>();
@@ -15,12 +15,43 @@ namespace SharpTrader
         public List<double> VerticalLines { get; set; } = new List<double>();
         public TimeSerieNavigator<ICandlestick> Candles { get; set; } = new TimeSerieNavigator<ICandlestick>();
         public string Title { get; set; }
+
+        public void PlotLines<T>(TimeSerieNavigator<T> timeSerie,
+                                 ColorARGB color,
+                                 Func<T, double[]> valuesSelector) where T : ITimeRecord
+        {
+            var myNavigator = new TimeSerieNavigator<T>(timeSerie);
+            List<Line> lines = new List<Line>();
+            bool firstPass = true;
+            myNavigator.OnNewRecord += (T obj) =>
+            {
+                while (myNavigator.Next())
+                {
+                    var values = valuesSelector(myNavigator.Tick);
+                    if (firstPass)
+                    {
+                        firstPass = false;
+                        foreach (var val in values)
+                            lines.Add(new Line() { Color = color });
+                        Lines.AddRange(lines);
+                    }
+                    for (int i = 0; i < values.Length; i++)
+                    {
+                        lines[i].Points.Add(new Point(myNavigator.Tick.Time, values[i]));
+                    }
+                }
+            };
+        }
+
+
     }
+
     public class Line
     {
         public List<Point> Points = new List<Point>();
         public ColorARGB Color;
     }
+
     [StructLayout(LayoutKind.Explicit)]
     public struct ColorARGB
     {

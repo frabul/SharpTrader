@@ -14,7 +14,7 @@ namespace SharpTrader
         public bool Active { get; set; }
         public IMarketsManager MarketsManager { get; }
         public IMarketApi Market { get; set; }
-        public GraphDrawer Drawer { get; }
+        public PlotHelper Drawer { get; }
 
         public bool Started { get; private set; }
 
@@ -26,13 +26,13 @@ namespace SharpTrader
 
         public TraderBot(IMarketsManager marketsManager)
         {
-            Drawer = new GraphDrawer();
+            Drawer = new PlotHelper();
             MarketsManager = marketsManager;
         }
 
         public TraderBot(IMarketApi market)
         {
-            Drawer = new GraphDrawer();
+            Drawer = new PlotHelper();
             Market = market;
             Started = true;
         }
@@ -57,6 +57,34 @@ namespace SharpTrader
                 OptimizationIndexes.Add(0);
             }
             return OptimizationSpace[OptimizationIndexes[OptimizationSpace.Count - 1]];
+        }
+
+        public List<int[]> GetOptimizePermutations()
+        {
+            List<int[]> permutations = new List<int[]>();
+            int[] currentPerm = new int[OptimizationSpace.Count];
+            bool terminated = false;
+
+            bool Increment(int i)
+            {
+                if (i == currentPerm.Length)
+                    return false; //we created all possible permutations
+
+                currentPerm[i] += 1;
+                if (currentPerm[i] == OptimizationSpace[i].Length)
+                {
+                    currentPerm[i] = 0;
+                    return Increment(i + 1);
+                }
+                else
+                    return true;
+            }
+
+            while (Increment(0))
+            {
+                permutations.Add(currentPerm.ToArray());
+            }
+            return permutations;
         }
     }
 

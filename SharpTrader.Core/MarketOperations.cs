@@ -70,6 +70,7 @@ namespace SharpTrader
         PartiallyFilled,
         Filled,
     }
+
     public interface IOrder
     {
         OrderStatus Status { get; }
