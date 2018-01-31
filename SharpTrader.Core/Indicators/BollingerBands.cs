@@ -31,6 +31,7 @@ namespace SharpTrader.Indicators
 
             Chart = new TimeSerieNavigator<ICandlestick>(data);
             MeanAndVarianceValues.OnNewRecord += rec => this.Calculate();
+            Calculate();
         }
 
         private void Calculate()

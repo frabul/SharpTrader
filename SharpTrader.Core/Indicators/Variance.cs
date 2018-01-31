@@ -50,6 +50,7 @@ namespace SharpTrader.Indicators
             Chart = new TimeSerieNavigator<ICandlestick>(chart);
             Period = period;
             chart.OnNewRecord += rec => this.Calculate();
+            this.Calculate();
         }
 
         /// <summary>

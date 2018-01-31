@@ -47,13 +47,7 @@ namespace SharpTrader
         {
             Client = new BinanceClient(new ApiClient(apiKey, apiSecret));
 
-            var time = Client.GetServerTime().Result;
-            var timeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            Console.WriteLine($"Connected to Binance:\n\t server time {time.ServerTime}\n\t local time  {timeNow} ");
-            ServerTimeDiff = time.ServerTime - timeNow;
-
-            if ((ServerTimeDiff) < 0)
-                Binance.API.Csharp.Client.Utils.Utilities.DeltaTimeAdjustment = (long)((time.ServerTime - timeNow) * 1.1);
+            ServerTimeSynch();
             //todo, return error
             //Client.TestConnectivity();
             //UserDataStream = Client.StartUserStream().Result;
@@ -64,21 +58,40 @@ namespace SharpTrader
                 SymbolsTable.Add(symb.SymbolName, (symb.BaseAsset, symb.QuoteAsset));
             }
             //download account info
-            var accountInfo = Client.GetAccountInfo().Result;
-            foreach (var bal in accountInfo.Balances)
-                this._Balances[bal.Asset] = bal.Free;
 
+            SynchBalance();
             ListenUserData();
 
             HearthBeatTimer = new System.Timers.Timer()
             {
-                Interval = 15000,
+                Interval = 5000,
                 AutoReset = false,
                 Enabled = true,
 
             };
             HearthBeatTimer.Elapsed += HearthBeat;
         }
+
+        private void ServerTimeSynch()
+        {
+            try
+            {
+                var time = Client.GetServerTime().Result;
+                var timeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                //Console.WriteLine($"Connected to Binance:\n\t server time {time.ServerTime}\n\t local time  {timeNow} ");
+                ServerTimeDiff = time.ServerTime - timeNow;
+
+                if ((ServerTimeDiff) < 0)
+                    Binance.API.Csharp.Client.Utils.Utilities.DeltaTimeAdjustment = (long)((time.ServerTime - timeNow) * 1.1);
+            }
+            catch
+            {
+                Console.WriteLine("Error during server time synch");
+            }
+            
+        }
+
+        Stopwatch BalanceUpdateWatchdog = new Stopwatch();
 
         private void HearthBeat(object state, ElapsedEventArgs elapsed)
         {
@@ -101,7 +114,29 @@ namespace SharpTrader
                 if (!connected)
                     ListenUserData();
 
+               
+                SynchBalance();
+
                 HearthBeatTimer.Start();
+            }
+        }
+
+        private void SynchBalance()
+        {
+            if (!BalanceUpdateWatchdog.IsRunning || BalanceUpdateWatchdog.ElapsedMilliseconds > 10000)
+            {
+                ServerTimeSynch();
+                BalanceUpdateWatchdog.Restart();
+                try
+                {
+                    var accountInfo = Client.GetAccountInfo().Result;
+                    foreach (var bal in accountInfo.Balances)
+                        this._Balances[bal.Asset] = bal.Free;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error while trying to update account info " + ex.Message);
+                }
             }
         }
 
@@ -274,8 +309,9 @@ namespace SharpTrader
                 while (symbolHistory.Ticks.Next())
                     this.Ticks.AddRecord(symbolHistory.Ticks.Tick);
 
-                KlineListen(null);
                 PartialDepthListen(null);
+                KlineListen(null);
+             
 
                 HearthBeatTimer = new Timer(5000)
                 {
@@ -321,20 +357,26 @@ namespace SharpTrader
                 try
                 {
                     if (PartialDepthSocket != null)
-                        KlineSocket.Close();
+                        PartialDepthSocket.Close();
                 }
                 catch { }
                 PartialDepthSocket = Client.ListenPartialDepthEndPoint(this.Symbol.ToLower(), 5, HandleDepthUpdate);
-                KlineWatchdog.Restart();
+                PartialDepthWatchDog.Restart();
             }
 
             private void HandleDepthUpdate(DepthPartialMessage messageData)
             {
                 PartialDepthWatchDog.Restart();
-                this.Bid = (double)messageData.Bids.FirstOrDefault().Price;
-                this.Ask = (double)messageData.Asks.FirstOrDefault().Price;
-                Spread = Ask - Bid;
-                SignalTick();
+                var bid = (double)messageData.Bids.FirstOrDefault().Price;
+                var ask = (double)messageData.Asks.FirstOrDefault().Price;
+                if (bid != 0 && ask != 0)
+                {
+                    this.Bid = bid;
+                    this.Ask = ask;
+                    Spread = Ask - Bid;
+                    SignalTick();
+                }
+
             }
 
             private void HandleKlineEvent(KlineMessage msg)
