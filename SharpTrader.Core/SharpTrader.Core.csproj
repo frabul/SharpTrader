@@ -7,7 +7,7 @@
     <ProjectGuid>{320B1902-461A-4B88-8852-D881DC4E5293}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SharpTrader.Core</RootNamespace>
+    <RootNamespace>SharpTrader</RootNamespace>
     <AssemblyName>SharpTrader.Core</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -69,7 +69,12 @@
     <Compile Include="IMarketApi.cs" />
     <Compile Include="IMarketsManager.cs" />
     <Compile Include="Indicators\BollingerBands.cs" />
+    <Compile Include="Indicators\FisherN.cs" />
+    <Compile Include="Indicators\HighPass.cs" />
+    <Compile Include="Indicators\Hurst.cs" />
     <Compile Include="Indicators\Indicator.cs" />
+    <Compile Include="Indicators\MMI.cs" />
+    <Compile Include="Indicators\Normalize.cs" />
     <Compile Include="Indicators\Variance.cs" />
     <Compile Include="MultiMarketSimulator.cs" />
     <Compile Include="MultiMarketSimulator.SymbolFeed.cs" />
