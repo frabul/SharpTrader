@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class HighPass : Filter
+    public class HighPass<T> : Filter<T> where T : ITimeRecord
     {
         public int CutoffPeriod { get; private set; }
-         
+
         private double a;
         private double alpha1;
         private double b;
@@ -17,10 +17,10 @@ namespace SharpTrader.Indicators
 
         public override bool IsReady => Filtered.Count > CutoffPeriod + 3;
 
-        public HighPass(TimeSerieNavigator<ITimeRecord> signal, Func<ITimeRecord, double> valueSelector, int cutOffPeriod)
+        public HighPass(TimeSerieNavigator<T> signal, Func<T, double> valueSelector, int cutOffPeriod)
             : base("HighPass", signal, valueSelector)
         {
-
+            //bisogna fare una timeserie navigator che ritorna FIlter.Record (ha il suo selector interno )
             CutoffPeriod = cutOffPeriod;
 
             Filtered.AddRecord(new Record(DateTime.MinValue, 0));

@@ -6,10 +6,11 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class Normalize : Filter
+    public class Normalize<T> : Filter<T> where T : ITimeRecord
     {
         public int Period { get; }
-        public Normalize(TimeSerieNavigator<ITimeRecord> signal, Func<ITimeRecord, double> valueSelector, int period) : base("Normalize", signal, valueSelector)
+        public Normalize(TimeSerieNavigator<T> signal, Func<T, double> valueSelector, int period)
+            : base("Normalize", signal, valueSelector)
         {
             Period = period;
             CalculateAll();
@@ -36,14 +37,14 @@ namespace SharpTrader.Indicators
                 return 2d * (GetSignal(0) - min) / (max - min) - 1;
             else
                 return 0;
-        } 
+        }
     }
 
-    public class Min : Filter
+    public class Min<T> : Filter<T> where T : ITimeRecord
     {
         public int Period { get; }
         //todo
-        public Min(TimeSerieNavigator<ITimeRecord> signal, Func<ITimeRecord, double> valueSelector) 
+        public Min(TimeSerieNavigator<T> signal, Func<T, double> valueSelector)
             : base("Min(serie)", signal, valueSelector)
         {
 
@@ -64,10 +65,11 @@ namespace SharpTrader.Indicators
         }
     }
 
-    public class Max : Filter
+    public class Max<T> : Filter<T> where T : ITimeRecord
     {
         public int Period { get; }
-        public Max(TimeSerieNavigator<ITimeRecord> signal, Func<ITimeRecord, double> valueSelector) : base("Max(serie)", signal, valueSelector)
+        public Max(TimeSerieNavigator<T> signal, Func<T, double> valueSelector)
+            : base("Max(serie)", signal, valueSelector)
         {
 
             CalculateAll();

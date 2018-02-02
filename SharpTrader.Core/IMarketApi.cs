@@ -8,6 +8,8 @@ namespace SharpTrader
 {
     public interface IMarketApi
     {
+        event Action<IMarketApi, ITrade> OnNewTrade;
+
         string MarketName { get; }
         /// <summary>
         /// Current date and time
@@ -29,14 +31,22 @@ namespace SharpTrader
         /// </summary> 
         ISymbolFeed GetSymbolFeed(string symbol);
 
+        /// <summary>
+        /// Get all currently open orders
+        /// </summary> 
+        IEnumerable<IOrder> OpenOrders { get; }
+
         IEnumerable<ISymbolFeed> ActiveFeeds { get; }
 
         IEnumerable<ITrade> Trades { get; }
 
         decimal GetBalance(string asset);
-        (string Symbol, decimal balance)[] Balances { get; } 
+        (string Symbol, decimal balance)[] Balances { get; }
+     
+
         decimal GetBtcPortfolioValue();
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
+        void OrderCancel(string id);
     }
 
     public interface ISymbolFeed

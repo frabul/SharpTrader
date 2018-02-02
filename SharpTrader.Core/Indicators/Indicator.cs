@@ -16,15 +16,15 @@ namespace SharpTrader.Indicators
         public abstract bool IsReady { get; }
     }
 
-    public abstract class Filter : Indicator
+    public abstract class Filter<T> : Indicator where T : ITimeRecord
     {
-        private TimeSerieNavigator<ITimeRecord> Signal;
-        private Func<ITimeRecord, double> Selector;
+        private TimeSerieNavigator<T> Signal;
+        private Func<T, double> Selector;
         protected TimeSerie<Record> Filtered { get; } = new TimeSerie<Record>();
 
-        public Filter(string name, TimeSerieNavigator<ITimeRecord> signal, Func<ITimeRecord, double> valueSelector) : base(name)
+        public Filter(string name, TimeSerieNavigator<T> signal, Func<T, double> valueSelector) : base(name)
         {
-            Signal = signal;
+            Signal = new TimeSerieNavigator<T>(signal);
             Signal.OnNewRecord += rec => CalculateAll();
         }
 

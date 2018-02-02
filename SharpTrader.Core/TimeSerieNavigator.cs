@@ -13,6 +13,7 @@ namespace SharpTrader
         DateTime Time { get; }
     }
 
+
     public class TimeSerieNavigator<T> where T : ITimeRecord
     {
         public event Action<T> OnNewRecord;
@@ -47,7 +48,7 @@ namespace SharpTrader
         public TimeSerieNavigator()
         {
             Records = new TimeRecordCollection<T>();
-            Records.NewRecord += (sender, rec ) => OnNewRecord?.Invoke(rec);
+            Records.NewRecord += (sender, rec) => OnNewRecord?.Invoke(rec);
         }
 
         public TimeSerieNavigator(TimeSerieNavigator<T> items)
@@ -61,11 +62,14 @@ namespace SharpTrader
             Records.NewRecord += (sender, rec) => OnNewRecord?.Invoke(rec);
         }
 
-        public T GetFromCursor(int count)
+        public T GetFromCursor(int ind)
         {
-            return Records[_Cursor - count];
+            return Records[_Cursor - ind];
         }
-
+        public T GetFromLast(int ind)
+        {
+            return Records[Records.Count - 1 - ind];
+        }
         public bool TryGetRecord(DateTime time, out T record)
         {
 
@@ -94,6 +98,8 @@ namespace SharpTrader
         {
             _Cursor = Records.Count - 1;
         }
+
+
 
         /// <summary>
         /// Sets the cursor to the nearest tick before  or exacty at provided time.
@@ -184,9 +190,13 @@ namespace SharpTrader
             _Cursor = PositionSaveStack.Pop();
         }
 
+        public Signal<T> ToSignal(Func<T, double> selector)
+        {
+            return new Signal<T>(this, selector);
+        }
 
     }
-     
+
     public class TimeRecordCollection<T> where T : ITimeRecord
     {
         public event Action<TimeRecordCollection<T>, T> NewRecord;

@@ -93,6 +93,8 @@ namespace SharpTrader
                             market.AddNewCandle(feed as SymbolFeed, new Candlestick(data.Ticks.Tick));
                         }
                 }
+            foreach (var market in _Markets)
+                market.ResolveOrders();
 
             if (raiseEvents)
             {
@@ -108,10 +110,6 @@ namespace SharpTrader
             public MarketConfiguration[] Markets { get; set; }
             public SymbolConfiguration[] Symbols { get; set; }
         }
-
-
-
-
     }
 
 

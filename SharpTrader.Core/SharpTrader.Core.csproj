@@ -76,8 +76,10 @@
     <Compile Include="Indicators\MMI.cs" />
     <Compile Include="Indicators\Normalize.cs" />
     <Compile Include="Indicators\Variance.cs" />
+    <Compile Include="ISignalNavigator.cs" />
     <Compile Include="MultiMarketSimulator.cs" />
     <Compile Include="MultiMarketSimulator.SymbolFeed.cs" />
+    <Compile Include="Signal.cs" />
     <Compile Include="SymbolFeedBoilerplate.cs" />
     <Compile Include="TimeSerie.cs" />
     <Compile Include="TimeSerieNavigator.cs" />

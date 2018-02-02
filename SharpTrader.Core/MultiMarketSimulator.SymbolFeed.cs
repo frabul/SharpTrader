@@ -28,6 +28,7 @@ namespace SharpTrader
 
             public event Action<IMarketApi, ITrade> OnNewTrade;
 
+
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
             public IEnumerable<ISymbolFeed> ActiveFeeds => SymbolsFeed.Values;
             public IEnumerable<ITrade> Trades => this._Trades;
@@ -61,7 +62,6 @@ namespace SharpTrader
                 lock (LockObject)
                     this.PendingOrders.Add(order);
                 return new MarketOperation(MarketOperationStatus.Completed) { };
-
             }
 
             public IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount)
@@ -83,6 +83,7 @@ namespace SharpTrader
 
                 return new MarketOperation(MarketOperationStatus.Completed) { };
             }
+
             public decimal GetBalance(string asset)
             {
                 _Balances.TryGetValue(asset, out decimal res);
@@ -90,6 +91,15 @@ namespace SharpTrader
             }
 
             public (string Symbol, decimal balance)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
+
+            public IEnumerable<IOrder> OpenOrders
+            {
+                get
+                {
+                    lock (LockObject)
+                        return PendingOrders.ToArray();
+                }
+            }
 
             internal void RaisePendingEvents()
             {
@@ -99,7 +109,7 @@ namespace SharpTrader
                     trades = new List<ITrade>(TradesToSignal);
                     TradesToSignal.Clear();
                 }
-                foreach (var trade in TradesToSignal)
+                foreach (var trade in trades)
                 {
                     this.OnNewTrade?.Invoke(this, trade);
                 }
@@ -112,21 +122,22 @@ namespace SharpTrader
             {
                 //resolve orders/trades 
                 lock (LockObject)
+                {
                     for (int i = 0; i < PendingOrders.Count; i++)
                     {
                         var order = PendingOrders[i];
                         var feed = SymbolsFeed[order.Symbol];
                         if (order.Type == OrderType.Limit)
                         {
-                            var willBuy = (order.TradeType == TradeType.Buy && feed.Ticks.Tick.Low + feed.Spread <= order.Rate);
-                            var willSell = (order.TradeType == TradeType.Sell && feed.Ticks.Tick.High >= order.Rate);
+                            var willBuy = (order.TradeType == TradeType.Buy && feed.Ticks.LastTick.Low + feed.Spread <= order.Rate);
+                            var willSell = (order.TradeType == TradeType.Sell && feed.Ticks.LastTick.High >= order.Rate);
 
                             if (willBuy || willSell)
                             {
                                 var trade = new Trade(
                                     market: this.MarketName,
                                     symbol: feed.Symbol,
-                                    time: feed.Ticks.Tick.OpenTime,
+                                    time: feed.Ticks.LastTick.OpenTime.AddSeconds(feed.Ticks.LastTick.Timeframe.Seconds / 2),
                                     price: order.Rate,
                                     amount: order.Amount,
                                     type: order.TradeType,
@@ -134,10 +145,14 @@ namespace SharpTrader
                                 );
                                 RegisterTrade(feed, trade);
                                 order.Status = OrderStatus.Filled;
+                                PendingOrders.RemoveAt(i--);
                             }
                         }
                     }
+                }
             }
+
+
 
             internal void AddNewCandle(SymbolFeed feed, Candlestick tick)
             {
@@ -147,24 +162,29 @@ namespace SharpTrader
 
             private void RegisterTrade(SymbolFeed feed, Trade trade)
             {
-                if (!_Balances.ContainsKey(feed.Asset))
-                    _Balances.Add(feed.Asset, 0);
-                if (!_Balances.ContainsKey(feed.QuoteAsset))
-                    _Balances.Add(feed.QuoteAsset, 0);
-                if (trade.Type == TradeType.Buy)
-                {
-                    _Balances[feed.Asset] += Convert.ToDecimal(trade.Amount);
-                    _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
-                }
-                if (trade.Type == TradeType.Sell)
-                {
-                    _Balances[feed.Asset] -= Convert.ToDecimal(trade.Amount);
-                    _Balances[feed.QuoteAsset] += Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
-                }
-                _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Fee);
-
                 lock (LockObject)
+                {
+                    if (!_Balances.ContainsKey(feed.Asset))
+                        _Balances.Add(feed.Asset, 0);
+                    if (!_Balances.ContainsKey(feed.QuoteAsset))
+                        _Balances.Add(feed.QuoteAsset, 0);
+                    if (trade.Type == TradeType.Buy)
+                    {
+                        _Balances[feed.Asset] += Convert.ToDecimal(trade.Amount);
+                        _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
+                    }
+                    if (trade.Type == TradeType.Sell)
+                    {
+                        _Balances[feed.Asset] -= Convert.ToDecimal(trade.Amount);
+                        _Balances[feed.QuoteAsset] += Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
+                    }
+                    _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Fee);
+
+
                     this._Trades.Add(trade);
+                    TradesToSignal.Add(trade);
+                }
+
             }
 
             public decimal GetBtcPortfolioValue()
@@ -186,6 +206,24 @@ namespace SharpTrader
             public (decimal min, decimal step) GetMinTradable(string tradeSymbol)
             {
                 return (0, 0);
+            }
+
+            public void OrderCancel(string id)
+            {
+                lock (LockObject)
+                {
+                    for (int i = 0; i < PendingOrders.Count; i++)
+                    {
+                        var order = PendingOrders[i];
+                        if (order.Id == id)
+                        {
+                            PendingOrders.RemoveAt(i--);
+                            order.Status = OrderStatus.Cancelled;
+                            ClosedOrders.Add(order);
+                        }
+
+                    }
+                }
             }
         }
 
