@@ -55,13 +55,13 @@ namespace SharpTrader
                 return feed;
             }
 
-            public IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, double rate)
+            public IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
             {
-
-                var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, rate);
+                var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, (double)rate);
                 lock (LockObject)
                     this.PendingOrders.Add(order);
                 return new MarketOperation(MarketOperationStatus.Completed) { };
+
             }
 
             public IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount)
@@ -224,6 +224,17 @@ namespace SharpTrader
 
                     }
                 }
+            }
+
+
+            public decimal GetSymbolPrecision(string symbol)
+            {
+                return 0.0000000001m;
+            }
+
+            public decimal GetMinNotional(string asset)
+            {
+                return 0;
             }
         }
 

@@ -32,6 +32,7 @@ namespace SharpTrader
         private string UserDataListenKey;
         private System.Timers.Timer HearthBeatTimer;
         private SymbolsTable SymbolsTable = new SymbolsTable();
+
         private List<SymbolFeed> Feeds = new List<SymbolFeed>();
         private object LockObject = new object();
         private List<ApiOrder> _OpenOrders = new List<ApiOrder>();
@@ -60,10 +61,10 @@ namespace SharpTrader
             Client = new BinanceClient(new ApiClient(apiKey, apiSecret));
 
             ServerTimeSynch();
-     
+
             //Client.TestConnectivity();
             //UserDataStream = Client.StartUserStream().Result;
-       
+
             ExchangeInfo = Client.GetTradingRulesAsync().Result;
             foreach (var symb in ExchangeInfo.Symbols)
             {
@@ -73,7 +74,7 @@ namespace SharpTrader
             //todo Synch trades
             SynchBalance();
             ListenUserData();
-
+            SynchOrders();
             HearthBeatTimer = new System.Timers.Timer()
             {
                 Interval = 5000,
@@ -82,6 +83,28 @@ namespace SharpTrader
 
             };
             HearthBeatTimer.Elapsed += HearthBeat;
+        }
+
+        private void SynchOrders()
+        {
+            lock (LockObject)
+            {
+                try
+                {
+                    _OpenOrders.Clear();
+                    var currOrders = Client.GetCurrentOpenOrders("").Result;
+                    foreach (var order in currOrders)
+                    {
+                        var ord = new ApiOrder(order);
+                        _OpenOrders.Add(ord);
+                        Orders.Add(ord);
+                    }
+                }
+                catch
+                {
+                    Console.WriteLine("Error whili synch orders");
+                }
+            }
         }
 
         private void ServerTimeSynch()
@@ -125,29 +148,31 @@ namespace SharpTrader
                 }
                 if (!connected)
                     ListenUserData();
-
-
-                SynchBalance();
-
-                HearthBeatTimer.Start();
             }
+
+            SynchBalance();
+            HearthBeatTimer.Start();
+
         }
 
         private void SynchBalance()
         {
             if (!BalanceUpdateWatchdog.IsRunning || BalanceUpdateWatchdog.ElapsedMilliseconds > 10000)
             {
-                ServerTimeSynch();
-                BalanceUpdateWatchdog.Restart();
-                try
+                lock (LockObject)
                 {
-                    var accountInfo = Client.GetAccountInfo().Result;
-                    foreach (var bal in accountInfo.Balances)
-                        this._Balances[bal.Asset] = bal.Free;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Error while trying to update account info " + ex.Message);
+                    ServerTimeSynch();
+                    BalanceUpdateWatchdog.Restart();
+                    try
+                    {
+                        var accountInfo = Client.GetAccountInfo().Result;
+                        foreach (var bal in accountInfo.Balances)
+                            this._Balances[bal.Asset] = bal.Free;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Error while trying to update account info " + ex.Message);
+                    }
                 }
             }
         }
@@ -176,9 +201,9 @@ namespace SharpTrader
                     }
 
                     UserDataListenKey = Client.ListenUserDataEndpoint(
-                        HandleAccountUpdatedMessage,
-                        HandleOrderUpdateMsg,
-                        HandleTradeUpdateMsg);
+                        HandleAccountUpdatedMessage, 
+                        HandleTradeUpdateMsg,
+                        HandleOrderUpdateMsg);
                 }
                 catch
                 {
@@ -191,10 +216,14 @@ namespace SharpTrader
 
         private void HandleAccountUpdatedMessage(AccountUpdatedMessage msg)
         {
-            foreach (var bal in msg.Balances)
+            lock (LockObject)
             {
-                this._Balances[bal.Asset] = bal.Free;
+                foreach (var bal in msg.Balances)
+                {
+                    this._Balances[bal.Asset] = bal.Free;
+                }
             }
+
         }
 
         private void HandleOrderUpdateMsg(OrderOrTradeUpdatedMessage msg)
@@ -202,48 +231,68 @@ namespace SharpTrader
             lock (LockObject)
             {
                 var order = new ApiOrder(msg);
-                if (msg.Status == "NEW" || msg.Status == "PARTIALLY_FILLED") //order open
+                bool remove = true;
+                if (msg.Status == "NEW" || msg.Status == "PARTIALLY_FILLED")
+                    remove = false;//order open
+                //update and add
+                bool found = false;
+                for (int i = 0; i < Orders.Count; i++)
                 {
-                    bool found = false;
-                    for (int i = 0; i < _OpenOrders.Count; i++)
+                    if (Orders[i].BinanceOrder.OrderId == msg.OrderId)
                     {
-                        if (_OpenOrders[i].BinanceOrder.OrderId == msg.Orderid)
-                        {
-                            _OpenOrders[i] = order;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found)
-                    {
-                        _OpenOrders.Add(order);
+                        Orders[i].Update(order);
+                        found = true;
                     }
                 }
-                else
+                if (!found)
+                    Orders.Add(order);
+                //-----
+                found = false;
+                for (int i = 0; i < _OpenOrders.Count; i++)
                 {
-                    for (int i = 0; i < _OpenOrders.Count; i++)
+                    if (_OpenOrders[i].BinanceOrder.OrderId == msg.OrderId)
                     {
-                        if (_OpenOrders[i].BinanceOrder.OrderId == msg.Orderid)
-                        {
+                        if (remove)
                             _OpenOrders.RemoveAt(i);
-                            break;
-                        }
+                        found = true;
                     }
+                }
+                if (!found && !remove)
+                {
+                    _OpenOrders.Add(order);
                 }
             }
-
         }
 
         private void HandleTradeUpdateMsg(OrderOrTradeUpdatedMessage msg)
         {
             var trade = new ApiTrade(msg);
+            lock (LockObject)
+            {
+                var order = Orders.FirstOrDefault(o => o.Id == trade.OrderId);
+                if (order != null)
+                {
+                    if (msg.ExecutionType == "CANCELLED")
+                    {
+                        Orders.Remove(order);
+                        if (_OpenOrders.Contains(order))
+                            _OpenOrders.Remove(order);
+                    } 
+                    order.ResultingTrades.Add(trade);
+                }
+            }
+
             OnNewTrade?.Invoke(this, trade);
         }
 
         public decimal GetBalance(string asset)
         {
-            if (_Balances.ContainsKey(asset))
-                return _Balances[asset];
+            lock (LockObject)
+            {
+                if (_Balances.ContainsKey(asset))
+                    return _Balances[asset];
+
+            }
             return 0;
         }
 
@@ -264,9 +313,11 @@ namespace SharpTrader
             return feed;
         }
 
-        public IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, double rate)
+        public IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
         {
-            throw new NotImplementedException();
+            var side = type == TradeType.Buy ? be.OrderSide.BUY : be.OrderSide.SELL;
+            var order = Client.PostNewOrder(symbol, amount, rate, side, be.OrderType.LIMIT).Result;
+            return new MarketOperation(MarketOperationStatus.Completed);
         }
 
         public IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount)
@@ -303,6 +354,18 @@ namespace SharpTrader
             return (0, 0);
         }
 
+        public decimal GetSymbolPrecision(string symbol)
+        {
+            var info = ExchangeInfo.Symbols.Where(s => s.SymbolName == symbol).FirstOrDefault();
+            if (info != null)
+            {
+                var filt = info.Filters.Where(f => f.FilterType == "PRICE_FILTER").FirstOrDefault();
+                if (filt != null)
+                    return filt.TickSize;
+            }
+            return 0.000001m;
+        }
+
         public void OrderCancel(string id)
         {
             var orders = this.Orders.Where(or => or.Id == id);
@@ -313,6 +376,18 @@ namespace SharpTrader
 
             var cancel = this.Client.CancelOrder(order.Symbol, order.BinanceOrder.OrderId, recvWindow: 5000).Result;
 
+        }
+
+        public decimal GetMinNotional(string symbol)
+        {
+            var info = ExchangeInfo.Symbols.Where(s => s.SymbolName == symbol).FirstOrDefault();
+            if (info != null)
+            {
+                var filt = info.Filters.Where(f => f.FilterType == "MIN_NOTIONAL").FirstOrDefault();
+                if (filt != null)
+                    return filt.MinNotional;
+            }
+            return 0;
         }
 
         class MarketOperation : IMarketOperation
@@ -474,6 +549,8 @@ namespace SharpTrader
             public OrderType Type { get; private set; }
             public Order BinanceOrder { get; set; }
             public OrderStatus Status { get; internal set; } = OrderStatus.Pending;
+            internal List<ApiTrade> ResultingTrades { get; private set; } = new List<ApiTrade>();
+            public IEnumerable<ITrade> Trades => ResultingTrades;
 
             public ApiOrder(Order binanceOrder)
             {
@@ -485,19 +562,36 @@ namespace SharpTrader
                 Rate = (double)binanceOrder.Price;
                 Status = GetStatus(binanceOrder.Status);
                 Id = binanceOrder.OrderId.ToString();
-
+                BinanceOrder = binanceOrder;
             }
 
-            public ApiOrder(OrderOrTradeUpdatedMessage binanceOrder)
+            public ApiOrder(OrderOrTradeUpdatedMessage bo)
             {
-                Symbol = binanceOrder.Symbol;
+                Symbol = bo.Symbol;
                 Market = "Binance";
-                TradeType = binanceOrder.Side == "BUY" ? TradeType.Buy : TradeType.Sell;
-                Type = binanceOrder.Type == "LIMIT" ? OrderType.Limit : OrderType.Market;
-                Amount = binanceOrder.OriginalQuantity;
-                Rate = (double)binanceOrder.Price;
-                Status = GetStatus(binanceOrder.Status);
-                Id = binanceOrder.Orderid.ToString();
+                TradeType = bo.Side == "BUY" ? TradeType.Buy : TradeType.Sell;
+                Type = bo.Type == "LIMIT" ? OrderType.Limit : OrderType.Market;
+                Amount = bo.OriginalQuantity;
+                Rate = (double)bo.Price;
+                Status = GetStatus(bo.Status);
+                Id = bo.OrderId.ToString();
+                BinanceOrder = new Order
+                {
+                    ClientOrderId = bo.NewClientOrderId,
+                    ExecutedQty = bo.FilledTradesAccumulatedQuantity,
+                    IcebergQty = bo.IcebergQuantity,
+                    OrderId = bo.OrderId,
+                    OrigQty = bo.OriginalQuantity,
+                    Price = bo.Price,
+                    Side = bo.Side,
+                    Status = bo.Status,
+                    StopPrice = bo.StopPrice,
+                    Symbol = bo.Symbol,
+                    Time = bo.TradeTime,
+                    TimeInForce = bo.TimeInForce,
+                    Type = bo.Type,
+
+                };
             }
 
 
@@ -523,6 +617,11 @@ namespace SharpTrader
                         return OrderStatus.Pending;
                 }
             }
+
+            internal void Update(ApiOrder order)
+            {
+                this.Status = order.Status;
+            }
         }
 
         class ApiTrade : ITrade
@@ -533,9 +632,11 @@ namespace SharpTrader
                 Symbol = tr.Symbol;
                 Date = DateTimeOffset.FromUnixTimeMilliseconds(tr.TradeTime).ToUniversalTime().UtcDateTime;
                 Type = tr.Side == "BUY" ? TradeType.Buy : TradeType.Sell;
-                Price = (double)tr.Price;
-                Amount = tr.OriginalQuantity;
+                Price = (double)tr.LastFilledTradePrice;
+                Amount = tr.LastFilledTradeQuantity;
                 Fee = Fee;
+                FeeAsset = FeeAsset;
+                OrderId = tr.OrderId.ToString();
             }
             public decimal Amount { get; private set; }
 
@@ -550,6 +651,10 @@ namespace SharpTrader
             public string Symbol { get; private set; }
 
             public TradeType Type { get; private set; }
+
+            public string OrderId { get; private set; }
+
+            public string FeeAsset { get; private set; }
         }
     }
 }

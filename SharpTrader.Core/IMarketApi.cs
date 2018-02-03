@@ -24,7 +24,7 @@ namespace SharpTrader
         /// <summary>
         /// Puts a limit order on the market
         /// </summary> 
-        IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, double rate);
+        IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, decimal rate);
 
         /// <summary>
         /// Subscribes to updates from a given symbol in a given market
@@ -46,7 +46,9 @@ namespace SharpTrader
 
         decimal GetBtcPortfolioValue();
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
+        decimal GetSymbolPrecision(string symbol);
         void OrderCancel(string id);
+        decimal GetMinNotional(string asset);
     }
 
     public interface ISymbolFeed
