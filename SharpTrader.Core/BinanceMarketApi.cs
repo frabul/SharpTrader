@@ -151,8 +151,7 @@ namespace SharpTrader
             }
 
             SynchBalance();
-            HearthBeatTimer.Start();
-
+            HearthBeatTimer.Start(); 
         }
 
         private void SynchBalance()
@@ -296,7 +295,7 @@ namespace SharpTrader
             return 0;
         }
 
-        public decimal GetBtcPortfolioValue()
+        public decimal GetNormalizedPortfolioValue(string asset)
         {
             throw new NotImplementedException();
         }

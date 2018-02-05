@@ -28,13 +28,18 @@ namespace SharpTrader.Plotting
     public class TraderBotResultsPlotViewModel : ObservableObject
     {
         private TraderBot Robot;
-        CandleStickSeries CandlesChart;
+        private CandleStickSeries CandlesChart;
         private System.Timers.Timer timer;
+        private Stopwatch yRangeUpdateWD = new Stopwatch();
 
         public int ChartWidth { get; set; } = 80;
         public PlotModel PlotViewModel { get; private set; }
         public bool Continue { get; set; }
         public string Symbol { get; set; }
+
+        private DateTimeAxis XAxis;
+        private LinearAxis SymbolY;
+
 
         public TraderBotResultsPlotViewModel(TraderBot robot)
         {
@@ -47,77 +52,44 @@ namespace SharpTrader.Plotting
                 //CandleWidth = ChartCandleWidth * 0.5, 
             };
             CandlesChart.TrackerFormatString = "{0}\n{1}: {2}\nHigh: {3:0.#####}\nLow: {4:0.#####}\nOpen: {5:0.#####}\nClose: {6:0.#####}";
-           
-            PlotViewModel.Axes.Add(new DateTimeAxis() { Position = AxisPosition.Bottom, StringFormat = "yyyy/MM/dd" }  );
-
-            PlotViewModel.Axes.Add(new LinearAxis() { Position = AxisPosition.Left    });
-
+            XAxis = new DateTimeAxis()
+            {
+                
+                Position = AxisPosition.Bottom,
+                StringFormat = "yyyy/MM/dd HH:mm"
+            };
+            SymbolY = new LinearAxis() { Position = AxisPosition.Left };
+            PlotViewModel.Axes.Add(XAxis);
+            PlotViewModel.Axes.Add(SymbolY);
+            PlotViewModel.KeyDown += PlotViewModel_KeyDown;
             timer = new System.Timers.Timer()
             {
-                Interval = 250,
+                Interval = 100,
                 AutoReset = true,
 
             };
             timer.Elapsed += UpdateOnTimerTick;
             timer.Start();
-
-            PlotViewModel.Updated += PlotViewModel_Updated;
-            PlotViewModel.TouchCompleted += PlotViewModel_TouchCompleted;
         }
 
-        private void PlotViewModel_TouchCompleted(object sender, OxyTouchEventArgs e)
+        private void PlotViewModel_KeyDown(object sender, OxyKeyEventArgs e)
         {
+            if (e.Key == OxyKey.R && e.ModifierKeys == OxyModifierKeys.None)
+            {
+                AdjustYAxisZoom();
+                PlotViewModel.InvalidatePlot(false);
+            }
 
         }
-
-        Stopwatch yRangeUpdateWD = new Stopwatch();
 
         private void UpdateOnTimerTick(object sender, EventArgs e)
         {
-            if (yRangeUpdateWD.ElapsedMilliseconds > 500)
+            if (yRangeUpdateWD.ElapsedMilliseconds > 300)
             {
                 yRangeUpdateWD.Stop();
                 yRangeUpdateWD.Reset();
                 AdjustYAxisZoom();
             }
-        }
-
-        private void PlotViewModel_Updated(object sender, EventArgs e)
-        {
-
-            yRangeUpdateWD.Restart();
-        }
-
-        public static TraderBotResultsPlotViewModel RunWindow(TraderBot bot)
-        {
-            SharpTrader.Plotting.TraderBotResultsPlotViewModel vm = new Plotting.TraderBotResultsPlotViewModel(bot);
-            Thread newWindowThread = new Thread(new ThreadStart(() =>
-            {
-                // Create our context, and install it:
-                SynchronizationContext.SetSynchronizationContext(
-                    new DispatcherSynchronizationContext(
-                        Dispatcher.CurrentDispatcher));
-
-                var Window = new TraderBotResultsPlot
-                {
-                    DataContext = vm
-                };
-                Window.Show();
-                // When the window closes, shut down the dispatcher
-                Window.Closed += (s, e) =>
-                   Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
-
-                Window.Show();
-                // Start the Dispatcher Processing
-                System.Windows.Threading.Dispatcher.Run();
-            }));
-            newWindowThread.SetApartmentState(ApartmentState.STA);
-            // Make the thread a background thread
-            newWindowThread.IsBackground = true;
-            // Start the thread
-            newWindowThread.Start();
-
-            return vm;
         }
 
         public void UpdateChart()
@@ -130,14 +102,14 @@ namespace SharpTrader.Plotting
             }
             if (this.CandlesChart.Items.Count < 1)
                 return;
+
             PlotViewModel.Series.Add(CandlesChart);
             var lastTick = Robot.Drawer.Candles.Tick;
 
             //---------- ADJUST X
 
             PlotViewModel.Axes[0].Minimum =
-                Robot.Drawer.Candles.Tick.Time.Subtract(new TimeSpan(ChartWidth * lastTick.Timeframe.Ticks)).ToAxisDouble();
-
+            Robot.Drawer.Candles.Tick.Time.Subtract(new TimeSpan(ChartWidth * lastTick.Timeframe.Ticks)).ToAxisDouble();
             PlotViewModel.Axes[0].Maximum = Robot.Drawer.Candles.Tick.Time.ToAxisDouble();
             PlotViewModel.Axes[0].Reset();
             //--------- ADJUST Y
@@ -224,9 +196,48 @@ namespace SharpTrader.Plotting
                 i--;
             }
 
-            PlotViewModel.Axes[1].Minimum = range.Low - (range.High - range.Low) * 0.1;
-            PlotViewModel.Axes[1].Maximum = range.High + (range.High - range.Low) * 0.1;
+            PlotViewModel.Axes[1].Minimum = range.Low - (range.High - range.Low) * 0.03;
+            PlotViewModel.Axes[1].Maximum = range.High + (range.High - range.Low) * 0.03;
+
             PlotViewModel.Axes[1].Reset();
+            //PlotViewModel.InvalidatePlot(false);
+
+
+        }
+
+        public static TraderBotResultsPlotViewModel RunWindow(TraderBot bot)
+        {
+            SharpTrader.Plotting.TraderBotResultsPlotViewModel vm = new Plotting.TraderBotResultsPlotViewModel(bot);
+            TraderBotResultsPlot Window = null;
+            Thread newWindowThread = new Thread(new ThreadStart(() =>
+            {
+                // Create our context, and install it:
+                SynchronizationContext.SetSynchronizationContext(
+                    new DispatcherSynchronizationContext(
+                        Dispatcher.CurrentDispatcher));
+
+                Window = new TraderBotResultsPlot();
+
+                // When the window closes, shut down the dispatcher
+                Window.Closed += (s, e) =>
+                   Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
+
+                Window.Show();
+                // Start the Dispatcher Processing
+                System.Windows.Threading.Dispatcher.Run();
+            }));
+
+
+            newWindowThread.SetApartmentState(ApartmentState.STA);
+            // Make the thread a background thread
+            newWindowThread.IsBackground = true;
+            // Start the thread
+            newWindowThread.Start();
+            while (Window == null)
+                Thread.Sleep(100);
+            Window.Dispatcher.Invoke(new Action(() => Window.DataContext = vm));
+            Thread.Sleep(100);
+            return vm;
         }
     }
 

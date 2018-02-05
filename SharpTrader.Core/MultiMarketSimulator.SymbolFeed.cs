@@ -32,14 +32,13 @@ namespace SharpTrader
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
             public IEnumerable<ISymbolFeed> ActiveFeeds => SymbolsFeed.Values;
             public IEnumerable<ITrade> Trades => this._Trades;
-            public Market(string name, double makerFee, double takerFee, string dataDir, decimal initialBTC = 0)
+            public Market(string name, double makerFee, double takerFee, string dataDir)
             {
                 MarketName = name;
                 MakerFee = makerFee;
                 TakerFee = takerFee;
                 var text = System.IO.File.ReadAllText(dataDir + "BinanceSymbolsTable.json");
                 SymbolsTable = Newtonsoft.Json.JsonConvert.DeserializeObject<SymbolsTable>(text);
-                _Balances.Add("BTC", initialBTC);
             }
 
             public ISymbolFeed GetSymbolFeed(string symbol)
@@ -187,17 +186,21 @@ namespace SharpTrader
 
             }
 
-            public decimal GetBtcPortfolioValue()
+            public decimal GetNormalizedPortfolioValue(string asset)
             {
                 decimal val = 0;
                 foreach (var kv in _Balances)
                 {
-                    if (kv.Key == "BTC")
+                    if (kv.Key == asset)
                         val += kv.Value;
                     else if (kv.Value > 0)
                     {
-                        var feed = SymbolsFeed[kv.Key + "BTC"];
-                        val += ((decimal)feed.Ask * kv.Value);
+                        var symbol = (kv.Key + asset);
+                        if (SymbolsFeed.ContainsKey(symbol))
+                        {
+                            var feed = SymbolsFeed[symbol];
+                            val += ((decimal)feed.Ask * kv.Value);
+                        }
                     }
                 }
                 return val;
@@ -236,7 +239,16 @@ namespace SharpTrader
             {
                 return 0;
             }
+
+            internal void AddBalance(string asset, decimal amount)
+            {
+                if (!_Balances.ContainsKey(asset))
+                    _Balances.Add(asset, 0);
+                _Balances[asset] += amount;
+            }
         }
+
+
 
         class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
         {

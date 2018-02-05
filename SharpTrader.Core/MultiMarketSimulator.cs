@@ -29,7 +29,7 @@ namespace SharpTrader
             int i = 0;
             foreach (var mc in Config.Markets)
             {
-                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, 1);
+                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory );
                 _Markets[i++] = market;
             }
         }
@@ -103,6 +103,11 @@ namespace SharpTrader
                     market.RaisePendingEvents();
             }
             return true;
+        }
+
+        public void Deposit(string market, string asset, decimal amount)
+        {
+            _Markets.Where(m => m.MarketName == market).First().AddBalance(asset, amount);
         }
 
         class Configuration

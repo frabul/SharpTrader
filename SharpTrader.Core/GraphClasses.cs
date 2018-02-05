@@ -9,12 +9,43 @@ namespace SharpTrader
 {
     public class PlotHelper
     {
+        private object Locker = new object();
+        public string Title { get; set; }
         public List<(DateTime Time, double Value)> Points { get; set; } = new List<(DateTime Time, double Value)>();
         public List<Line> Lines { get; set; } = new List<Line>();
         public List<double> HorizontalLines { get; set; } = new List<double>();
         public List<double> VerticalLines { get; set; } = new List<double>();
         public TimeSerieNavigator<ICandlestick> Candles { get; set; } = new TimeSerieNavigator<ICandlestick>();
-        public string Title { get; set; }
+        List<ITrade> TradesToAdd { get; } = new List<ITrade>();
+
+        public void PlotTrade(ITrade newTrade)
+        {
+            lock (Locker)
+            {
+                if (newTrade.Type == TradeType.Buy)
+                {
+                    TradesToAdd.Add(newTrade);
+                }
+                else
+                {
+                    var arrival = new Point(newTrade.Date, newTrade.Price);
+                    foreach (var tr in TradesToAdd)
+                    {
+                        var start = new Point(tr.Date, tr.Price);
+                        if (tr.Price == 0)
+                            Console.WriteLine("price 0");
+                        var color = arrival.Y * (1 - 0.002) > start.Y ?
+                            new ColorARGB(255, 10, 10, 255) : new ColorARGB(255, 255, 10, 10);
+                        this.Lines.Add(new Line() { Color = color, Points = new List<Point>() { start, arrival } });
+                    }
+                    TradesToAdd.Clear();
+                }
+            }
+
+            //if it is sell trade add lines from the last not signaled trades to this 
+
+
+        }
 
         public void PlotLines<T>(TimeSerieNavigator<T> timeSerie,
                                  ColorARGB color,

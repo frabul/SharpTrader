@@ -52,7 +52,7 @@ namespace SharpTrader.Core
                      //todo add some callback
                 }
                 steps++; 
-                var currentBalance = this.Simulator.Markets.Sum(m => m.GetBtcPortfolioValue());
+                var currentBalance = this.Simulator.Markets.Sum(m => m.GetNormalizedPortfolioValue("BTC"));
                 BalancePeak = currentBalance > BalancePeak ? currentBalance : BalancePeak;
                 if (BalancePeak - currentBalance > MaxDrawDown)
                 {
