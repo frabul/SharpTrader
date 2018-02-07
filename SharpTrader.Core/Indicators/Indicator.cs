@@ -21,11 +21,12 @@ namespace SharpTrader.Indicators
         private TimeSerieNavigator<T> Signal;
         private Func<T, double> Selector;
         protected TimeSerie<Record> Filtered { get; } = new TimeSerie<Record>();
-
+        private TimeSpan halfSpan;
         public Filter(string name, TimeSerieNavigator<T> signal, Func<T, double> valueSelector) : base(name)
         {
             Signal = new TimeSerieNavigator<T>(signal);
             Signal.OnNewRecord += rec => CalculateAll();
+            Selector = valueSelector;
         }
 
         public TimeSerieNavigator<Record> GetNavigator() => new TimeSerieNavigator<Record>(Filtered);
@@ -34,6 +35,7 @@ namespace SharpTrader.Indicators
         {
             while (Signal.Next())
             {
+
                 var value = Calculate();
                 var time = Signal.Tick.Time;
                 var rec = new Record(time, value);

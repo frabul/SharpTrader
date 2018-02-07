@@ -27,13 +27,14 @@ namespace SharpTrader
 
             TraderBot[] bots = new TraderBot[]
             {
+                new TestIndicatorsBot(simulator)
             };
 
             foreach (var bot in bots)
                 bot.Start();
 
             var simStart = new DateTime(2017, 09, 10);
-            var simEnd = new DateTime(2018, 01, 28);
+            var simEnd = new DateTime(2018, 02, 28);
 
             bool raiseEvents = false;
             int steps = 1;
@@ -54,7 +55,7 @@ namespace SharpTrader
                 }
                 steps++;
 
-                var balance = api.GetBtcPortfolioValue();
+                var balance = api.GetNormalizedPortfolioValue("BTC");
                 BalancePeak = balance > BalancePeak ? balance : BalancePeak;
                 if (BalancePeak - balance > MaxDrawDown)
                 {
@@ -66,11 +67,6 @@ namespace SharpTrader
             //save DATASET
 
 
-            var totalBal = api.GetBtcPortfolioValue();
-            var lostInFee = api.Trades.Select(tr => tr.Fee).Sum();
-            Console.WriteLine($"Balance: {totalBal} - Trades:{api.Trades.Count()} - Lost in fee:{lostInFee}");
-
-            Console.WriteLine($"Profit/oper: {(totalBal - 1) / api.Trades.Count()} MaxDrawDown:{MaxDrawDown} - Max DD %:{MaxDDPrc * 100}");
             foreach (var bot in bots)
             {
                 var vm = TraderBotResultsPlotViewModel.RunWindow(bot);
@@ -78,7 +74,7 @@ namespace SharpTrader
             }
             Console.ReadLine();
         }
-        
+
         public void TestMeanAndVarianceIndicator()
         {
             TimeSerie<ICandlestick> ts = new TimeSerie<ICandlestick>();

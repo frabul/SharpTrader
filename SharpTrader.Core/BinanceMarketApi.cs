@@ -127,7 +127,7 @@ namespace SharpTrader
         }
 
         Stopwatch BalanceUpdateWatchdog = new Stopwatch();
-
+        Stopwatch SynchOrdersWatchdog = new Stopwatch();
         private void HearthBeat(object state, ElapsedEventArgs elapsed)
         {
             lock (LockObject)
@@ -151,7 +151,12 @@ namespace SharpTrader
             }
 
             SynchBalance();
-            HearthBeatTimer.Start(); 
+            if (!SynchOrdersWatchdog.IsRunning || SynchOrdersWatchdog.ElapsedMilliseconds > 65000)
+            {
+                SynchOrders();
+                SynchOrdersWatchdog.Restart();
+            }
+            HearthBeatTimer.Start();
         }
 
         private void SynchBalance()
@@ -200,7 +205,7 @@ namespace SharpTrader
                     }
 
                     UserDataListenKey = Client.ListenUserDataEndpoint(
-                        HandleAccountUpdatedMessage, 
+                        HandleAccountUpdatedMessage,
                         HandleTradeUpdateMsg,
                         HandleOrderUpdateMsg);
                 }
@@ -276,7 +281,7 @@ namespace SharpTrader
                         Orders.Remove(order);
                         if (_OpenOrders.Contains(order))
                             _OpenOrders.Remove(order);
-                    } 
+                    }
                     order.ResultingTrades.Add(trade);
                 }
             }

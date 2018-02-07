@@ -21,13 +21,14 @@ namespace SharpTrader.Plotting
     {
         public TraderBotResultsPlot()
         {
-        
+
             InitializeComponent();
+            Plot1.IsManipulationEnabled = true;
         }
 
         private void PlotView_ManipulationCompleted(object sender, ManipulationCompletedEventArgs e)
         {
-        
+
         }
     }
 }

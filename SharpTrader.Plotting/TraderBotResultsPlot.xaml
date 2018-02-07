@@ -4,18 +4,19 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SharpTrader.Plotting"
-        xmlns:oxy="http://oxyplot.org/wpf"
+        
+        xmlns:oxy="http://oxyplot.org/sharpdx/wpf"
         mc:Ignorable="d"
-        Title="{Binding  Symbol}"  Height="600" Width="800">
+        Title="{Binding  Symbol}"  Height="600" Width="800"  >
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"></RowDefinition>
             <RowDefinition Height="*"></RowDefinition>
         </Grid.RowDefinitions>
 
-   
+
         <oxy:PlotView Name="Plot1" Grid.Row="1"  HorizontalAlignment="Stretch" Model="{Binding PlotViewModel}"
-                      ManipulationCompleted="PlotView_ManipulationCompleted"   />
+                      ManipulationCompleted="PlotView_ManipulationCompleted"    />
 
     </Grid>
 </Window>

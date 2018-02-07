@@ -49,6 +49,7 @@
     <Compile Include="TestBinanceMarketApi.cs" />
     <Compile Include="TestHistoryDB.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TestIndicatorsBot.cs" />
     <Compile Include="TestMarketSimulator.cs" />
   </ItemGroup>
   <ItemGroup>

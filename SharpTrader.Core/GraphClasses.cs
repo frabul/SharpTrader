@@ -13,6 +13,8 @@ namespace SharpTrader
         public string Title { get; set; }
         public List<(DateTime Time, double Value)> Points { get; set; } = new List<(DateTime Time, double Value)>();
         public List<Line> Lines { get; set; } = new List<Line>();
+        public List<Line> LinesOnDedicatedAxis = new List<Line>();
+
         public List<double> HorizontalLines { get; set; } = new List<double>();
         public List<double> VerticalLines { get; set; } = new List<double>();
         public TimeSerieNavigator<ICandlestick> Candles { get; set; } = new TimeSerieNavigator<ICandlestick>();
@@ -49,7 +51,7 @@ namespace SharpTrader
 
         public void PlotLines<T>(TimeSerieNavigator<T> timeSerie,
                                  ColorARGB color,
-                                 Func<T, double[]> valuesSelector) where T : ITimeRecord
+                                 Func<T, double[]> valuesSelector, bool dedicatedAxis = false) where T : ITimeRecord
         {
             var myNavigator = new TimeSerieNavigator<T>(timeSerie);
             List<Line> lines = new List<Line>();
@@ -64,14 +66,17 @@ namespace SharpTrader
                         firstPass = false;
                         foreach (var val in values)
                             lines.Add(new Line() { Color = color });
-                        Lines.AddRange(lines);
+                        if (!dedicatedAxis)
+                            Lines.AddRange(lines);
+                        else
+                            LinesOnDedicatedAxis.AddRange(lines);
                     }
                     for (int i = 0; i < values.Length; i++)
                     {
                         lines[i].Points.Add(new Point(myNavigator.Tick.Time, values[i]));
                     }
                 }
-            };
+            }; 
         }
 
 
