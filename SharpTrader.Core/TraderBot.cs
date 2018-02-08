@@ -63,7 +63,6 @@ namespace SharpTrader
         {
             List<int[]> permutations = new List<int[]>();
             int[] currentPerm = new int[OptimizationSpace.Count];
-            bool terminated = false;
 
             bool Increment(int i)
             {

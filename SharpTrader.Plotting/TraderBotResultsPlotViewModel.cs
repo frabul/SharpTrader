@@ -104,11 +104,8 @@ namespace SharpTrader.Plotting
             if (Thread.CurrentThread != Dispatcher.Thread)
             {
                 Dispatcher.BeginInvoke(new Action(UpdateChart));
-                return; 
+                return;
             }
-
-            //while (PlotViewModel.Axes.Count < 2)
-            //    Thread.Sleep(100);
 
             PlotViewModel.Series.Clear();
 
@@ -167,9 +164,11 @@ namespace SharpTrader.Plotting
                 linesAdded++;
             }
 
+            int cnt = 0;
             foreach (var line in Robot.Drawer.LinesOnDedicatedAxis)
             {
-                var axis = new LinearAxis() { Position = AxisPosition.Right, Key = "loda_1" };
+                cnt++;
+                var axis = new LinearAxis() { Position = AxisPosition.Right, Key = "loda_" + cnt };
                 PlotViewModel.Axes.Add(axis);
                 LineSeries lineserie = new LineSeries()
                 {
@@ -177,7 +176,7 @@ namespace SharpTrader.Plotting
                     LineStyle = LineStyle.Solid,
                     Color = OxyColor.FromArgb(line.Color.A, line.Color.R, line.Color.G, line.Color.B),
                     StrokeThickness = 3f,
-                    YAxisKey = PlotViewModel.Axes[2].Key,
+                    YAxisKey = axis.Key,
                     XAxisKey = XAxis.Key
                 };
 

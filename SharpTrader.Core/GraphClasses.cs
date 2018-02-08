@@ -48,6 +48,30 @@ namespace SharpTrader
 
 
         }
+        public void PlotLine<T>(TimeSerieNavigator<T> timeSerie,
+                                ColorARGB color,
+                                Func<T, double> valuesSelector, bool dedicatedAxis = false) where T : ITimeRecord
+        {
+            var myNavigator = new TimeSerieNavigator<T>(timeSerie);
+            var chartLine = new Line() { Color = color };
+         
+            if (!dedicatedAxis)
+                Lines.Add(chartLine);
+            else
+                LinesOnDedicatedAxis.Add(chartLine);
+            myNavigator.OnNewRecord += (T obj) =>
+            {
+                while (myNavigator.Next())
+                {
+                    var value = valuesSelector(myNavigator.Tick);
+
+                    chartLine.Points.Add(new Point(myNavigator.Tick.Time, value));
+
+                }
+            };
+
+        }
+
 
         public void PlotLines<T>(TimeSerieNavigator<T> timeSerie,
                                  ColorARGB color,
@@ -76,7 +100,7 @@ namespace SharpTrader
                         lines[i].Points.Add(new Point(myNavigator.Tick.Time, values[i]));
                     }
                 }
-            }; 
+            };
         }
 
 
