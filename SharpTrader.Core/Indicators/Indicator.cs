@@ -20,7 +20,7 @@ namespace SharpTrader.Indicators
     {
         private TimeSerieNavigator<T> Signal;
         private Func<T, double> Selector;
-        protected TimeSerie<Record> Filtered { get; } = new TimeSerie<Record>();
+        protected TimeSerie<FRecord> Filtered { get; } = new TimeSerie<FRecord>();
 
         public Filter(string name, TimeSerieNavigator<T> signal, Func<T, double> valueSelector) : base(name)
         {
@@ -29,7 +29,19 @@ namespace SharpTrader.Indicators
             Selector = valueSelector;
         }
 
-        public TimeSerieNavigator<Record> GetNavigator() => new TimeSerieNavigator<Record>(Filtered);
+
+
+        public TimeSerieNavigator<FRecord> GetNavigator() => new TimeSerieNavigator<FRecord>(Filtered);
+
+        public FRecord this[int i] { get => Filtered.GetFromLast(i); }
+
+        public int Count => Filtered.Count;
+
+        public double Peek(double nextSignalSample)
+        {
+            var nextFilter = Calculate(nextSignalSample);
+            return nextFilter;
+        }
 
         protected void CalculateAll()
         {
@@ -38,13 +50,14 @@ namespace SharpTrader.Indicators
 
                 var value = Calculate();
                 var time = Signal.Tick.Time;
-                var rec = new Record(time, value);
+                var rec = new FRecord(time, value);
                 Filtered.AddRecord(rec);
             }
         }
 
-
         protected abstract double Calculate();
+
+        protected abstract double Calculate(double sample);
 
         protected double GetSignal(int ind) => Selector(Signal.GetFromCursor(ind));
 
@@ -52,16 +65,16 @@ namespace SharpTrader.Indicators
         {
             return Signal.Count;
         }
+    }
 
-        public struct Record : ITimeRecord
+    public struct FRecord : ITimeRecord
+    {
+        public DateTime Time { get; set; }
+        public double Value { get; set; }
+        public FRecord(DateTime time, double value)
         {
-            public DateTime Time { get; set; }
-            public double Value { get; set; }
-            public Record(DateTime time, double value)
-            {
-                Value = value;
-                Time = time;
-            }
+            Value = value;
+            Time = time;
         }
     }
 }

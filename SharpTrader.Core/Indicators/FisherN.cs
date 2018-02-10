@@ -3,18 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Record = SharpTrader.Indicators.Filter<SharpTrader.ITimeRecord>.Record;
+ 
 namespace SharpTrader.Indicators
 {
 
     public class FisherN<T> : Indicator where T : ITimeRecord
     { 
         public int Period { get; } 
-        private TimeSerie<Record> Filtered { get; } = new TimeSerie<Record>();
+        private TimeSerie<FRecord> Filtered { get; } = new TimeSerie<FRecord>();
 
 
         private Normalize<T> Normalize { get; }
-        private TimeSerieNavigator<Filter<T>.Record> Normalized = new TimeSerieNavigator<Filter<T>.Record>();
+        private TimeSerieNavigator<FRecord> Normalized = new TimeSerieNavigator<FRecord>();
         //private List<double> MidValues = new List<double>();
 
         public override bool IsReady => Filtered.Count > Period;
@@ -24,7 +24,7 @@ namespace SharpTrader.Indicators
             Normalize = new Normalize<T>(signal, valueSelector, period);
             Normalized = Normalize.GetNavigator();
             Normalized.OnNewRecord += rec => CalculateAll();
-            Filtered.AddRecord(new Record(DateTime.MinValue, 0));
+            Filtered.AddRecord(new FRecord(DateTime.MinValue, 0));
             //MidValues = new List<double>() { 0 };
             CalculateAll();
 
@@ -40,7 +40,7 @@ namespace SharpTrader.Indicators
                 var newMidValue = 0.33 * normalizedTick + 0.67 * LastMidValue;
                 // MidValues.Add(midVal);
                 var val = Fisher(newMidValue) + 0.5 * Filtered.LastTick.Value;
-                Filtered.AddRecord(new Record(Normalized.Tick.Time, val));
+                Filtered.AddRecord(new FRecord(Normalized.Tick.Time, val));
                 LastMidValue = newMidValue;
             }
         }
@@ -52,9 +52,9 @@ namespace SharpTrader.Indicators
             return 0.5 * Math.Log((1d + v) / (1d - v));
         }
 
-        public TimeSerieNavigator<Record> GetNavigator()
+        public TimeSerieNavigator<FRecord> GetNavigator()
         {
-            return new TimeSerieNavigator<Record>(Filtered);
+            return new TimeSerieNavigator<FRecord>(Filtered);
         }
     }
 

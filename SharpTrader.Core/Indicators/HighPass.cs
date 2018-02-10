@@ -24,15 +24,15 @@ namespace SharpTrader.Indicators
             //bisogna fare una timeserie navigator che ritorna FIlter.Record (ha il suo selector interno )
             CutoffPeriod = cutOffPeriod;
 
-            Filtered.AddRecord(new Record(DateTime.MinValue, 0));
-            Filtered.AddRecord(new Record(DateTime.MinValue.AddDays(1), 0));
-            Filtered.AddRecord(new Record(DateTime.MinValue.AddDays(2), 0));
+            Filtered.AddRecord(new FRecord(DateTime.MinValue, 0));
+            Filtered.AddRecord(new FRecord(DateTime.MinValue.AddDays(1), 0));
+            Filtered.AddRecord(new FRecord(DateTime.MinValue.AddDays(2), 0));
             a = (0.707d * 2 * Math.PI) / CutoffPeriod;
             alpha1 = 1d + (Math.Sin(a) - 1d) / Math.Cos(a);
             b = 1d - alpha1 / 2d;
             c = 1d - alpha1;
             alpha = (double)CutoffPeriod / (1 + CutoffPeriod);
-            
+
         }
 
 
@@ -47,13 +47,19 @@ namespace SharpTrader.Indicators
                 //b * b * (GetSignal(0) - 2 * GetSignal(1) + GetSignal(2))
                 //+ 2 * c * Filtered.GetFromLast(1).Value
                 //- c * c * Filtered.GetFromLast(2).Value;
-                Debug.Assert(Math.Abs(value) < 5);
-                Debug.Assert(!double.IsInfinity(value));
+
 
             }
             return value;
         }
 
+        protected override double Calculate(double sample)
+        {
+            var value = 0d;
+            if (GetSignalLen() > 3)
+                value = alpha * (Filtered.GetFromLast(0).Value + sample - GetSignal(0));
+            return value;
+        }
 
     }
 }

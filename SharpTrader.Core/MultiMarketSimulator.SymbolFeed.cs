@@ -54,33 +54,34 @@ namespace SharpTrader
                 return feed;
             }
 
-            public IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
+            public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
             {
                 var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, (double)rate);
                 lock (LockObject)
                     this.PendingOrders.Add(order);
-                return new MarketOperation(MarketOperationStatus.Completed) { };
+                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
 
             }
 
-            public IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount)
+            public IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount)
             {
                 lock (LockObject)
                 {
                     var feed = SymbolsFeed[symbol];
                     var price = type == TradeType.Buy ? feed.Ask : feed.Bid;
                     var order = new Order(this.MarketName, symbol, type, OrderType.Market, amount, price);
-
+                    order.Filled = order.Amount;
                     var trade = new Trade(
                         this.MarketName, symbol, this.Time,
                         type, price, amount,
-                        amount * (decimal)(this.TakerFee * price));
+                        amount * (decimal)(this.TakerFee * price), order);
 
                     RegisterTrade(feed, trade);
                     this.ClosedOrders.Add(order);
+                    return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
                 }
 
-                return new MarketOperation(MarketOperationStatus.Completed) { };
+
             }
 
             public decimal GetBalance(string asset)
@@ -140,10 +141,12 @@ namespace SharpTrader
                                     price: order.Rate,
                                     amount: order.Amount,
                                     type: order.TradeType,
-                                    fee: order.Amount * (decimal)(this.MakerFee * order.Rate)
+                                    fee: order.Amount * (decimal)(this.MakerFee * order.Rate),
+                                    order: order
                                 );
                                 RegisterTrade(feed, trade);
                                 order.Status = OrderStatus.Filled;
+                                order.Filled = order.Amount;
                                 PendingOrders.RemoveAt(i--);
                             }
                         }
@@ -193,13 +196,19 @@ namespace SharpTrader
                 {
                     if (kv.Key == asset)
                         val += kv.Value;
-                    else if (kv.Value > 0)
+                    else if (kv.Value != 0)
                     {
                         var symbol = (kv.Key + asset);
                         if (SymbolsFeed.ContainsKey(symbol))
                         {
                             var feed = SymbolsFeed[symbol];
                             val += ((decimal)feed.Ask * kv.Value);
+                        }
+                        var sym2 = asset + kv.Key;
+                        if (SymbolsFeed.ContainsKey(sym2))
+                        {
+                            var feed = SymbolsFeed[sym2];
+                            val += (kv.Value / (decimal)feed.Bid);
                         }
                     }
                 }
@@ -332,7 +341,7 @@ namespace SharpTrader
 
             public TradeType TradeType { get; private set; }
             public OrderType Type { get; private set; }
-
+            public decimal Filled { get; set; }
             public Order(string market, string symbol, TradeType tradeSide, OrderType orderType, decimal amount, double rate = 0)
             {
                 Symbol = symbol;
@@ -348,7 +357,7 @@ namespace SharpTrader
 
         class Trade : ITrade
         {
-            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, decimal fee)
+            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, decimal fee, IOrder order)
             {
                 Market = market;
                 Symbol = symbol;
@@ -357,6 +366,7 @@ namespace SharpTrader
                 Price = price;
                 Amount = amount;
                 Fee = fee;
+                Order = order;
             }
             public decimal Amount { get; private set; }
 
@@ -371,15 +381,18 @@ namespace SharpTrader
             public string Symbol { get; private set; }
 
             public TradeType Type { get; private set; }
-        }
 
-        class MarketOperation : IMarketOperation
+            public IOrder Order { get; private set; }
+        }
+        class MarketOperation<T> : IMarketOperation<T>
         {
-            public MarketOperation(MarketOperationStatus status)
+            public MarketOperation(MarketOperationStatus status, T res)
             {
                 Status = status;
+                Result = res;
             }
             public MarketOperationStatus Status { get; internal set; }
+            public T Result { get; }
         }
 
         class MarketConfiguration

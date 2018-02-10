@@ -38,6 +38,11 @@ namespace SharpTrader.Indicators
             else
                 return 0;
         }
+
+        protected override double Calculate(double sample)
+        {
+            throw new NotImplementedException();
+        }
     }
 
     public class Min<T> : Filter<T> where T : ITimeRecord
@@ -55,13 +60,29 @@ namespace SharpTrader.Indicators
 
         protected override double Calculate()
         {
-            var signalOut = GetSignal(Period);
+            var signalOut = GetSignalLen() >= Period ? GetSignal(Period) : double.MaxValue;
             var signalIn = GetSignal(0);
-            if (signalOut > Filtered.LastTick.Value)
+            if (signalOut > Filtered.LastTick.Value) //we are losing a value 
                 return signalIn < Filtered.LastTick.Value ? signalIn : Filtered.LastTick.Value;
+            else if (signalIn < signalOut) //the minimum is going out of range, but signalIn is lower than min then signalIn IS the min
+                return signalIn;
             else
-                throw new NotImplementedException(""); //we need to search new min agian
+            {
+                //min is going out of range so we need to search again
+                double min = double.MaxValue;
+                for (int i = 0; i < Period; i++)
+                {
+                    if (GetSignal(i) < min)
+                        min = GetSignal(i);
+                }
+                return min;
+            }
 
+        }
+
+        protected override double Calculate(double sample)
+        {
+            throw new NotImplementedException();
         }
     }
 
@@ -80,13 +101,29 @@ namespace SharpTrader.Indicators
         //todo
         protected override double Calculate()
         {
-            var signalOut = GetSignal(Period);
+            var signalOut = GetSignalLen() >= Period ? GetSignal(Period) : double.MinValue;
             var signalIn = GetSignal(0);
             if (signalOut < Filtered.LastTick.Value)
                 return signalIn < Filtered.LastTick.Value ? signalIn : Filtered.LastTick.Value;
+            else if (signalIn > signalOut) //the MAX is going out of range, but signalIn is lower than min then signalIn IS the min
+                return signalIn;
             else
-                throw new NotImplementedException(); //we need to search again
+            {
+                //MAX is going out of range so we need to search again
+                double max = double.MinValue;
+                for (int i = 0; i < Period; i++)
+                {
+                    if (GetSignal(i) > max)
+                        max = GetSignal(i);
+                }
+                return max;
+            }
 
+        }
+
+        protected override double Calculate(double sample)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -19,12 +19,12 @@ namespace SharpTrader
         /// <summary>
         /// Put a market order
         /// </summary> 
-        IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount);
+        IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount);
 
         /// <summary>
         /// Puts a limit order on the market
         /// </summary> 
-        IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, decimal rate);
+        IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate);
 
         /// <summary>
         /// Subscribes to updates from a given symbol in a given market
@@ -42,7 +42,7 @@ namespace SharpTrader
 
         decimal GetBalance(string asset);
         (string Symbol, decimal balance)[] Balances { get; }
-     
+
 
         decimal GetNormalizedPortfolioValue(string asset);
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
@@ -73,9 +73,10 @@ namespace SharpTrader
         void OnNewCandle(ISymbolFeed sender, ICandlestick newCandle);
     }
 
-    public interface IMarketOperation
+    public interface IMarketOperation<T>
     {
         MarketOperationStatus Status { get; }
+        T Result { get; }
     }
     public enum MarketOperationStatus
     {

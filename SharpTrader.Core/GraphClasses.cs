@@ -54,7 +54,7 @@ namespace SharpTrader
         {
             var myNavigator = new TimeSerieNavigator<T>(timeSerie);
             var chartLine = new Line() { Color = color };
-         
+
             if (!dedicatedAxis)
                 Lines.Add(chartLine);
             else
@@ -103,7 +103,14 @@ namespace SharpTrader
             };
         }
 
-
+        public void PlotOperation(ITrade buy, ITrade sell)
+        {
+            var start = new Point(buy.Date, buy.Price);
+            var arrival = new Point(sell.Date, sell.Price);
+            var color = arrival.Y * (1 - 0.002) > start.Y ?
+                new ColorARGB(255, 10, 10, 255) : new ColorARGB(255, 255, 10, 10);
+            this.Lines.Add(new Line() { Color = color, Points = new List<Point>() { start, arrival } });
+        }
     }
 
     public class Line

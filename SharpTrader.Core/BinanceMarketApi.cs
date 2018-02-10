@@ -15,6 +15,7 @@ using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset
 using WebSocketSharp;
 using System.Diagnostics;
 using System.Timers;
+using Newtonsoft.Json;
 
 namespace SharpTrader
 {
@@ -317,32 +318,54 @@ namespace SharpTrader
             return feed;
         }
 
-        public IMarketOperation LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
+        public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
         {
-            var side = type == TradeType.Buy ? be.OrderSide.BUY : be.OrderSide.SELL;
-            var order = Client.PostNewOrder(symbol, amount, rate, side, be.OrderType.LIMIT).Result;
-            return new MarketOperation(MarketOperationStatus.Completed);
+            lock (LockObject)
+            {
+                var side = type == TradeType.Buy ? be.OrderSide.BUY : be.OrderSide.SELL;
+                var order = Client.PostNewOrder(symbol, amount, rate, side, be.OrderType.LIMIT).Result;
+                var apiOrder = Orders.First(o => o.Id == order.OrderId.ToString());
+                if (apiOrder == null)
+                    apiOrder = new ApiOrder(order);
+                else
+                    Console.WriteLine($"Two different orders: { JsonConvert.SerializeObject(apiOrder)} - { JsonConvert.SerializeObject(order)}");
+
+                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
+
+            }
+
+
+
         }
 
-        public IMarketOperation MarketOrder(string symbol, TradeType type, decimal amount)
+        public IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount)
         {
             var side = type == TradeType.Buy ? be.OrderSide.BUY : be.OrderSide.SELL;
             try
             {
                 dynamic res;
-                if (Test)
-                    res = Client.PostNewOrderTest(symbol, (decimal)amount, 0, side, be.OrderType.MARKET, recvWindow: 3000).Result;
-                else
+                ApiOrder apiOrder = null;
+                lock (LockObject)
                 {
-                    var ord = Client.PostNewOrder(symbol, (decimal)amount, 0, side, be.OrderType.MARKET, recvWindow: 3000).Result;
-                    NewOrders.Add(ord);
+                    if (Test)
+                    {
+                        res = Client.PostNewOrderTest(symbol, (decimal)amount, 0, side, be.OrderType.MARKET, recvWindow: 3000).Result;
+                    }
+                    else
+                    {
+                        var ord = Client.PostNewOrder(symbol, (decimal)amount, 0, side, be.OrderType.MARKET, recvWindow: 3000).Result;
+                        apiOrder = new ApiOrder(ord);
+                        NewOrders.Add(ord);
+                       
+                    }
+                    return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
                 }
-                return new MarketOperation(MarketOperationStatus.Completed);
+
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Market operation failed because: " + ex.InnerException.Message);
-                return new MarketOperation(MarketOperationStatus.Failed);
+                return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null);
             }
         }
 
@@ -394,13 +417,21 @@ namespace SharpTrader
             return 0;
         }
 
-        class MarketOperation : IMarketOperation
+        class MarketOperation<T> : IMarketOperation<T>
         {
             public MarketOperation(MarketOperationStatus status)
             {
                 Status = status;
+
+            }
+            public MarketOperation(MarketOperationStatus status, T res)
+            {
+                Status = status;
+                Result = res;
             }
             public MarketOperationStatus Status { get; internal set; }
+
+            public T Result { get; }
         }
 
         class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
@@ -556,6 +587,15 @@ namespace SharpTrader
             internal List<ApiTrade> ResultingTrades { get; private set; } = new List<ApiTrade>();
             public IEnumerable<ITrade> Trades => ResultingTrades;
 
+            public decimal Filled { get; private set; }
+
+            public ApiOrder(NewOrder binanceOrder)
+            {
+                Symbol = binanceOrder.Symbol;
+                Market = "Binance";
+                Id = binanceOrder.OrderId.ToString();
+            }
+
             public ApiOrder(Order binanceOrder)
             {
                 Symbol = binanceOrder.Symbol;
@@ -566,6 +606,7 @@ namespace SharpTrader
                 Rate = (double)binanceOrder.Price;
                 Status = GetStatus(binanceOrder.Status);
                 Id = binanceOrder.OrderId.ToString();
+                Filled = binanceOrder.ExecutedQty;
                 BinanceOrder = binanceOrder;
             }
 
@@ -579,6 +620,7 @@ namespace SharpTrader
                 Rate = (double)bo.Price;
                 Status = GetStatus(bo.Status);
                 Id = bo.OrderId.ToString();
+                Filled = bo.FilledTradesAccumulatedQuantity;
                 BinanceOrder = new Order
                 {
                     ClientOrderId = bo.NewClientOrderId,
@@ -659,6 +701,8 @@ namespace SharpTrader
             public string OrderId { get; private set; }
 
             public string FeeAsset { get; private set; }
+
+            public IOrder Order { get; private set; }
         }
     }
 }
