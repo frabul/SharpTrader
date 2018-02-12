@@ -8,5 +8,6 @@ namespace SharpTrader
 
         IMarketApi GetMarketApi(string marketName);
         IEnumerable<string> GetSymbols(string market);
+        decimal GetEquity(string baseAsset);
     }
 }

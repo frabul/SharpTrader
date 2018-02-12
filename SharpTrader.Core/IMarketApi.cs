@@ -44,7 +44,7 @@ namespace SharpTrader
         (string Symbol, decimal balance)[] Balances { get; }
 
 
-        decimal GetNormalizedPortfolioValue(string asset);
+        decimal GetEquity(string asset);
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
         decimal GetSymbolPrecision(string symbol);
         void OrderCancel(string id);

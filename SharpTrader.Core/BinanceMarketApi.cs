@@ -301,7 +301,7 @@ namespace SharpTrader
             return 0;
         }
 
-        public decimal GetNormalizedPortfolioValue(string asset)
+        public decimal GetEquity(string asset)
         {
             throw new NotImplementedException();
         }
@@ -324,18 +324,14 @@ namespace SharpTrader
             {
                 var side = type == TradeType.Buy ? be.OrderSide.BUY : be.OrderSide.SELL;
                 var order = Client.PostNewOrder(symbol, amount, rate, side, be.OrderType.LIMIT).Result;
-                var apiOrder = Orders.First(o => o.Id == order.OrderId.ToString());
+                var apiOrder = Orders.FirstOrDefault(o => o.Id == order.OrderId.ToString());
                 if (apiOrder == null)
                     apiOrder = new ApiOrder(order);
                 else
                     Console.WriteLine($"Two different orders: { JsonConvert.SerializeObject(apiOrder)} - { JsonConvert.SerializeObject(order)}");
 
                 return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
-
             }
-
-
-
         }
 
         public IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount)

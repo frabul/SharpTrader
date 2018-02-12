@@ -55,7 +55,7 @@ namespace SharpTrader
                 }
                 steps++;
 
-                var balance = api.GetNormalizedPortfolioValue("BTC");
+                var balance = api.GetEquity("BTC");
                 BalancePeak = balance > BalancePeak ? balance : BalancePeak;
                 if (BalancePeak - balance > MaxDrawDown)
                 {

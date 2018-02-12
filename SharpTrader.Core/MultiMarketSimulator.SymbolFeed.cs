@@ -9,6 +9,8 @@ namespace SharpTrader
 {
     public partial class MultiMarketSimulator
     {
+        public IEnumerable<ITrade> Trades => Markets.SelectMany(m => m.Trades);
+
         class Market : IMarketApi
         {
             object LockObject = new object();
@@ -189,7 +191,7 @@ namespace SharpTrader
 
             }
 
-            public decimal GetNormalizedPortfolioValue(string asset)
+            public decimal GetEquity(string asset)
             {
                 decimal val = 0;
                 foreach (var kv in _Balances)
@@ -257,7 +259,10 @@ namespace SharpTrader
             }
         }
 
-
+        public decimal GetEquity(string baseAsset)
+        {
+            return Markets.Sum(m => m.GetEquity(baseAsset));
+        }
 
         class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
         {

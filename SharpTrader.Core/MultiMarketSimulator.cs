@@ -109,6 +109,7 @@ namespace SharpTrader
         {
             _Markets.Where(m => m.MarketName == market).First().AddBalance(asset, amount);
         }
+ 
 
         class Configuration
         {

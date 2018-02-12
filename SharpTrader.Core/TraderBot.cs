@@ -9,7 +9,7 @@ namespace SharpTrader
     public abstract class TraderBot : IChartDataListener
     {
         private List<object[]> OptimizationSpace = new List<object[]>();
-        private List<int> OptimizationIndexes;
+        private List<int> OptimizationIndexes = new List<int>();
 
         public bool Active { get; set; }
         public IMarketsManager MarketsManager { get; }
@@ -56,13 +56,14 @@ namespace SharpTrader
             {
                 OptimizationIndexes.Add(0);
             }
-            return OptimizationSpace[OptimizationIndexes[OptimizationSpace.Count - 1]];
+            return OptimizationSpace[OptimizationSpace.Count - 1][OptimizationIndexes[OptimizationSpace.Count - 1]];
         }
 
         public List<int[]> GetOptimizePermutations()
         {
             List<int[]> permutations = new List<int[]>();
             int[] currentPerm = new int[OptimizationSpace.Count];
+
 
             bool Increment(int i)
             {
@@ -78,7 +79,7 @@ namespace SharpTrader
                 else
                     return true;
             }
-
+            permutations.Add(currentPerm.ToArray());
             while (Increment(0))
             {
                 permutations.Add(currentPerm.ToArray());

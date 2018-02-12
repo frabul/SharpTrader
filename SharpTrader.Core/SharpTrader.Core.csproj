@@ -63,9 +63,11 @@
     <Compile Include="BinanceDataMiner.cs" />
     <Compile Include="BinanceMarketApi.cs" />
     <Compile Include="CandlesticksSerieNavigator.cs" />
+    <Compile Include="ConsoleLogger.cs" />
     <Compile Include="GraphClasses.cs" />
     <Compile Include="HistoricalRateDataBase.cs" />
     <Compile Include="ICandlestick.cs" />
+    <Compile Include="ILogger.cs" />
     <Compile Include="IMarketApi.cs" />
     <Compile Include="IMarketsManager.cs" />
     <Compile Include="Indicators\BollingerBands.cs" />
