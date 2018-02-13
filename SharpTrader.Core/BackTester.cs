@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -82,26 +83,28 @@ namespace SharpTrader
 
     public class Optimizer
     {
-        public Func<IMarketsManager, TraderBot> BotFactory { get; set; }
+        public Func<IMarketsManager, OptimizationSpace, TraderBot> BotFactory { get; set; }
         public Func<MultiMarketSimulator> MarketFactory { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public string BaseAsset { get; set; }
-
         public ILogger Logger { get; set; }
+
+        private OptimizationSpace BaseSpace;
+
         public void Start()
         {
+            BaseSpace = new OptimizationSpace();
+
             var dummyMarket = MarketFactory();
-            var dummyBot = BotFactory(dummyMarket);
-            dummyBot.Start();
+            var dummyBot = BotFactory(dummyMarket, BaseSpace);
+            var paramSets = BaseSpace.GetPermutations();
 
-            List<int[]> optimizationArray = dummyBot.GetOptimizePermutations();
 
-            foreach (var arr in optimizationArray)
+            Action<OptimizationSpace> act = paramSet =>
             {
                 var sim = MarketFactory();
-                var bot = BotFactory(sim);
-                bot.OptimizationArray = arr;
+                var bot = BotFactory(sim, paramSet);
                 var startingEquity = sim.GetEquity(BaseAsset);
                 var backTester = new BackTester(sim, bot) { };
                 backTester.StartTime = StartTime;
@@ -112,12 +115,94 @@ namespace SharpTrader
                 //collect info 
                 var totalBal = sim.GetEquity(BaseAsset);
 
-                Logger?.LogInfo($"Optimization array:{ JsonConvert.SerializeObject(arr) }");
-                Logger?.LogInfo($"Balance: {sim.GetEquity(BaseAsset)} - Trades:{sim.Trades.Count()}");
-                Logger?.LogInfo($"Profit/buy: {(totalBal - startingEquity) / sim.Trades.Count():F8} - MaxDrawDown:{backTester.MaxDrowDown} - Max DD %:{backTester.MaxDrowDownPrc * 100}");
-            }
+                var tostr = "";
+                foreach (var pp in paramSet.ParamsSet)
+                    tostr += $"{pp.prop}: {pp.val}, ";
+
+                var msg = $"\n\nOptimization array:{ tostr }";
+                msg += $"\n\tBalance: {sim.GetEquity(BaseAsset)} - MaxDrawDown:{backTester.MaxDrowDown} - Profit/buy: {(totalBal - startingEquity) / sim.Trades.Count():F8} ";
+                msg += $"\n\tTrades:{sim.Trades.Count()}- Max DD %:{backTester.MaxDrowDownPrc * 100}";
+                Logger?.LogInfo(msg);
+            };
+            foreach (var ps in paramSets)
+                act(ps);
+            //Parallel.ForEach(paramSets, new ParallelOptions { MaxDegreeOfParallelism = 2 }, act);
         }
     }
 
+    public class OptimizationSpace
+    {
+        private List<(string prop, object[] pars)> Values = new List<(string, object[])>();
+        private List<int> OptimizationIndexes = new List<int>();
+        private int Cursor = -1;
+        public IEnumerable<(string prop, object[] pars)> Space => Values;
+        public IEnumerable<(string prop, object val)> ParamsSet
+        {
+            get
+            {
+                for (int i = 0; i < Values.Count; i++)
+                {
+                    yield return (Values[i].prop, Values[i].pars[OptimizationIndexes[i]]);
+                }
+            }
+        }
 
+        public T Optimize<T>(string property, T[] values)
+        {
+            Cursor++;
+            if (Values.Count <= Cursor)
+            {
+                Values.Add((property, values.Cast<object>().ToArray()));
+                OptimizationIndexes.Add(0);
+            }
+            else
+            {
+                //check that values are equal
+                Debug.Assert(property.Equals(Values[Cursor].prop));
+                Debug.Assert(values.Length == Values[Cursor].pars.Length);
+                for (int i = 0; i < values.Length; i++)
+                {
+                    Debug.Assert(values[i].Equals(Values[Cursor].pars[i]));
+                }
+
+            }
+            return (T)Values[Cursor].pars[OptimizationIndexes[Cursor]];
+        }
+
+        public IEnumerable<OptimizationSpace> GetPermutations()
+        {
+            List<int[]> permutations = new List<int[]>();
+            int[] currentPerm = new int[Values.Count];
+
+
+            bool Increment(int i)
+            {
+                if (i == currentPerm.Length)
+                    return false; //we created all possible permutations
+
+                currentPerm[i] += 1;
+                if (currentPerm[i] == Values[i].pars.Length)
+                {
+                    currentPerm[i] = 0;
+                    return Increment(i + 1);
+                }
+                else
+                    return true;
+            }
+            permutations.Add(currentPerm.ToArray());
+            while (Increment(0))
+            {
+                permutations.Add(currentPerm.ToArray());
+            }
+            var spaces = permutations
+                .Select(p => new OptimizationSpace()
+                {
+                    Values = this.Values,
+                    OptimizationIndexes = p.ToList(),
+                });
+            return spaces;
+        }
+
+
+    }
 }
