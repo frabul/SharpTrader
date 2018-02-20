@@ -26,8 +26,7 @@ namespace SharpTrader
         private Stopwatch LastListenTry = new Stopwatch();
         private HistoricalRateDataBase HistoryDb = new HistoricalRateDataBase(".\\Data\\");
         private BinanceClient Client;
-        private TradingRules ExchangeInfo;
-        private List<NewOrder> NewOrders = new List<NewOrder>();
+        private TradingRules ExchangeInfo; 
         private long ServerTimeDiff;
         private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
         private string UserDataListenKey;
@@ -280,7 +279,7 @@ namespace SharpTrader
                 found = false;
                 for (int i = 0; i < _OpenOrders.Count; i++)
                 {
-                    if (_OpenOrders[i].BinanceOrder.OrderId == msg.OrderId)
+                    if (_OpenOrders[i].Id == msg.OrderId.ToString())
                     {
                         if (remove)
                             _OpenOrders.RemoveAt(i);
@@ -302,6 +301,9 @@ namespace SharpTrader
                 var order = Orders.FirstOrDefault(o => o.Id == trade.OrderId);
                 if (order != null)
                 {
+                    trade.Order = order;
+
+
                     if (msg.ExecutionType == "CANCELLED")
                     {
                         Orders.Remove(order);
@@ -310,6 +312,8 @@ namespace SharpTrader
                     }
                     order.ResultingTrades.Add(trade);
                 }
+                else
+                    trade.Order = new ApiOrder() { Id = trade.OrderId };
             }
 
             OnNewTrade?.Invoke(this, trade);
@@ -351,16 +355,23 @@ namespace SharpTrader
 
         public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
         {
+            NewOrder newOrd;
             lock (LockObject)
             {
                 var side = type == TradeType.Buy ? be.OrderSide.BUY : be.OrderSide.SELL;
-                var order = Client.PostNewOrder(symbol, amount, rate, side, be.OrderType.LIMIT).Result;
-                var apiOrder = Orders.FirstOrDefault(o => o.Id == order.OrderId.ToString());
+                newOrd = Client.PostNewOrder(symbol, amount, rate, side, be.OrderType.LIMIT).Result;
+            }
+            System.Threading.Thread.Sleep(500);
+            lock (LockObject)
+            {
+                var apiOrder = Orders.FirstOrDefault(o => o.Id == newOrd.OrderId.ToString());
                 if (apiOrder == null)
-                    apiOrder = new ApiOrder(order);
-                else
-                    Console.WriteLine($"Two different orders: { JsonConvert.SerializeObject(apiOrder)} - { JsonConvert.SerializeObject(order)}");
-
+                {
+                    Console.WriteLine("The order that was just sent was not found");
+                    apiOrder = new ApiOrder(newOrd);
+                    this._OpenOrders.Add(apiOrder);
+                    this.Orders.Add(apiOrder);
+                } 
                 return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
             }
         }
@@ -382,7 +393,7 @@ namespace SharpTrader
                     {
                         var ord = Client.PostNewOrder(symbol, (decimal)amount, 0, side, be.OrderType.MARKET, recvWindow: 3000).Result;
                         apiOrder = new ApiOrder(ord);
-                        NewOrders.Add(ord);
+                
 
                     }
                     return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
@@ -428,7 +439,7 @@ namespace SharpTrader
             if (order == null)
                 throw new Exception($"Order {id} not found");
 
-            var cancel = this.Client.CancelOrder(order.Symbol, order.BinanceOrder.OrderId, recvWindow: 5000).Result;
+            var cancel = this.Client.CancelOrder(order.Symbol, int.Parse(order.Id), recvWindow: 5000).Result;
 
         }
 
