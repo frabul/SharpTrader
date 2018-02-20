@@ -61,9 +61,9 @@ namespace SharpTrader.Indicators
 
         protected double GetSignal(int ind) => Selector(Signal.GetFromCursor(ind));
 
-        protected int GetSignalLen()
+        protected int GetSignalCursor()
         {
-            return Signal.Count;
+            return Signal.Position;
         }
     }
 

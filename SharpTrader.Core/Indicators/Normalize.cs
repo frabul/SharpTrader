@@ -20,7 +20,7 @@ namespace SharpTrader.Indicators
 
         protected override double Calculate()
         {
-            var len = GetSignalLen() - 1;
+            var len = GetSignalCursor() - 1;
             if (len + 1 < Period)
                 return 0;
 
@@ -60,7 +60,7 @@ namespace SharpTrader.Indicators
 
         protected override double Calculate()
         {
-            var signalOut = GetSignalLen() >= Period ? GetSignal(Period) : double.MaxValue;
+            var signalOut = GetSignalCursor() >= Period ? GetSignal(Period) : double.MaxValue;
             var signalIn = GetSignal(0);
             if (signalOut > Filtered.LastTick.Value) //we are losing a value 
                 return signalIn < Filtered.LastTick.Value ? signalIn : Filtered.LastTick.Value;
@@ -101,7 +101,7 @@ namespace SharpTrader.Indicators
         //todo
         protected override double Calculate()
         {
-            var signalOut = GetSignalLen() >= Period ? GetSignal(Period) : double.MinValue;
+            var signalOut = GetSignalCursor() >= Period ? GetSignal(Period) : double.MinValue;
             var signalIn = GetSignal(0);
             if (signalOut < Filtered.LastTick.Value)
                 return signalIn < Filtered.LastTick.Value ? signalIn : Filtered.LastTick.Value;

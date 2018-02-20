@@ -62,12 +62,12 @@ namespace SharpTrader
 
     public enum OrderStatus
     {
+        Pending,
+        PartiallyFilled,
         Cancelled,
         PendingCancel,
         Rejected,
-        Expired,
-        Pending,
-        PartiallyFilled,
+        Expired, 
         Filled,
     }
 

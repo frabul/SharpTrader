@@ -41,7 +41,7 @@ namespace SharpTrader.Indicators
             // alpha1 = (Cosine(.707*360 / 48) + Sine (.707*360 / 48) - 1) / Cosine(.707*360 / 48);
             // HP = (1 - alpha1 / 2)*(1 - alpha1 / 2)*(Close - 2*Close[1] + Close[2]) + 2*(1 - alpha1)*HP[1] - (1 - alpha1)*(1 - alpha1)*HP[2];
             var value = 0d;
-            if (GetSignalLen() > 3)
+            if (GetSignalCursor() > 3)
             {
                 value = alpha * (Filtered.GetFromLast(0).Value + GetSignal(0) - GetSignal(1));
                 //b * b * (GetSignal(0) - 2 * GetSignal(1) + GetSignal(2))
@@ -56,7 +56,7 @@ namespace SharpTrader.Indicators
         protected override double Calculate(double sample)
         {
             var value = 0d;
-            if (GetSignalLen() > 3)
+            if (GetSignalCursor() > 3)
                 value = alpha * (Filtered.GetFromLast(0).Value + sample - GetSignal(0));
             return value;
         }

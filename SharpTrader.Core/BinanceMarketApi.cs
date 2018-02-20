@@ -59,6 +59,7 @@ namespace SharpTrader
 
         public BinanceMarketApi(string apiKey, string apiSecret)
         {
+
             Client = new BinanceClient(new ApiClient(apiKey, apiSecret));
 
             ServerTimeSynch();
@@ -75,7 +76,7 @@ namespace SharpTrader
             //todo Synch trades
             SynchBalance();
             ListenUserData();
-            SynchOrders();
+            SynchOrders(false);
             HearthBeatTimer = new System.Timers.Timer()
             {
                 Interval = 5000,
@@ -86,25 +87,49 @@ namespace SharpTrader
             HearthBeatTimer.Elapsed += HearthBeat;
         }
 
-        private void SynchOrders()
+        private void SynchOrders(bool raiseEvents = true)
         {
             lock (LockObject)
             {
+                List<ApiOrder> newORders = new List<ApiOrder>();
                 try
                 {
                     _OpenOrders.Clear();
-                    var currOrders = Client.GetCurrentOpenOrders("").Result;
+                    var currOrders = Feeds.SelectMany(feed => Client.GetCurrentOpenOrders(feed.Symbol).Result);
                     foreach (var order in currOrders)
                     {
-                        var ord = new ApiOrder(order);
-                        _OpenOrders.Add(ord);
-                        Orders.Add(ord);
+                        var to = new ApiOrder(order);
+                        var ord = Orders.Where(o => o.Id == to.Id).FirstOrDefault();
+                        if (ord != null)
+                        {
+                            ord.Update(ord);
+                            if (ord.Status > OrderStatus.PartiallyFilled)
+                            {
+                                if (_OpenOrders.Contains(ord))
+                                    _OpenOrders.Remove(ord);
+                            }
+                            else
+                            {
+                                if (!_OpenOrders.Contains(ord))
+                                    _OpenOrders.Add(ord);
+                            }
+                        }
+                        else
+                        {
+                            Orders.Add(to);
+                            if (to.Status <= OrderStatus.PartiallyFilled)
+                                _OpenOrders.Add(to);
+
+                            newORders.Add(to);
+                        }
                     }
+
                 }
                 catch
                 {
                     Console.WriteLine("Error whili synch orders");
                 }
+
             }
         }
 
@@ -152,7 +177,7 @@ namespace SharpTrader
             }
 
             SynchBalance();
-            if (!SynchOrdersWatchdog.IsRunning || SynchOrdersWatchdog.ElapsedMilliseconds > 65000)
+            if (!SynchOrdersWatchdog.IsRunning || SynchOrdersWatchdog.ElapsedMilliseconds > 30000)
             {
                 SynchOrders();
                 SynchOrdersWatchdog.Restart();
@@ -237,13 +262,13 @@ namespace SharpTrader
             {
                 var order = new ApiOrder(msg);
                 bool remove = true;
-                if (msg.Status == "NEW" || msg.Status == "PARTIALLY_FILLED")
+                if (order.Status <= OrderStatus.PartiallyFilled)
                     remove = false;//order open
                 //update and add
                 bool found = false;
                 for (int i = 0; i < Orders.Count; i++)
                 {
-                    if (Orders[i].BinanceOrder.OrderId == msg.OrderId)
+                    if (Orders[i].Id == order.Id)
                     {
                         Orders[i].Update(order);
                         found = true;
@@ -288,6 +313,12 @@ namespace SharpTrader
             }
 
             OnNewTrade?.Invoke(this, trade);
+        }
+
+        public IEnumerable<ITrade> GetTrades(string symbol)
+        {
+            var binTrades = Client.GetTradeList(symbol, 500, 5000).Result;
+            return binTrades.Select(tr => new ApiTrade(symbol, tr));
         }
 
         public decimal GetBalance(string asset)
@@ -352,7 +383,7 @@ namespace SharpTrader
                         var ord = Client.PostNewOrder(symbol, (decimal)amount, 0, side, be.OrderType.MARKET, recvWindow: 3000).Result;
                         apiOrder = new ApiOrder(ord);
                         NewOrders.Add(ord);
-                       
+
                     }
                     return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
                 }
@@ -569,21 +600,21 @@ namespace SharpTrader
 
         class ApiOrder : IOrder
         {
-            private OrderOrTradeUpdatedMessage msg;
-
-            public string Symbol { get; private set; }
-            public string Market { get; private set; }
-            public double Rate { get; private set; }
-            public decimal Amount { get; private set; }
-            public string Id { get; private set; }
-            public TradeType TradeType { get; private set; }
-            public OrderType Type { get; private set; }
+            public string Symbol { get; set; }
+            public string Market { get; set; }
+            public double Rate { get; set; }
+            public decimal Amount { get; set; }
+            public string Id { get; set; }
+            public TradeType TradeType { get; set; }
+            public OrderType Type { get; set; }
             public Order BinanceOrder { get; set; }
             public OrderStatus Status { get; internal set; } = OrderStatus.Pending;
-            internal List<ApiTrade> ResultingTrades { get; private set; } = new List<ApiTrade>();
+            internal List<ApiTrade> ResultingTrades { get; set; } = new List<ApiTrade>();
             public IEnumerable<ITrade> Trades => ResultingTrades;
 
-            public decimal Filled { get; private set; }
+            public decimal Filled { get; set; }
+
+            public ApiOrder() { }
 
             public ApiOrder(NewOrder binanceOrder)
             {
@@ -663,11 +694,30 @@ namespace SharpTrader
             internal void Update(ApiOrder order)
             {
                 this.Status = order.Status;
+                this.Filled = order.Filled;
+
             }
         }
 
         class ApiTrade : ITrade
         {
+            public ApiTrade()
+            {
+
+            }
+            public ApiTrade(string symbol, Trade tr)
+            {
+
+                Market = "Binance";
+                Symbol = symbol;
+                Date = DateTimeOffset.FromUnixTimeMilliseconds(tr.Time).ToUniversalTime().UtcDateTime;
+                Type = tr.IsBuyer ? TradeType.Buy : TradeType.Sell;
+                Price = (double)tr.Price;
+                Amount = tr.Quantity;
+                Fee = Fee;
+                FeeAsset = FeeAsset;
+                OrderId = "Unknown";
+            }
             public ApiTrade(OrderOrTradeUpdatedMessage tr)
             {
                 Market = "Binance";
@@ -680,25 +730,25 @@ namespace SharpTrader
                 FeeAsset = FeeAsset;
                 OrderId = tr.OrderId.ToString();
             }
-            public decimal Amount { get; private set; }
+            public decimal Amount { get; set; }
 
-            public DateTime Date { get; private set; }
+            public DateTime Date { get; set; }
 
-            public decimal Fee { get; private set; }
+            public decimal Fee { get; set; }
 
-            public string Market { get; private set; }
+            public string Market { get; set; }
 
-            public double Price { get; private set; }
+            public double Price { get; set; }
 
-            public string Symbol { get; private set; }
+            public string Symbol { get; set; }
 
-            public TradeType Type { get; private set; }
+            public TradeType Type { get; set; }
 
-            public string OrderId { get; private set; }
+            public string OrderId { get; set; }
 
-            public string FeeAsset { get; private set; }
+            public string FeeAsset { get; set; }
 
-            public IOrder Order { get; private set; }
+            public IOrder Order { get; set; }
         }
     }
 }
