@@ -26,7 +26,7 @@ namespace SharpTrader
         private Stopwatch LastListenTry = new Stopwatch();
         private HistoricalRateDataBase HistoryDb = new HistoricalRateDataBase(".\\Data\\");
         private BinanceClient Client;
-        private TradingRules ExchangeInfo; 
+        private TradingRules ExchangeInfo;
         private long ServerTimeDiff;
         private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
         private string UserDataListenKey;
@@ -94,7 +94,12 @@ namespace SharpTrader
                 try
                 {
                     _OpenOrders.Clear();
-                    var currOrders = Feeds.SelectMany(feed => Client.GetCurrentOpenOrders(feed.Symbol).Result);
+                    Order[] currOrders;
+                    lock (Feeds)
+                    {
+                        currOrders = Feeds.SelectMany(feed => Client.GetCurrentOpenOrders(feed.Symbol).Result).ToArray();
+                    }
+
                     foreach (var order in currOrders)
                     {
                         var to = new ApiOrder(order);
@@ -313,7 +318,7 @@ namespace SharpTrader
                     order.ResultingTrades.Add(trade);
                 }
                 else
-                    trade.Order = new ApiOrder() { Id = trade.OrderId };
+                    trade.Order = new ApiOrder() { BinanceOrderId = trade.BinanceOrderId };
             }
 
             OnNewTrade?.Invoke(this, trade);
@@ -343,14 +348,18 @@ namespace SharpTrader
 
         public ISymbolFeed GetSymbolFeed(string symbol)
         {
-            var feed = Feeds.Where(sf => sf.Symbol == symbol).FirstOrDefault();
-            if (feed == null)
+            lock (Feeds)
             {
-                var (Asset, Quote) = SymbolsTable[symbol];
-                feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, Asset, Quote);
-                Feeds.Add(feed);
+                var feed = Feeds.Where(sf => sf.Symbol == symbol).FirstOrDefault();
+                if (feed == null)
+                {
+                    var (Asset, Quote) = SymbolsTable[symbol];
+                    feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, Asset, Quote);
+                    Feeds.Add(feed);
+                }
+                return feed;
             }
-            return feed;
+
         }
 
         public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
@@ -371,7 +380,7 @@ namespace SharpTrader
                     apiOrder = new ApiOrder(newOrd);
                     this._OpenOrders.Add(apiOrder);
                     this.Orders.Add(apiOrder);
-                } 
+                }
                 return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
             }
         }
@@ -393,7 +402,7 @@ namespace SharpTrader
                     {
                         var ord = Client.PostNewOrder(symbol, (decimal)amount, 0, side, be.OrderType.MARKET, recvWindow: 3000).Result;
                         apiOrder = new ApiOrder(ord);
-                
+
 
                     }
                     return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
@@ -615,14 +624,13 @@ namespace SharpTrader
             public string Market { get; set; }
             public double Rate { get; set; }
             public decimal Amount { get; set; }
-            public string Id { get; set; }
+            public string Id => BinanceOrderId.ToString();
             public TradeType TradeType { get; set; }
             public OrderType Type { get; set; }
-            public Order BinanceOrder { get; set; }
             public OrderStatus Status { get; internal set; } = OrderStatus.Pending;
             internal List<ApiTrade> ResultingTrades { get; set; } = new List<ApiTrade>();
             public IEnumerable<ITrade> Trades => ResultingTrades;
-
+            public int BinanceOrderId { get; set; }
             public decimal Filled { get; set; }
 
             public ApiOrder() { }
@@ -631,7 +639,7 @@ namespace SharpTrader
             {
                 Symbol = binanceOrder.Symbol;
                 Market = "Binance";
-                Id = binanceOrder.OrderId.ToString();
+                BinanceOrderId = binanceOrder.OrderId;
             }
 
             public ApiOrder(Order binanceOrder)
@@ -643,9 +651,8 @@ namespace SharpTrader
                 Amount = binanceOrder.OrigQty;
                 Rate = (double)binanceOrder.Price;
                 Status = GetStatus(binanceOrder.Status);
-                Id = binanceOrder.OrderId.ToString();
                 Filled = binanceOrder.ExecutedQty;
-                BinanceOrder = binanceOrder;
+                BinanceOrderId = binanceOrder.OrderId;
             }
 
             public ApiOrder(OrderOrTradeUpdatedMessage bo)
@@ -657,25 +664,8 @@ namespace SharpTrader
                 Amount = bo.OriginalQuantity;
                 Rate = (double)bo.Price;
                 Status = GetStatus(bo.Status);
-                Id = bo.OrderId.ToString();
                 Filled = bo.FilledTradesAccumulatedQuantity;
-                BinanceOrder = new Order
-                {
-                    ClientOrderId = bo.NewClientOrderId,
-                    ExecutedQty = bo.FilledTradesAccumulatedQuantity,
-                    IcebergQty = bo.IcebergQuantity,
-                    OrderId = bo.OrderId,
-                    OrigQty = bo.OriginalQuantity,
-                    Price = bo.Price,
-                    Side = bo.Side,
-                    Status = bo.Status,
-                    StopPrice = bo.StopPrice,
-                    Symbol = bo.Symbol,
-                    Time = bo.TradeTime,
-                    TimeInForce = bo.TimeInForce,
-                    Type = bo.Type,
-
-                };
+                BinanceOrderId = bo.OrderId;
             }
 
 
@@ -706,7 +696,6 @@ namespace SharpTrader
             {
                 this.Status = order.Status;
                 this.Filled = order.Filled;
-
             }
         }
 
@@ -727,7 +716,8 @@ namespace SharpTrader
                 Amount = tr.Quantity;
                 Fee = Fee;
                 FeeAsset = FeeAsset;
-                OrderId = "Unknown";
+                BinanceOrderId = -1;
+                BinanceTradeId = tr.Id;
             }
             public ApiTrade(OrderOrTradeUpdatedMessage tr)
             {
@@ -739,8 +729,15 @@ namespace SharpTrader
                 Amount = tr.LastFilledTradeQuantity;
                 Fee = Fee;
                 FeeAsset = FeeAsset;
-                OrderId = tr.OrderId.ToString();
+                BinanceOrderId = tr.OrderId;
+                BinanceTradeId = tr.TradeId;
             }
+
+            public int BinanceTradeId { get; set; }
+            public int BinanceOrderId { get; set; }
+            public string Id => BinanceTradeId.ToString();
+            public string OrderId => BinanceOrderId.ToString();
+
             public decimal Amount { get; set; }
 
             public DateTime Date { get; set; }
@@ -755,7 +752,7 @@ namespace SharpTrader
 
             public TradeType Type { get; set; }
 
-            public string OrderId { get; set; }
+
 
             public string FeeAsset { get; set; }
 
