@@ -514,7 +514,7 @@ namespace SharpTrader
                 //load missing data to hist db 
                 Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
                 var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb);
-                downloader.DownloadCompleteSymbolHistory(Symbol);
+                downloader.DownloadCompleteSymbolHistory(Symbol, TimeSpan.FromDays(1));
 
                 ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
 

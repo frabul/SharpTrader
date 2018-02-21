@@ -39,10 +39,10 @@ namespace SharpTrader.Utils
             var symbols = prices.Where(sp => sp.Symbol.EndsWith("BTC")).Select(sp => sp.Symbol);
             symbols = symbols.Concat(prices.Where(sp => sp.Symbol.EndsWith("USDT")).Select(sp => sp.Symbol));
             foreach (var symbol in symbols)
-                DownloadCompleteSymbolHistory(symbol);
+                DownloadCompleteSymbolHistory(symbol, TimeSpan.FromDays(1));
         }
 
-        public void DownloadCompleteSymbolHistory(string symbol)
+        public void DownloadCompleteSymbolHistory(string symbol, TimeSpan preload)
         {
             Console.WriteLine($"Downloading history for {symbol}");
             DateTime endTime = DateTime.UtcNow.Subtract(TimeSpan.FromSeconds(60));
@@ -54,7 +54,7 @@ namespace SharpTrader.Utils
             var symbolHistory = HistoryDB.GetSymbolHistory(MarketName, symbol, TimeSpan.FromSeconds(60));
 
             if (symbolHistory.Ticks.Count > 0)
-                startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(TimeSpan.FromHours(48));
+                startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(preload);
 
 
             while (AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime)
@@ -77,7 +77,7 @@ namespace SharpTrader.Utils
                 AllCandles.AddRange(batch);
                 if (AllCandles.Count > 1)
                     startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime + TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
-              
+
             }
             //---
             HistoryDB.AddCandlesticks(MarketName, symbol, AllCandles);

@@ -118,9 +118,9 @@ namespace SharpTrader
                 var tostr = "";
                 foreach (var pp in paramSet.ParamsSet)
                     tostr += $"{pp.prop}: {pp.val}, ";
-
+                var buysCnt = sim.Trades.Where(tr => tr.Type == TradeType.Buy).Count();
                 var msg = $"\n\nOptimization array:{ tostr }";
-                msg += $"\n\tBalance: {sim.GetEquity(BaseAsset)} - MaxDrawDown:{backTester.MaxDrowDown} - Profit/buy: {(totalBal - startingEquity) / sim.Trades.Count():F8} ";
+                msg += $"\n\tBalance: {sim.GetEquity(BaseAsset)} - MaxDrawDown:{backTester.MaxDrowDown} - Profit/buy: {(totalBal - startingEquity) / buysCnt:F8} ";
                 msg += $"\n\tTrades:{sim.Trades.Count()}- Max DD %:{backTester.MaxDrowDownPrc * 100}";
                 Logger?.LogInfo(msg);
             };
