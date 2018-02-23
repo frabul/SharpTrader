@@ -41,7 +41,7 @@ namespace SharpTrader
         IEnumerable<ITrade> Trades { get; }
 
         decimal GetBalance(string asset);
-        (string Symbol, decimal balance)[] Balances { get; }
+        //(string Symbol, decimal balance)[] Balances { get; }
 
 
         decimal GetEquity(string asset);

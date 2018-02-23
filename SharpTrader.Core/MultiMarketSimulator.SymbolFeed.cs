@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,7 +15,8 @@ namespace SharpTrader
         class Market : IMarketApi
         {
             object LockObject = new object();
-            private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
+            //private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
+            private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
             private List<Trade> _Trades = new List<Trade>();
             private Dictionary<string, SymbolFeed> SymbolsFeed = new Dictionary<string, SymbolFeed>();
             private List<Order> PendingOrders = new List<Order>();
@@ -26,14 +28,11 @@ namespace SharpTrader
             public double MakerFee { get; private set; } = 0.0015;
             public double TakerFee { get; private set; } = 0.0025;
             public DateTime Time { get; internal set; }
-
-
             public event Action<IMarketApi, ITrade> OnNewTrade;
-
-
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
             public IEnumerable<ISymbolFeed> ActiveFeeds => SymbolsFeed.Values;
             public IEnumerable<ITrade> Trades => this._Trades;
+
             public Market(string name, double makerFee, double takerFee, string dataDir)
             {
                 MarketName = name;
@@ -53,16 +52,45 @@ namespace SharpTrader
                     lock (LockObject)
                         SymbolsFeed.Add(symbol, feed);
                 }
+                if (!_Balances.ContainsKey(feed.Asset))
+                    _Balances.Add(feed.Asset, new AssetBalance());
+                if (!_Balances.ContainsKey(feed.QuoteAsset))
+                    _Balances.Add(feed.QuoteAsset, new AssetBalance());
                 return feed;
             }
 
             public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
             {
                 var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, (double)rate);
+
+                RegisterOrder(order);
                 lock (LockObject)
                     this.PendingOrders.Add(order);
                 return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
 
+            }
+
+            private void RegisterOrder(Order order)
+            {
+                var ass = SymbolsTable[order.Symbol];
+                AssetBalance bal;
+                decimal amount;
+                if (order.TradeType == TradeType.Sell)
+                {
+                    bal = _Balances[ass.Asset];
+                    amount = order.Amount;
+                }
+                else
+                {
+                    bal = _Balances[ass.Quote];
+                    amount = order.Amount * (decimal)order.Rate;
+                }
+
+                if (bal.Free < amount)
+                    throw new Exception("Insufficient balance");
+
+                bal.Free -= amount;
+                bal.Locked += amount;
             }
 
             public IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount)
@@ -72,7 +100,8 @@ namespace SharpTrader
                     var feed = SymbolsFeed[symbol];
                     var price = type == TradeType.Buy ? feed.Ask : feed.Bid;
                     var order = new Order(this.MarketName, symbol, type, OrderType.Market, amount, price);
-                    order.Filled = order.Amount;
+
+                    RegisterOrder(order);
                     var trade = new Trade(
                         this.MarketName, symbol, this.Time,
                         type, price, amount,
@@ -82,17 +111,15 @@ namespace SharpTrader
                     this.ClosedOrders.Add(order);
                     return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
                 }
-
-
             }
 
             public decimal GetBalance(string asset)
             {
-                _Balances.TryGetValue(asset, out decimal res);
-                return res;
+                _Balances.TryGetValue(asset, out var res);
+                return res.Free;
             }
 
-            public (string Symbol, decimal balance)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
+            public (string Symbol, AssetBalance bal)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
 
             public IEnumerable<IOrder> OpenOrders
             {
@@ -147,8 +174,6 @@ namespace SharpTrader
                                     order: order
                                 );
                                 RegisterTrade(feed, trade);
-                                order.Status = OrderStatus.Filled;
-                                order.Filled = order.Amount;
                                 PendingOrders.RemoveAt(i--);
                             }
                         }
@@ -156,6 +181,32 @@ namespace SharpTrader
                 }
             }
 
+            private void RegisterTrade(SymbolFeed feed, Trade trade)
+            {
+                lock (LockObject)
+                {
+                    var qBal = _Balances[feed.QuoteAsset];
+                    var aBal = _Balances[feed.Asset];
+                    if (trade.Type == TradeType.Buy)
+                    {
+                        aBal.Free += Convert.ToDecimal(trade.Amount);
+                        qBal.Locked -= Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
+                        Debug.Assert(qBal.Locked >= 0, "incoerent trade");
+                    }
+                    if (trade.Type == TradeType.Sell)
+                    {
+                        qBal.Free += Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
+                        aBal.Locked -= Convert.ToDecimal(trade.Amount);
+                        Debug.Assert(_Balances[feed.Asset].Locked >= -0.0000000001m, "incoerent trade");
+                    }
+                    qBal.Free -= Convert.ToDecimal(trade.Fee);
+
+                    trade.Order.Status = OrderStatus.Filled;
+                    trade.Order.Filled = trade.Amount;
+                    this._Trades.Add(trade);
+                    TradesToSignal.Add(trade);
+                }
+            }
 
 
             internal void AddNewCandle(SymbolFeed feed, Candlestick tick)
@@ -164,31 +215,11 @@ namespace SharpTrader
                 feed.AddNewCandle(tick);
             }
 
-            private void RegisterTrade(SymbolFeed feed, Trade trade)
+            public class AssetBalance
             {
-                lock (LockObject)
-                {
-                    if (!_Balances.ContainsKey(feed.Asset))
-                        _Balances.Add(feed.Asset, 0);
-                    if (!_Balances.ContainsKey(feed.QuoteAsset))
-                        _Balances.Add(feed.QuoteAsset, 0);
-                    if (trade.Type == TradeType.Buy)
-                    {
-                        _Balances[feed.Asset] += Convert.ToDecimal(trade.Amount);
-                        _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
-                    }
-                    if (trade.Type == TradeType.Sell)
-                    {
-                        _Balances[feed.Asset] -= Convert.ToDecimal(trade.Amount);
-                        _Balances[feed.QuoteAsset] += Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
-                    }
-                    _Balances[feed.QuoteAsset] -= Convert.ToDecimal(trade.Fee);
-
-
-                    this._Trades.Add(trade);
-                    TradesToSignal.Add(trade);
-                }
-
+                public decimal Free;
+                public decimal Locked;
+                public decimal Total => Free + Locked;
             }
 
             public decimal GetEquity(string asset)
@@ -197,20 +228,20 @@ namespace SharpTrader
                 foreach (var kv in _Balances)
                 {
                     if (kv.Key == asset)
-                        val += kv.Value;
-                    else if (kv.Value != 0)
+                        val += kv.Value.Free;
+                    else if (kv.Value.Total != 0)
                     {
                         var symbol = (kv.Key + asset);
                         if (SymbolsFeed.ContainsKey(symbol))
                         {
                             var feed = SymbolsFeed[symbol];
-                            val += ((decimal)feed.Ask * kv.Value);
+                            val += ((decimal)feed.Ask * kv.Value.Total);
                         }
                         var sym2 = asset + kv.Key;
                         if (SymbolsFeed.ContainsKey(sym2))
                         {
                             var feed = SymbolsFeed[sym2];
-                            val += (kv.Value / (decimal)feed.Bid);
+                            val += (kv.Value.Total / (decimal)feed.Bid);
                         }
                     }
                 }
@@ -233,6 +264,25 @@ namespace SharpTrader
                         {
                             PendingOrders.RemoveAt(i--);
                             order.Status = OrderStatus.Cancelled;
+
+                            var ass = SymbolsTable[order.Symbol];
+                            AssetBalance bal;
+                            decimal amount;
+                            if (order.TradeType == TradeType.Sell)
+                            {
+                                bal = _Balances[ass.Asset];
+                                amount = order.Amount;
+                            }
+                            else
+                            {
+                                bal = _Balances[ass.Quote];
+                                amount = order.Amount * (decimal)order.Rate;
+                            }
+
+
+                            bal.Free += amount;
+                            bal.Locked -= amount;
+                            Debug.Assert(bal.Locked >= -0.0000001m, "Incoerent locked amount");
                             ClosedOrders.Add(order);
                         }
 
@@ -254,8 +304,8 @@ namespace SharpTrader
             internal void AddBalance(string asset, decimal amount)
             {
                 if (!_Balances.ContainsKey(asset))
-                    _Balances.Add(asset, 0);
-                _Balances[asset] += amount;
+                    _Balances.Add(asset, new AssetBalance());
+                _Balances[asset].Free += amount;
             }
         }
 
@@ -362,7 +412,7 @@ namespace SharpTrader
 
         class Trade : ITrade
         {
-            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, decimal fee, IOrder order)
+            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, decimal fee, Order order)
             {
                 Market = market;
                 Symbol = symbol;
@@ -387,7 +437,9 @@ namespace SharpTrader
 
             public TradeType Type { get; private set; }
 
-            public IOrder Order { get; private set; }
+            public Order Order { get; private set; }
+
+            IOrder ITrade.Order => Order;
         }
         class MarketOperation<T> : IMarketOperation<T>
         {
