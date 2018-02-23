@@ -301,11 +301,13 @@ namespace SharpTrader
         private void HandleTradeUpdateMsg(OrderOrTradeUpdatedMessage msg)
         {
             var trade = new ApiTrade(msg);
+            var ordUpdate = new ApiOrder(msg);
             lock (LockObject)
             {
                 var order = Orders.FirstOrDefault(o => o.Id == trade.OrderId);
                 if (order != null)
                 {
+                    order.Update(ordUpdate);
                     trade.Order = order;
 
 
