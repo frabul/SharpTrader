@@ -27,6 +27,7 @@ namespace SharpTrader.Indicators
             Signal = new TimeSerieNavigator<T>(signal);
             Signal.OnNewRecord += rec => CalculateAll();
             Selector = valueSelector;
+            CalculateAll();
         }
 
 

@@ -329,7 +329,7 @@ namespace SharpTrader
         public IEnumerable<ITrade> GetTrades(string symbol)
         {
             var binTrades = Client.GetTradeList(symbol, 500, 5000).Result;
-            return binTrades.Select(tr => new ApiTrade(symbol, tr));
+            return binTrades.Select(tr => new ApiTrade(symbol, tr.o));
         }
 
         public decimal GetBalance(string asset)
@@ -446,11 +446,15 @@ namespace SharpTrader
         {
             var orders = this.Orders.Where(or => or.Id == id);
             Debug.Assert(orders.Count() < 2, "Two orders with same id");
-            var order = orders.FirstOrDefault();
-            if (order == null)
-                throw new Exception($"Order {id} not found");
-
-            var cancel = this.Client.CancelOrder(order.Symbol, int.Parse(order.Id), recvWindow: 5000).Result;
+            var order = _OpenOrders.FirstOrDefault();
+            if (order != null)
+            {
+                var cancel = this.Client.CancelOrder(order.Symbol, int.Parse(order.Id), recvWindow: 5000).Result;
+            }
+            //else
+                //throw new Exception($"Order {id} not found");
+            
+          
 
         }
 
@@ -624,7 +628,7 @@ namespace SharpTrader
         {
             public string Symbol { get; set; }
             public string Market { get; set; }
-            public double Rate { get; set; }
+            public double Price { get; set; }
             public decimal Amount { get; set; }
             public string Id => BinanceOrderId.ToString();
             public TradeType TradeType { get; set; }
@@ -651,7 +655,7 @@ namespace SharpTrader
                 TradeType = binanceOrder.Side == "BUY" ? TradeType.Buy : TradeType.Sell;
                 Type = binanceOrder.Type == "LIMIT" ? OrderType.Limit : OrderType.Market;
                 Amount = binanceOrder.OrigQty;
-                Rate = (double)binanceOrder.Price;
+                Price = (double)binanceOrder.Price;
                 Status = GetStatus(binanceOrder.Status);
                 Filled = binanceOrder.ExecutedQty;
                 BinanceOrderId = binanceOrder.OrderId;
@@ -664,7 +668,7 @@ namespace SharpTrader
                 TradeType = bo.Side == "BUY" ? TradeType.Buy : TradeType.Sell;
                 Type = bo.Type == "LIMIT" ? OrderType.Limit : OrderType.Market;
                 Amount = bo.OriginalQuantity;
-                Rate = (double)bo.Price;
+                Price = (double)bo.Price;
                 Status = GetStatus(bo.Status);
                 Filled = bo.FilledTradesAccumulatedQuantity;
                 BinanceOrderId = bo.OrderId;

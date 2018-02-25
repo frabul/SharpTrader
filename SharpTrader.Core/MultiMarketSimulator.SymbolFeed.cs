@@ -83,7 +83,7 @@ namespace SharpTrader
                 else
                 {
                     bal = _Balances[ass.Quote];
-                    amount = order.Amount * (decimal)order.Rate;
+                    amount = order.Amount * (decimal)order.Price;
                 }
 
                 if (bal.Free < amount)
@@ -158,8 +158,8 @@ namespace SharpTrader
                         var feed = SymbolsFeed[order.Symbol];
                         if (order.Type == OrderType.Limit)
                         {
-                            var willBuy = (order.TradeType == TradeType.Buy && feed.Ticks.LastTick.Low + feed.Spread <= order.Rate);
-                            var willSell = (order.TradeType == TradeType.Sell && feed.Ticks.LastTick.High >= order.Rate);
+                            var willBuy = (order.TradeType == TradeType.Buy && feed.Ticks.LastTick.Low + feed.Spread <= order.Price);
+                            var willSell = (order.TradeType == TradeType.Sell && feed.Ticks.LastTick.High >= order.Price);
 
                             if (willBuy || willSell)
                             {
@@ -167,10 +167,10 @@ namespace SharpTrader
                                     market: this.MarketName,
                                     symbol: feed.Symbol,
                                     time: feed.Ticks.LastTick.OpenTime.AddSeconds(feed.Ticks.LastTick.Timeframe.Seconds / 2),
-                                    price: order.Rate,
+                                    price: order.Price,
                                     amount: order.Amount,
                                     type: order.TradeType,
-                                    fee: order.Amount * (decimal)(this.MakerFee * order.Rate),
+                                    fee: order.Amount * (decimal)(this.MakerFee * order.Price),
                                     order: order
                                 );
                                 RegisterTrade(feed, trade);
@@ -276,7 +276,7 @@ namespace SharpTrader
                             else
                             {
                                 bal = _Balances[ass.Quote];
-                                amount = order.Amount * (decimal)order.Rate;
+                                amount = order.Amount * (decimal)order.Price;
                             }
 
 
@@ -388,7 +388,7 @@ namespace SharpTrader
             private static int idCounter = 0;
             public string Symbol { get; private set; }
             public string Market { get; private set; }
-            public double Rate { get; private set; }
+            public double Price { get; private set; }
             public decimal Amount { get; private set; }
             public string Id { get; private set; }
 
@@ -404,7 +404,7 @@ namespace SharpTrader
                 TradeType = tradeSide;
                 Type = orderType;
                 Amount = amount;
-                Rate = rate;
+                Price = rate;
                 Id = (idCounter++).ToString();
             }
 
