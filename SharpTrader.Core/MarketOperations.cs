@@ -58,6 +58,11 @@ namespace SharpTrader
     {
         Limit,
         Market,
+        StopLoss,
+        StopLossLimit,
+        TakeProfit,
+        TakeProfitLimit,
+        LimitMaker,
     }
 
     public enum OrderStatus
@@ -79,7 +84,7 @@ namespace SharpTrader
         string Id { get; }
         decimal Amount { get; }
         decimal Filled { get; }
-        double Rate { get; } 
+        double Price { get; } 
         string Symbol { get; }
         string Market { get; }
        
