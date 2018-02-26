@@ -31,6 +31,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="log4net, Version=2.0.8.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
+      <HintPath>..\packages\log4net.2.0.8\lib\net45-full\log4net.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.10.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
@@ -62,6 +65,7 @@
     <Compile Include="BackTester.cs" />
     <Compile Include="BinanceDataMiner.cs" />
     <Compile Include="BinanceMarketApi.cs" />
+    <Compile Include="BinanceMarketApi2.cs" />
     <Compile Include="CandlesticksSerieNavigator.cs" />
     <Compile Include="ConsoleLogger.cs" />
     <Compile Include="GraphClasses.cs" />
@@ -98,6 +102,10 @@
     <Analyzer Include="..\packages\ZeroFormatter.Analyzer.1.1.1\analyzers\dotnet\cs\ZeroFormatterAnalyzer.dll" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj">
+      <Project>{d86be250-3618-4088-b7a6-4f4ecba20d6c}</Project>
+      <Name>BinanceExchange.API</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Binance.API.Csharp.Client\Binance.API.Csharp.Client.Domain\Binance.API.Csharp.Client.Domain.csproj">
       <Project>{e255f763-a2fe-43a8-9331-019796c935c7}</Project>
       <Name>Binance.API.Csharp.Client.Domain</Name>

@@ -19,12 +19,12 @@ namespace SharpTrader
         /// <summary>
         /// Put a market order
         /// </summary> 
-        IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount);
+        IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount, string clientOrderId = null);
 
         /// <summary>
         /// Puts a limit order on the market
         /// </summary> 
-        IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate);
+        IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null);
 
         /// <summary>
         /// Subscribes to updates from a given symbol in a given market

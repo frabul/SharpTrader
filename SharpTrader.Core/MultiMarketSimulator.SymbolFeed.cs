@@ -59,7 +59,7 @@ namespace SharpTrader
                 return feed;
             }
 
-            public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate)
+            public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate,  string clientOrderId = null)
             {
                 var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, (double)rate);
 
@@ -93,7 +93,7 @@ namespace SharpTrader
                 bal.Locked += amount;
             }
 
-            public IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount)
+            public IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount, string clientOrderId = null)
             {
                 lock (LockObject)
                 {

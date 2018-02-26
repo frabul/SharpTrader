@@ -58,6 +58,11 @@ namespace SharpTrader
     {
         Limit,
         Market,
+        StopLoss,
+        StopLossLimit,
+        TakeProfit,
+        TakeProfitLimit,
+        LimitMaker,
     }
 
     public enum OrderStatus
