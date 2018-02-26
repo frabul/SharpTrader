@@ -1,12 +1,13 @@
-﻿using Binance.API.Csharp.Client;
-using Binance.API.Csharp.Client.Models.Market;
-using Binance.API.Csharp.Client.Models.Enums;
+﻿
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SharpTrader;
+using BinanceExchange.API.Client;
+using BinanceExchange.API.Models.Request;
+using BinanceExchange.API.Enums;
 
 namespace SharpTrader.Utils
 {
@@ -15,30 +16,30 @@ namespace SharpTrader.Utils
         private const string MarketName = "Binance";
 
 
-        private ApiClient ApiClient;
+
         private BinanceClient Client;
         private HistoricalRateDataBase HistoryDB;
         private string DataDir;
         public BinanceDataDownloader(string dataDir)
         {
             DataDir = dataDir;
-            ApiClient = new ApiClient("", "");
-            Client = new BinanceClient(ApiClient, false);
+
+            Client = new BinanceClient(new ClientConfiguration { EnableRateLimiting = true });
             HistoryDB = new HistoricalRateDataBase(DataDir);
         }
         public BinanceDataDownloader(HistoricalRateDataBase db)
         {
 
-            ApiClient = new ApiClient("", "");
-            Client = new BinanceClient(ApiClient, false);
+
+            Client = new BinanceClient(new ClientConfiguration { EnableRateLimiting = true });
             HistoryDB = db;
         }
         public void MineBinance()
         {
-            IEnumerable<SymbolPrice> prices = Client.GetAllPrices().Result;
-            var symbols = prices.Where(sp => sp.Symbol.EndsWith("BTC")).Select(sp => sp.Symbol);
-            symbols = symbols.Concat(prices.Where(sp => sp.Symbol.EndsWith("USDT")).Select(sp => sp.Symbol));
-            foreach (var symbol in symbols)
+            var symbols = Client.GetExchangeInfo().Result.Symbols;
+            var toDownload = symbols.Where(sp => sp.Symbol.EndsWith("BTC")).Select(sp => sp.Symbol);
+            toDownload = toDownload.Concat(symbols.Where(sp => sp.Symbol.EndsWith("USDT")).Select(sp => sp.Symbol));
+            foreach (var symbol in toDownload)
                 DownloadCompleteSymbolHistory(symbol, TimeSpan.FromDays(1));
         }
 
@@ -60,7 +61,12 @@ namespace SharpTrader.Utils
             while (AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime)
             {
                 Console.WriteLine($"Downloading history for {symbol} - {startTime}");
-                var candles = Client.GetCandleSticks(symbol, TimeInterval.Minutes_1, startTime).Result;
+                var candles = Client.GetKlinesCandlesticks(new GetKlinesCandlesticksRequest
+                {
+                    Symbol = symbol,
+                    StartTime = startTime,
+                    Interval = KlineInterval.OneMinute,
+                }).Result;
                 System.Threading.Thread.Sleep(60);
                 var batch = candles.Select(
                     c => new SharpTrader.Candlestick()
@@ -69,8 +75,8 @@ namespace SharpTrader.Utils
                         High = (double)c.High,
                         Low = (double)c.Low,
                         Close = (double)c.Close,
-                        OpenTime = DateTimeOffset.FromUnixTimeMilliseconds(c.OpenTime).UtcDateTime,
-                        CloseTime = DateTimeOffset.FromUnixTimeMilliseconds(c.OpenTime).UtcDateTime + TimeSpan.FromSeconds(60),
+                        OpenTime = c.OpenTime,
+                        CloseTime = c.CloseTime,
                         Volume = (double)c.QuoteAssetVolume
                     }).ToList();
 
@@ -88,10 +94,10 @@ namespace SharpTrader.Utils
         public void SynchSymbolsTable()
         {
             Dictionary<string, (string Asset, string Quote)> dict = new Dictionary<string, (string Asset, string Quote)>();
-            var tradingRules = Client.GetTradingRulesAsync().Result;
+            var tradingRules = Client.GetExchangeInfo().Result;
             foreach (var symb in tradingRules.Symbols)
             {
-                dict.Add(symb.SymbolName, (symb.BaseAsset, symb.QuoteAsset));
+                dict.Add(symb.Symbol, (symb.BaseAsset, symb.QuoteAsset));
 
             }
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict);

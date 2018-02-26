@@ -2,7 +2,6 @@
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
-	<RestoreProjectStyle>PackageReference</RestoreProjectStyle>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{320B1902-461A-4B88-8852-D881DC4E5293}</ProjectGuid>
@@ -66,7 +65,6 @@
     <Compile Include="BackTester.cs" />
     <Compile Include="BinanceDataMiner.cs" />
     <Compile Include="BinanceMarketApi.cs" />
-    <Compile Include="BinanceMarketApi2.cs" />
     <Compile Include="CandlesticksSerieNavigator.cs" />
     <Compile Include="ConsoleLogger.cs" />
     <Compile Include="GraphClasses.cs" />
@@ -106,19 +104,6 @@
     <ProjectReference Include="..\..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj">
       <Project>{d86be250-3618-4088-b7a6-4f4ecba20d6c}</Project>
       <Name>BinanceExchange.API</Name>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Binance.API.Csharp.Client\Binance.API.Csharp.Client.Domain\Binance.API.Csharp.Client.Domain.csproj">
-      <Project>{e255f763-a2fe-43a8-9331-019796c935c7}</Project>
-      <Name>Binance.API.Csharp.Client.Domain</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Binance.API.Csharp.Client\Binance.API.Csharp.Client.Models\Binance.API.Csharp.Client.Models.csproj">
-      <Project>{7cf40eb8-d81d-40b5-b849-17e5662175d6}</Project>
-      <Name>Binance.API.Csharp.Client.Models</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Binance.API.Csharp.Client\Binance.API.Csharp.Client\Binance.API.Csharp.Client.csproj">
-      <Project>{ec2a020e-338a-46ee-9d08-c158cbd49c92}</Project>
-      <Name>Binance.API.Csharp.Client</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
