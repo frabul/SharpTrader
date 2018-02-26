@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using SharpTrader;
 using SharpTrader.Tests;
@@ -11,8 +12,9 @@ namespace TestConsole
     {
         static void Main(string[] args)
         {
-             
-
+            TestBinanceMarketApi.Test();
+            while (true)
+                Thread.Sleep(100);
             TestMarketSimulator tms = new TestMarketSimulator();
             tms.Test();
         }

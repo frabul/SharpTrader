@@ -48,7 +48,6 @@
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
-    <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
@@ -60,6 +59,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\SharpTrader.Core\SharpTrader.Core.csproj">
+      <Project>{320b1902-461a-4b88-8852-d881dc4e5293}</Project>
+      <Name>SharpTrader.Core</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\SharpTrader.Plotting\SharpTrader.Plotting.csproj">
       <Project>{6f67b4ab-53fb-4665-9116-c14f9256c0fa}</Project>
       <Name>SharpTrader.Plotting</Name>
