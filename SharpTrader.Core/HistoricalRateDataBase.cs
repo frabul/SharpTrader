@@ -134,19 +134,25 @@ namespace SharpTrader
                 {
                     ICandlestick lastCandle = sdata.Ticks.Count > 0 ? sdata.Ticks[sdata.Ticks.Count - 1] : null;
                     if (c.Timeframe != timeframe)
-                        throw new InvalidOperationException("Bad timeframe for candle");
-                    //if this candle open is preceding last candle open we need to insert it in sorted fashion
-                    var toAdd = new Candlestick(c);
-                    if (lastCandle?.OpenTime > toAdd.OpenTime)
                     {
-                        int index = sdata.Ticks.BinarySearch(toAdd, CandlestickTimeComparer);
-                        if (index > -1)
-                            sdata.Ticks[index] = toAdd;
-                        else
-                            sdata.Ticks.Insert(~index, toAdd);
+                        //throw new InvalidOperationException("Bad timeframe for candle");
+                        Console.WriteLine("Bad timeframe for candle");
                     }
                     else
-                        sdata.Ticks.Add(toAdd);
+                    {
+                        //if this candle open is preceding last candle open we need to insert it in sorted fashion
+                        var toAdd = new Candlestick(c);
+                        if (lastCandle?.OpenTime > toAdd.OpenTime)
+                        {
+                            int index = sdata.Ticks.BinarySearch(toAdd, CandlestickTimeComparer);
+                            if (index > -1)
+                                sdata.Ticks[index] = toAdd;
+                            else
+                                sdata.Ticks.Insert(~index, toAdd);
+                        }
+                        else
+                            sdata.Ticks.Add(toAdd);
+                    } 
                 }
             }
         }

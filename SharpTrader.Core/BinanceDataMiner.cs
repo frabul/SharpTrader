@@ -29,11 +29,16 @@ namespace SharpTrader.Utils
         }
         public BinanceDataDownloader(HistoricalRateDataBase db)
         {
-
-
-            Client = new BinanceClient(new ClientConfiguration { EnableRateLimiting = true });
+            Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, });
             HistoryDB = db;
         }
+
+        public BinanceDataDownloader(HistoricalRateDataBase db, BinanceClient cli)
+        {
+            Client = cli;
+            HistoryDB = db;
+        }
+
         public void MineBinance()
         {
             var symbols = Client.GetExchangeInfo().Result.Symbols;
@@ -66,6 +71,7 @@ namespace SharpTrader.Utils
                     Symbol = symbol,
                     StartTime = startTime,
                     Interval = KlineInterval.OneMinute,
+                    EndTime = DateTime.MaxValue
                 }).Result;
                 System.Threading.Thread.Sleep(60);
                 var batch = candles.Select(
@@ -76,14 +82,13 @@ namespace SharpTrader.Utils
                         Low = (double)c.Low,
                         Close = (double)c.Close,
                         OpenTime = c.OpenTime,
-                        CloseTime = c.CloseTime,
+                        CloseTime = c.CloseTime.AddMilliseconds(1),
                         Volume = (double)c.QuoteAssetVolume
                     }).ToList();
 
                 AllCandles.AddRange(batch);
                 if (AllCandles.Count > 1)
-                    startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime + TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
-
+                    startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime + TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc); 
             }
             //---
             HistoryDB.AddCandlesticks(MarketName, symbol, AllCandles);

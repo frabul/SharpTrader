@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset, string Quote)>;
 
-using WebSocketSharp;
+
 using System.Diagnostics;
 using System.Timers;
 using Newtonsoft.Json;
@@ -34,7 +34,7 @@ namespace SharpTrader
         private Stopwatch TimerUserDataWebSocket = new Stopwatch();
         private HistoricalRateDataBase HistoryDb = new HistoricalRateDataBase(".\\Data\\");
         private BinanceClient Client;
-        private InstanceBinanceWebSocketClient WSClient;
+        private DisposableBinanceWebSocketClient WSClient;
         private ExchangeInfoResponse ExchangeInfo;
         private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
 
@@ -71,84 +71,95 @@ namespace SharpTrader
             {
                 ApiKey = apiKey,
                 SecretKey = apiSecret,
-                CacheTime = TimeSpan.FromSeconds(20),
-                EnableRateLimiting = true,
             });
-            WSClient = new InstanceBinanceWebSocketClient(Client);
-            ServerTimeSynch();
 
-
+            WSClient = new DisposableBinanceWebSocketClient(Client);
+            SynchBalance();
             ExchangeInfo = Client.GetExchangeInfo().Result;
             foreach (var symb in ExchangeInfo.Symbols)
             {
                 SymbolsTable.Add(symb.Symbol, (symb.BaseAsset, symb.QuoteAsset));
             }
             //download account info
-            //todo Synch trades
-            SynchBalance(); 
+            //todo Synch trades 
+            SynchBalance();
             SynchOrders(false);
+            ListenUserData();
             HearthBeatTimer = new System.Timers.Timer()
             {
                 Interval = 5000,
                 AutoReset = false,
                 Enabled = true,
-
             };
             HearthBeatTimer.Elapsed += HearthBeat;
         }
 
+
+        private void HearthBeat(object state, ElapsedEventArgs elapsed)
+        { 
+            ListenUserData(); 
+            SynchBalance();
+            SynchOrders();
+            HearthBeatTimer.Start();
+        }
+
         private void SynchOrders(bool raiseEvents = true)
         {
-            lock (LockObject)
+            if (!SynchOrdersWatchdog.IsRunning || SynchOrdersWatchdog.ElapsedMilliseconds > 30000)
             {
-                List<ApiOrder> newORders = new List<ApiOrder>();
-                try
+                SynchOrdersWatchdog.Restart();
+                lock (LockObject)
                 {
-                    _OpenOrders.Clear();
-                    OrderResponse[] currOrders;
-                    lock (Feeds)
+                    List<ApiOrder> newORders = new List<ApiOrder>();
+                    try
                     {
-                        currOrders = Feeds
-                            .SelectMany(feed =>
-                                Client.GetCurrentOpenOrders(new CurrentOpenOrdersRequest() { Symbol = feed.Symbol }).Result)
-                            .ToArray();
-                    }
-
-                    foreach (var order in currOrders)
-                    {
-                        var to = new ApiOrder(order);
-                        var ord = Orders.Where(o => o.Id == to.Id).FirstOrDefault();
-                        if (ord != null)
+                        _OpenOrders.Clear();
+                        OrderResponse[] currOrders;
+                        lock (Feeds)
                         {
-                            ord.Update(ord);
-                            if (ord.Status > OrderStatus.PartiallyFilled)
+                            currOrders = Feeds
+                                .SelectMany(feed =>
+                                    Client.GetCurrentOpenOrders(new CurrentOpenOrdersRequest() { Symbol = feed.Symbol }).Result)
+                                .ToArray();
+                        }
+
+                        foreach (var order in currOrders)
+                        {
+                            var to = new ApiOrder(order);
+                            var ord = Orders.Where(o => o.Id == to.Id).FirstOrDefault();
+                            if (ord != null)
                             {
-                                if (_OpenOrders.Contains(ord))
-                                    _OpenOrders.Remove(ord);
+                                ord.Update(ord);
+                                if (ord.Status > OrderStatus.PartiallyFilled)
+                                {
+                                    if (_OpenOrders.Contains(ord))
+                                        _OpenOrders.Remove(ord);
+                                }
+                                else
+                                {
+                                    if (!_OpenOrders.Contains(ord))
+                                        _OpenOrders.Add(ord);
+                                }
                             }
                             else
                             {
-                                if (!_OpenOrders.Contains(ord))
-                                    _OpenOrders.Add(ord);
+                                Orders.Add(to);
+                                if (to.Status <= OrderStatus.PartiallyFilled)
+                                    _OpenOrders.Add(to);
+
+                                newORders.Add(to);
                             }
                         }
-                        else
-                        {
-                            Orders.Add(to);
-                            if (to.Status <= OrderStatus.PartiallyFilled)
-                                _OpenOrders.Add(to);
 
-                            newORders.Add(to);
-                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Error while synch orders: " + ex.Message);
                     }
 
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Error while synch orders: " + ex.Message);
-                }
-
             }
+
         }
 
         private void ServerTimeSynch()
@@ -164,28 +175,7 @@ namespace SharpTrader
             }
 
         }
-
-        private void HearthBeat(object state, ElapsedEventArgs elapsed)
-        {
-            lock (LockObject)
-            {
-
-                if (!TimerUserDataWebSocket.IsRunning || TimerUserDataWebSocket.Elapsed > TimeSpan.FromMinutes(30))
-                {
-                    ListenUserData();
-                    TimerUserDataWebSocket.Restart();
-                }
-            }
-
-            SynchBalance();
-            if (!SynchOrdersWatchdog.IsRunning || SynchOrdersWatchdog.ElapsedMilliseconds > 30000)
-            {
-                SynchOrders();
-                SynchOrdersWatchdog.Restart();
-            }
-            HearthBeatTimer.Start();
-        }
-
+         
         private void SynchBalance()
         {
             if (!BalanceUpdateWatchdog.IsRunning || BalanceUpdateWatchdog.ElapsedMilliseconds > 10000)
@@ -202,7 +192,7 @@ namespace SharpTrader
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("Error while trying to update account info " + ex.Message);
+                        Console.WriteLine("Error while trying to update account info " + ex.InnerException?.Message);
                     }
                 }
             }
@@ -212,33 +202,38 @@ namespace SharpTrader
         {
             lock (LockObject)
             {
-                try
+                if (!TimerUserDataWebSocket.IsRunning || TimerUserDataWebSocket.Elapsed > TimeSpan.FromMinutes(30))
                 {
-                    if (UserDataSocket != default(Guid))
+                    TimerUserDataWebSocket.Restart();
+                    try
                     {
-                        WSClient.CloseWebSocketInstance(UserDataSocket );
+                        if (UserDataSocket != default(Guid))
+                        {
+                            WSClient.CloseWebSocketInstance(UserDataSocket);
+                            UserDataSocket = default(Guid);
+                        }
                     }
-                }
-                catch { }
-                
-                try
-                {
-                    if (LastListenTry.IsRunning && LastListenTry.ElapsedMilliseconds < 20000)
-                        return;
-                     
-                    UserDataSocket = WSClient.ConnectToUserDataWebSocket(new UserDataWebSocketMessages()
-                    {
-                        AccountUpdateMessageHandler = HandleAccountUpdatedMessage,
-                        OrderUpdateMessageHandler = HandleOrderUpdateMsg,
-                        TradeUpdateMessageHandler = HandleTradeUpdateMsg
-                    }).Result;
+                    catch { }
 
+                    try
+                    {
+                        if (LastListenTry.IsRunning && LastListenTry.ElapsedMilliseconds < 20000)
+                            return;
+
+                        UserDataSocket = WSClient.ConnectToUserDataWebSocket(new UserDataWebSocketMessages()
+                        {
+                            AccountUpdateMessageHandler = HandleAccountUpdatedMessage,
+                            OrderUpdateMessageHandler = HandleOrderUpdateMsg,
+                            TradeUpdateMessageHandler = HandleTradeUpdateMsg
+                        }).Result;
+
+                    }
+                    catch
+                    {
+                        Console.WriteLine("Failed to listen for user data stream.");
+                    }
+                    LastListenTry.Restart();
                 }
-                catch
-                {
-                    Console.WriteLine("Failed to listen for user data stream.");
-                }
-                LastListenTry.Restart();
             }
 
         }
@@ -465,8 +460,6 @@ namespace SharpTrader
             throw new Exception($"Precision info not found for symbol {symbol}");
         }
 
-
-
         public decimal GetMinNotional(string symbol)
         {
             var info = ExchangeInfo.Symbols.Where(s => s.Symbol == symbol).FirstOrDefault();
@@ -523,31 +516,28 @@ namespace SharpTrader
             {
                 HistoryDb = hist;
                 this.Client = client;
+                this.WebSocketClient = new DisposableBinanceWebSocketClient(Client);
                 this.Symbol = symbol;
                 this.Market = market;
                 this.QuoteAsset = quoteAsset;
                 this.Asset = asset;
                 //load missing data to hist db 
                 Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
-                var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb);
-                downloader.DownloadCompleteSymbolHistory(Symbol, TimeSpan.FromDays(1));
 
-                WebSocketClient = new DisposableBinanceWebSocketClient(Client);
+                var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
+                downloader.DownloadCompleteSymbolHistory(Symbol, TimeSpan.FromDays(1));
 
                 ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
 
                 while (symbolHistory.Ticks.Next())
                     this.Ticks.AddRecord(symbolHistory.Ticks.Tick);
-
-                PartialDepthListen(null);
-                KlineListen(null);
-
-
+                 
+                PartialDepthListen();
+                KlineListen(); 
                 HearthBeatTimer = new Timer(5000)
                 {
                     AutoReset = false,
                     Enabled = true,
-
                 };
                 HearthBeatTimer.Elapsed += HearthBeat;
             }
@@ -557,17 +547,17 @@ namespace SharpTrader
             {
                 if (KlineWatchdog.ElapsedMilliseconds > 70000)
                 {
-                    KlineListen(null);
+                    KlineListen();
                 }
                 if (PartialDepthWatchDog.ElapsedMilliseconds > 40000)
                 {
 
-                    PartialDepthListen(null);
+                    PartialDepthListen();
                 }
                 HearthBeatTimer.Start();
             }
 
-            void KlineListen(CloseEventArgs eventArgs)
+            void KlineListen()
             {
                 try
                 {
@@ -579,7 +569,7 @@ namespace SharpTrader
                 KlineSocket = WebSocketClient.ConnectToKlineWebSocket(this.Symbol.ToLower(), KlineInterval.OneMinute, HandleKlineEvent);
                 KlineWatchdog.Restart();
             }
-            void PartialDepthListen(CloseEventArgs eventArgs)
+            void PartialDepthListen()
             {
                 try
                 {

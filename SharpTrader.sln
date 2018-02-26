@@ -7,14 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Core", "SharpTr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChartDataMiner", "ChartDataMiner\ChartDataMiner.csproj", "{6F2E907A-AF04-4D15-AE3C-9F34675CD039}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Binance.API.Csharp.Client", "Binance.API.Csharp.Client\Binance.API.Csharp.Client\Binance.API.Csharp.Client.csproj", "{EC2A020E-338A-46EE-9D08-C158CBD49C92}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BinanceClient", "BinanceClient", "{CF7C2B5D-B358-459F-9FEA-5CE40687DBA6}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Binance.API.Csharp.Client.Domain", "Binance.API.Csharp.Client\Binance.API.Csharp.Client.Domain\Binance.API.Csharp.Client.Domain.csproj", "{E255F763-A2FE-43A8-9331-019796C935C7}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Binance.API.Csharp.Client.Models", "Binance.API.Csharp.Client\Binance.API.Csharp.Client.Models\Binance.API.Csharp.Client.Models.csproj", "{7CF40EB8-D81D-40B5-B849-17E5662175D6}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{5B143371-C50B-4282-B999-43579B6B760A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestConsole", "Tests\TestConsole\TestConsole.csproj", "{5CBB7EB1-67C8-4706-9D9E-B961DD43E746}"
@@ -23,7 +15,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Tests", "Tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Plotting", "SharpTrader.Plotting\SharpTrader.Plotting.csproj", "{6F67B4AB-53FB-4665-9116-C14F9256C0FA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BinanceExchange.API", "..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj", "{D86BE250-3618-4088-B7A6-4F4ECBA20D6C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BinanceExchange.API", "BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj", "{2A8F66F5-44A4-4618-B21E-3D9D1B86FB2D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,18 +31,6 @@ Global
 		{6F2E907A-AF04-4D15-AE3C-9F34675CD039}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6F2E907A-AF04-4D15-AE3C-9F34675CD039}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6F2E907A-AF04-4D15-AE3C-9F34675CD039}.Release|Any CPU.Build.0 = Release|Any CPU
-		{EC2A020E-338A-46EE-9D08-C158CBD49C92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{EC2A020E-338A-46EE-9D08-C158CBD49C92}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{EC2A020E-338A-46EE-9D08-C158CBD49C92}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{EC2A020E-338A-46EE-9D08-C158CBD49C92}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E255F763-A2FE-43A8-9331-019796C935C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E255F763-A2FE-43A8-9331-019796C935C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E255F763-A2FE-43A8-9331-019796C935C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E255F763-A2FE-43A8-9331-019796C935C7}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7CF40EB8-D81D-40B5-B849-17E5662175D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7CF40EB8-D81D-40B5-B849-17E5662175D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7CF40EB8-D81D-40B5-B849-17E5662175D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7CF40EB8-D81D-40B5-B849-17E5662175D6}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5CBB7EB1-67C8-4706-9D9E-B961DD43E746}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5CBB7EB1-67C8-4706-9D9E-B961DD43E746}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5CBB7EB1-67C8-4706-9D9E-B961DD43E746}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -63,18 +43,15 @@ Global
 		{6F67B4AB-53FB-4665-9116-C14F9256C0FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6F67B4AB-53FB-4665-9116-C14F9256C0FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6F67B4AB-53FB-4665-9116-C14F9256C0FA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D86BE250-3618-4088-B7A6-4F4ECBA20D6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D86BE250-3618-4088-B7A6-4F4ECBA20D6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D86BE250-3618-4088-B7A6-4F4ECBA20D6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D86BE250-3618-4088-B7A6-4F4ECBA20D6C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A8F66F5-44A4-4618-B21E-3D9D1B86FB2D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A8F66F5-44A4-4618-B21E-3D9D1B86FB2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A8F66F5-44A4-4618-B21E-3D9D1B86FB2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A8F66F5-44A4-4618-B21E-3D9D1B86FB2D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{EC2A020E-338A-46EE-9D08-C158CBD49C92} = {CF7C2B5D-B358-459F-9FEA-5CE40687DBA6}
-		{E255F763-A2FE-43A8-9331-019796C935C7} = {CF7C2B5D-B358-459F-9FEA-5CE40687DBA6}
-		{7CF40EB8-D81D-40B5-B849-17E5662175D6} = {CF7C2B5D-B358-459F-9FEA-5CE40687DBA6}
 		{5CBB7EB1-67C8-4706-9D9E-B961DD43E746} = {5B143371-C50B-4282-B999-43579B6B760A}
 		{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323} = {5B143371-C50B-4282-B999-43579B6B760A}
 	EndGlobalSection

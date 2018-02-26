@@ -30,6 +30,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="log4net, Version=2.0.8.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\log4net.2.0.8\lib\net45-full\log4net.dll</HintPath>
+    </Reference>
     <Reference Include="MvvmFoundation.Wpf, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\..\packages\MvvmFoundation.Wpf.1.0.0\lib\net40\MvvmFoundation.Wpf.dll</HintPath>
     </Reference>
@@ -52,6 +55,10 @@
     <Compile Include="TestMarketSimulator.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj">
+      <Project>{2A8F66F5-44A4-4618-B21E-3D9D1B86FB2D}</Project>
+      <Name>BinanceExchange.API</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\SharpTrader.Core\SharpTrader.Core.csproj">
       <Project>{320b1902-461a-4b88-8852-d881dc4e5293}</Project>
       <Name>SharpTrader.Core</Name>
