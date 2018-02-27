@@ -59,7 +59,7 @@ namespace SharpTrader
                 return feed;
             }
 
-            public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate,  string clientOrderId = null)
+            public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
             {
                 var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, (double)rate);
 
@@ -307,6 +307,11 @@ namespace SharpTrader
                     _Balances.Add(asset, new AssetBalance());
                 _Balances[asset].Free += amount;
             }
+
+            public IEnumerable<ITrade> GetLastTrades(string symbol, int count, string fromId)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         public decimal GetEquity(string baseAsset)
@@ -412,6 +417,7 @@ namespace SharpTrader
 
         class Trade : ITrade
         {
+            private static long IdCounter = 0;
             public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, decimal fee, Order order)
             {
                 Market = market;
@@ -422,7 +428,9 @@ namespace SharpTrader
                 Amount = amount;
                 Fee = fee;
                 Order = order;
+                Id = (IdCounter++).ToString();
             }
+            public string Id { get; private set; }
             public decimal Amount { get; private set; }
 
             public DateTime Date { get; private set; }

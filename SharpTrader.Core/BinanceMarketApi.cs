@@ -82,7 +82,6 @@ namespace SharpTrader
             }
             //download account info
             //todo Synch trades 
-            SynchBalance();
             SynchOrders(false);
             ListenUserData();
             HearthBeatTimer = new System.Timers.Timer()
@@ -94,10 +93,9 @@ namespace SharpTrader
             HearthBeatTimer.Elapsed += HearthBeat;
         }
 
-
         private void HearthBeat(object state, ElapsedEventArgs elapsed)
-        { 
-            ListenUserData(); 
+        {
+            ListenUserData();
             SynchBalance();
             SynchOrders();
             HearthBeatTimer.Start();
@@ -175,7 +173,7 @@ namespace SharpTrader
             }
 
         }
-         
+
         private void SynchBalance()
         {
             if (!BalanceUpdateWatchdog.IsRunning || BalanceUpdateWatchdog.ElapsedMilliseconds > 10000)
@@ -316,9 +314,12 @@ namespace SharpTrader
             OnNewTrade?.Invoke(this, trade);
         }
 
-        public IEnumerable<ITrade> GetTrades(string symbol, int limit, long? fromid = null)
+        public IEnumerable<ITrade> GetLastTrades(string symbol, int count, string fromId)
         {
-            var binTrades = Client.GetAccountTrades(new AllTradesRequest { Symbol = symbol, Limit = limit, FromId = fromid }).Result;
+            long? id = null;
+            if (fromId != null)
+                id = long.Parse(fromId);
+            var binTrades = Client.GetAccountTrades(new AllTradesRequest { Symbol = symbol, Limit = count, FromId = id }).Result;
             return binTrades.Select(tr => new ApiTrade(symbol, tr));
         }
 
@@ -328,7 +329,6 @@ namespace SharpTrader
             {
                 if (_Balances.ContainsKey(asset))
                     return _Balances[asset];
-
             }
             return 0;
         }
@@ -357,9 +357,9 @@ namespace SharpTrader
         public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
         {
             AcknowledgeCreateOrderResponse newOrd;
+            var side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell;
             lock (LockObject)
             {
-                var side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell;
                 newOrd = (AcknowledgeCreateOrderResponse)Client.CreateOrder(
                     new CreateOrderRequest()
                     {
@@ -372,11 +372,21 @@ namespace SharpTrader
                         Type = be.Enums.OrderType.Limit,
                     }).Result;
 
+
             }
             System.Threading.Thread.Sleep(250);
             lock (LockObject)
             {
+                var feed = GetSymbolFeed(symbol);
                 var apiOrder = Orders.FirstOrDefault(o => o.Id == newOrd.OrderId.ToString());
+                if (apiOrder.Status == OrderStatus.Pending)
+                {
+                    if (side == OrderSide.Buy)
+                        _Balances[feed.QuoteAsset] -= apiOrder.Amount;
+                    else if (side == OrderSide.Sell)
+                        _Balances[feed.Asset] -= apiOrder.Amount;
+                }
+
                 if (apiOrder == null)
                 {
                     apiOrder = new ApiOrder(newOrd);
@@ -392,7 +402,7 @@ namespace SharpTrader
             var side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell;
             try
             {
-
+                var feed = GetSymbolFeed(symbol);
                 ApiOrder apiOrder = null;
                 lock (LockObject)
                 {
@@ -406,9 +416,13 @@ namespace SharpTrader
                                 NewOrderResponseType = NewOrderResponseType.Acknowledge
                             }).Result;
 
-
                     this._OpenOrders.Add(apiOrder);
                     this.Orders.Add(apiOrder);
+
+                    if (side == OrderSide.Buy)
+                        _Balances[feed.QuoteAsset] -= apiOrder.Amount;
+                    else if (side == OrderSide.Sell)
+                        _Balances[feed.Asset] -= apiOrder.Amount;
 
                     return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
                 }
@@ -419,6 +433,7 @@ namespace SharpTrader
                 return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null);
             }
         }
+
         public void OrderCancel(string id)
         {
             var orders = this.Orders.Where(or => or.Id == id);
@@ -430,12 +445,18 @@ namespace SharpTrader
                 {
                     Symbol = order.Symbol,
                     OrderId = order.BinanceOrderId,
-
                 });
+                var feed = GetSymbolFeed(order.Symbol);
+                if (order.TradeType == TradeType.Buy)
+                    _Balances[feed.QuoteAsset] += order.Amount - order.Filled;
+                else if (order.TradeType == TradeType.Sell)
+                    _Balances[feed.Asset] += order.Amount - order.Filled;
+
             }
             //else
             //throw new Exception($"Order {id} not found"); 
         }
+
         public (decimal min, decimal step) GetMinTradable(string symbol)
         {
             var info = ExchangeInfo.Symbols.Where(s => s.Symbol == symbol).FirstOrDefault();
@@ -531,9 +552,9 @@ namespace SharpTrader
 
                 while (symbolHistory.Ticks.Next())
                     this.Ticks.AddRecord(symbolHistory.Ticks.Tick);
-                 
+
                 PartialDepthListen();
-                KlineListen(); 
+                KlineListen();
                 HearthBeatTimer = new Timer(5000)
                 {
                     AutoReset = false,

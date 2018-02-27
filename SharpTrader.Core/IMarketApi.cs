@@ -40,15 +40,15 @@ namespace SharpTrader
 
         IEnumerable<ITrade> Trades { get; }
 
-        decimal GetBalance(string asset);
-        //(string Symbol, decimal balance)[] Balances { get; }
-
+        decimal GetBalance(string asset); 
 
         decimal GetEquity(string asset);
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
         decimal GetSymbolPrecision(string symbol);
         void OrderCancel(string id);
         decimal GetMinNotional(string asset);
+
+        IEnumerable<ITrade> GetLastTrades(string symbol, int count, string fromId);
     }
 
     public interface ISymbolFeed

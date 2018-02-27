@@ -72,7 +72,7 @@ namespace SharpTrader
         Cancelled,
         PendingCancel,
         Rejected,
-        Expired, 
+        Expired,
         Filled,
     }
 
@@ -84,10 +84,10 @@ namespace SharpTrader
         string Id { get; }
         decimal Amount { get; }
         decimal Filled { get; }
-        double Price { get; } 
+        double Price { get; }
         string Symbol { get; }
         string Market { get; }
-       
+
     }
 
     public class MarginTrade
@@ -124,6 +124,7 @@ namespace SharpTrader
 
     public interface ITrade
     {
+        string Id { get; }
         string Market { get; }
         string Symbol { get; }
         decimal Amount { get; }
