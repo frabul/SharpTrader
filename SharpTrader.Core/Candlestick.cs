@@ -3,41 +3,40 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using ZeroFormatter;
 using ProtoBuf;
 namespace SharpTrader
 {
-    [ZeroFormattable, ProtoContract]
+    [ProtoContract]
     public class Candlestick : ICandlestick
     {
-        [Index(0), ProtoMember(1)]
+        [ProtoMember(1)]
         public virtual DateTime OpenTime { get; set; }
 
-        [Index(1), ProtoMember(2)]
+        [ProtoMember(2)]
         public virtual DateTime CloseTime { get; set; }
 
-        [Index(2), ProtoMember(3)]
+        [ProtoMember(3)]
         public virtual double Open { get; set; }
 
-        [Index(3), ProtoMember(4)]
+        [ProtoMember(4)]
         public virtual double High { get; set; }
 
-        [Index(4), ProtoMember(5)]
+        [ProtoMember(5)]
         public virtual double Low { get; set; }
 
-        [Index(5), ProtoMember(6)]
+        [ProtoMember(6)]
         public virtual double Close { get; set; }
 
-        [Index(6), ProtoMember(7)]
+        [ProtoMember(7)]
         public virtual double Volume { get; set; }
 
-        [IgnoreFormat, ProtoIgnore]
+        [ProtoIgnore]
         public TimeSpan Timeframe => CloseTime - OpenTime;
 
-        [IgnoreFormat, ProtoIgnore]
+        [ProtoIgnore]
         public DateTime Time => CloseTime;
 
-        [IgnoreFormat, ProtoIgnore]
+        [ProtoIgnore]
         public virtual double Length { get { return this.High - this.Low; } }
 
         public Candlestick() { }
@@ -50,7 +49,7 @@ namespace SharpTrader
             Low = toCopy.Low;
             Volume = toCopy.Volume;
             OpenTime = openTime;
-            CloseTime = openTime  + duration;
+            CloseTime = openTime + duration;
         }
 
         public Candlestick(ICandlestick toCopy)

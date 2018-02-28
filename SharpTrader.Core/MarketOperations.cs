@@ -63,6 +63,7 @@ namespace SharpTrader
         TakeProfit,
         TakeProfitLimit,
         LimitMaker,
+        Unknown,
     }
 
     public enum OrderStatus

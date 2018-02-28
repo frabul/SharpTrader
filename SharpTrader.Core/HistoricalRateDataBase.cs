@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using ZeroFormatter;
 using System.IO;
 using ProtoBuf;
 
@@ -194,14 +193,7 @@ namespace SharpTrader
 
         private void Save(SymbolHistoryRaw sdata) => SaveProtobuf(sdata);
 
-        private void SaveZeroFormatter(SymbolHistoryRaw data)
-        {
-            lock (data.Locker)
-            {
-                using (var fs = File.Open(BaseDirectory + data.FileName, FileMode.Create))
-                    ZeroFormatterSerializer.Serialize(fs, data);
-            }
-        }
+      
 
         private void SaveProtobuf(SymbolHistoryRaw data)
         {
@@ -223,7 +215,7 @@ namespace SharpTrader
         }
 
 
-        [ZeroFormattable, ProtoContract]
+        [ ProtoContract]
         class SymbolHistoryRaw
         {
             private List<Candlestick> _Ticks;
@@ -233,22 +225,22 @@ namespace SharpTrader
 
             }
 
-            [IgnoreFormat, ProtoIgnore]
+            [ ProtoIgnore]
             public readonly object Locker = new object();
 
-            [Index(5), ProtoMember(6)]
+            [ProtoMember(6)]
             public virtual string FileName { get; set; }
 
-            [Index(0), ProtoMember(1)]
+            [ProtoMember(1)]
             public virtual string Market { get; set; }
 
-            [Index(1), ProtoMember(2)]
+            [ ProtoMember(2)]
             public virtual string Symbol { get; set; }
 
-            [Index(2), ProtoMember(3)]
+            [ ProtoMember(3)]
             public virtual TimeSpan Timeframe { get; set; }
 
-            [Index(3), ProtoMember(4)]
+            [ProtoMember(4)]
             public virtual List<Candlestick> Ticks
             {
                 get { return _Ticks; }
@@ -263,7 +255,7 @@ namespace SharpTrader
                 }
             }
 
-            [Index(4), ProtoMember(5)]
+            [ ProtoMember(5)]
             public virtual double Spread { get; set; }
 
 

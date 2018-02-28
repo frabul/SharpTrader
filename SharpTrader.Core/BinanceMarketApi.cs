@@ -121,13 +121,13 @@ namespace SharpTrader
                                 .ToArray();
                         }
 
-                        foreach (var order in currOrders)
+                        foreach (var foundOrder in currOrders)
                         {
-                            var to = new ApiOrder(order);
+                            var to = new ApiOrder(foundOrder);
                             var ord = Orders.Where(o => o.Id == to.Id).FirstOrDefault();
                             if (ord != null)
                             {
-                                ord.Update(ord);
+                                ord.Update(to);
                                 if (ord.Status > OrderStatus.PartiallyFilled)
                                 {
                                     if (_OpenOrders.Contains(ord))
@@ -370,6 +370,7 @@ namespace SharpTrader
                         NewOrderResponseType = NewOrderResponseType.Acknowledge,
                         Price = rate / 1.00000000000000000000000000000m,
                         Type = be.Enums.OrderType.Limit,
+                        TimeInForce = TimeInForce.GTC
                     }).Result;
 
 
@@ -379,13 +380,7 @@ namespace SharpTrader
             {
                 var feed = GetSymbolFeed(symbol);
                 var apiOrder = Orders.FirstOrDefault(o => o.Id == newOrd.OrderId.ToString());
-                if (apiOrder.Status == OrderStatus.Pending)
-                {
-                    if (side == OrderSide.Buy)
-                        _Balances[feed.QuoteAsset] -= apiOrder.Amount;
-                    else if (side == OrderSide.Sell)
-                        _Balances[feed.Asset] -= apiOrder.Amount;
-                }
+
 
                 if (apiOrder == null)
                 {
@@ -413,7 +408,8 @@ namespace SharpTrader
                                 Side = side,
                                 Quantity = (decimal)amount / 1.00000000000000m,
                                 NewClientOrderId = clientOrderId,
-                                NewOrderResponseType = NewOrderResponseType.Acknowledge
+                                NewOrderResponseType = NewOrderResponseType.Acknowledge,
+                                TimeInForce = TimeInForce.GTC
                             }).Result;
 
                     this._OpenOrders.Add(apiOrder);
@@ -438,20 +434,23 @@ namespace SharpTrader
         {
             var orders = this.Orders.Where(or => or.Id == id);
             Debug.Assert(orders.Count() < 2, "Two orders with same id");
-            var order = _OpenOrders.FirstOrDefault();
-            if (order != null)
+            var order = orders.FirstOrDefault();
+            lock (LockObject)
             {
-                var cancel = this.Client.CancelOrder(new CancelOrderRequest()
+                if (order != null)
                 {
-                    Symbol = order.Symbol,
-                    OrderId = order.BinanceOrderId,
-                });
-                var feed = GetSymbolFeed(order.Symbol);
-                if (order.TradeType == TradeType.Buy)
-                    _Balances[feed.QuoteAsset] += order.Amount - order.Filled;
-                else if (order.TradeType == TradeType.Sell)
-                    _Balances[feed.Asset] += order.Amount - order.Filled;
+                    var cancel = this.Client.CancelOrder(new CancelOrderRequest()
+                    {
+                        Symbol = order.Symbol,
+                        OrderId = order.BinanceOrderId,
+                    }).Result;
 
+                    var feed = GetSymbolFeed(order.Symbol);
+                    if (order.TradeType == TradeType.Buy)
+                        _Balances[feed.QuoteAsset] += order.Amount - order.Filled;
+                    else if (order.TradeType == TradeType.Sell)
+                        _Balances[feed.Asset] += order.Amount - order.Filled;
+                }
             }
             //else
             //throw new Exception($"Order {id} not found"); 
@@ -730,7 +729,7 @@ namespace SharpTrader
                     case be.Enums.OrderType.LimitMaker:
                         return OrderType.LimitMaker;
                     default:
-                        throw new Exception("Unknow order type");
+                        return OrderType.Unknown;
                 }
             }
             private static OrderStatus GetStatus(be.Enums.OrderStatus status)
