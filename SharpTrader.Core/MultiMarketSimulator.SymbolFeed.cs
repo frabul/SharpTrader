@@ -312,6 +312,11 @@ namespace SharpTrader
             {
                 throw new NotImplementedException();
             }
+
+            public IOrder QueryOrder(string symbol, string id)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         public decimal GetEquity(string baseAsset)

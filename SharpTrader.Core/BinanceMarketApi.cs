@@ -165,6 +165,8 @@ namespace SharpTrader
             try
             {
                 var time = Client.GetServerTime().Result;
+                var delta = time.ServerTime - DateTime.UtcNow;
+                //if (delta > TimeSpan.Zero)
                 Client.TimestampOffset = time.ServerTime - DateTime.UtcNow;
             }
             catch
@@ -301,7 +303,6 @@ namespace SharpTrader
 
                     if (msg.ExecutionType == ExecutionType.Cancelled)
                     {
-                        Orders.Remove(order);
                         if (_OpenOrders.Contains(order))
                             _OpenOrders.Remove(order);
                     }
@@ -409,7 +410,9 @@ namespace SharpTrader
                                 Quantity = (decimal)amount / 1.00000000000000m,
                                 NewClientOrderId = clientOrderId,
                                 NewOrderResponseType = NewOrderResponseType.Acknowledge,
-                                TimeInForce = TimeInForce.GTC
+                                TimeInForce = TimeInForce.GTC,
+                                Price = (decimal)(side == OrderSide.Buy ? feed.Ask : feed.Bid)
+
                             }).Result;
 
                     this._OpenOrders.Add(apiOrder);
@@ -432,11 +435,12 @@ namespace SharpTrader
 
         public void OrderCancel(string id)
         {
-            var orders = this.Orders.Where(or => or.Id == id);
-            Debug.Assert(orders.Count() < 2, "Two orders with same id");
-            var order = orders.FirstOrDefault();
             lock (LockObject)
             {
+                var orders = this.Orders.Where(or => or.Id == id);
+                Debug.Assert(orders.Count() < 2, "Two orders with same id");
+                var order = orders.FirstOrDefault();
+
                 if (order != null)
                 {
                     var cancel = this.Client.CancelOrder(new CancelOrderRequest()
@@ -490,6 +494,12 @@ namespace SharpTrader
                     return mn.MinNotional;
             }
             return 0;
+        }
+
+        public IOrder QueryOrder(string symbol, string id)
+        {
+            var res = Client.QueryOrder(new QueryOrderRequest() { OrderId = long.Parse(id), Symbol = symbol }).Result;
+            return new ApiOrder(res);
         }
 
         class MarketOperation<T> : IMarketOperation<T>
@@ -693,6 +703,7 @@ namespace SharpTrader
                 Status = GetStatus(or.Status);
                 Filled = or.ExecutedQuantity;
                 BinanceOrderId = or.OrderId;
+
             }
 
 

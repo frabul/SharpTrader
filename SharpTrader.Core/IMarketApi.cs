@@ -45,10 +45,12 @@ namespace SharpTrader
         decimal GetEquity(string asset);
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
         decimal GetSymbolPrecision(string symbol);
-        void OrderCancel(string id);
+    
         decimal GetMinNotional(string asset);
 
         IEnumerable<ITrade> GetLastTrades(string symbol, int count, string fromId);
+        void OrderCancel(string id);
+        IOrder QueryOrder(string symbol, string id);
     }
 
     public interface ISymbolFeed
