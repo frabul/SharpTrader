@@ -414,7 +414,7 @@ namespace SharpTrader
                                 Price = (decimal)(side == OrderSide.Buy ? feed.Ask : feed.Bid)
 
                             }).Result;
-
+                    apiOrder = new ApiOrder(ord);
                     this._OpenOrders.Add(apiOrder);
                     this.Orders.Add(apiOrder);
 
