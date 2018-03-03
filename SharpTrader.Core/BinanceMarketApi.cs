@@ -254,34 +254,24 @@ namespace SharpTrader
         {
             lock (LockObject)
             {
-                var order = new ApiOrder(msg);
-                bool remove = true;
-                if (order.Status <= OrderStatus.PartiallyFilled)
-                    remove = false;//order open
-                //update and add
-                bool found = false;
-                for (int i = 0; i < Orders.Count; i++)
+                var newOrder = new ApiOrder(msg);
+                //update or add
+                var order = Orders.FirstOrDefault(o => o.Id == newOrder.Id);
+                if (order != null)
                 {
-                    if (Orders[i].Id == order.Id)
-                    {
-                        Orders[i].Update(order);
-                        found = true;
-                    }
+                    order.Update(newOrder);
                 }
-                if (!found)
-                    Orders.Add(order);
-                //-----
-                found = false;
-                for (int i = 0; i < _OpenOrders.Count; i++)
+                else
                 {
-                    if (_OpenOrders[i].Id == msg.OrderId.ToString())
-                    {
-                        if (remove)
-                            _OpenOrders.RemoveAt(i);
-                        found = true;
-                    }
+                    Orders.Add(newOrder);
+                    order = newOrder;
                 }
-                if (!found && !remove)
+                var inOpenOrders = _OpenOrders.Contains(order);
+                if (inOpenOrders && order.Status > OrderStatus.PartiallyFilled)
+                {
+                    _OpenOrders.Remove(order);
+                }
+                else if (!inOpenOrders && order.Status <= OrderStatus.PartiallyFilled)
                 {
                     _OpenOrders.Add(order);
                 }
@@ -299,9 +289,7 @@ namespace SharpTrader
                 {
                     order.Update(ordUpdate);
                     trade.Order = order;
-
-
-                    if (msg.ExecutionType == ExecutionType.Cancelled)
+                    if (order.Status > OrderStatus.PartiallyFilled)
                     {
                         if (_OpenOrders.Contains(order))
                             _OpenOrders.Remove(order);
@@ -319,7 +307,7 @@ namespace SharpTrader
         {
             long? id = null;
             if (fromId != null)
-                id = long.Parse(fromId);
+                id = long.Parse(fromId); 
             var binTrades = Client.GetAccountTrades(new AllTradesRequest { Symbol = symbol, Limit = count, FromId = id }).Result;
             return binTrades.Select(tr => new ApiTrade(symbol, tr));
         }
@@ -357,18 +345,18 @@ namespace SharpTrader
 
         public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
         {
-            AcknowledgeCreateOrderResponse newOrd;
+            ResultCreateOrderResponse newOrd;
             var side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell;
             lock (LockObject)
             {
-                newOrd = (AcknowledgeCreateOrderResponse)Client.CreateOrder(
+                newOrd = (ResultCreateOrderResponse)Client.CreateOrder(
                     new CreateOrderRequest()
                     {
                         Symbol = symbol,
                         Side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell,
                         Quantity = amount / 1.00000000000000000000000000m,
                         NewClientOrderId = clientOrderId,
-                        NewOrderResponseType = NewOrderResponseType.Acknowledge,
+                        NewOrderResponseType = NewOrderResponseType.Result,
                         Price = rate / 1.00000000000000000000000000000m,
                         Type = be.Enums.OrderType.Limit,
                         TimeInForce = TimeInForce.GTC
@@ -402,14 +390,14 @@ namespace SharpTrader
                 ApiOrder apiOrder = null;
                 lock (LockObject)
                 {
-                    var ord = (AcknowledgeCreateOrderResponse)Client.CreateOrder(
+                    var ord = (ResultCreateOrderResponse)Client.CreateOrder(
                             new CreateOrderRequest()
                             {
                                 Symbol = symbol,
                                 Side = side,
                                 Quantity = (decimal)amount / 1.00000000000000m,
                                 NewClientOrderId = clientOrderId,
-                                NewOrderResponseType = NewOrderResponseType.Acknowledge,
+                                NewOrderResponseType = NewOrderResponseType.Result,
                                 TimeInForce = TimeInForce.GTC,
                                 Price = (decimal)(side == OrderSide.Buy ? feed.Ask : feed.Bid)
 
@@ -498,8 +486,25 @@ namespace SharpTrader
 
         public IOrder QueryOrder(string symbol, string id)
         {
-            var res = Client.QueryOrder(new QueryOrderRequest() { OrderId = long.Parse(id), Symbol = symbol }).Result;
-            return new ApiOrder(res);
+            var binOrd = Client.QueryOrder(new QueryOrderRequest() { OrderId = long.Parse(id), Symbol = symbol }).Result;
+            var ord = new ApiOrder(binOrd);
+            lock (LockObject)
+            {
+                var oldOrder = this.Orders.FirstOrDefault(o => o.Id == ord.Id);
+                if (oldOrder != null)
+                {
+                    oldOrder.Update(ord);
+                    ord = oldOrder;
+                }
+                else
+                {
+                    Orders.Add(ord);
+                    if (ord.Status < OrderStatus.PartiallyFilled)
+                        _OpenOrders.Add(ord);
+                }
+            }
+
+            return ord;
         }
 
         class MarketOperation<T> : IMarketOperation<T>
@@ -685,11 +690,25 @@ namespace SharpTrader
 
             public ApiOrder(AcknowledgeCreateOrderResponse binanceOrder)
             {
-
-                Symbol = binanceOrder.Symbol;
-                Market = "Binance";
                 BinanceOrderId = binanceOrder.OrderId;
                 ClientId = binanceOrder.ClientOrderId;
+                Symbol = binanceOrder.Symbol;
+                Market = "Binance";
+          
+            }
+            public ApiOrder(ResultCreateOrderResponse binanceOrder)
+            {
+                BinanceOrderId = binanceOrder.OrderId;
+                ClientId = binanceOrder.ClientOrderId;
+                Symbol = binanceOrder.Symbol;
+                Market = "Binance";
+
+                TradeType = binanceOrder.Side == OrderSide.Buy ? TradeType.Buy : TradeType.Sell;
+                Type = GetOrderType(binanceOrder.Type);
+                Amount = binanceOrder.OriginalQuantity;
+                Price = (double)binanceOrder.Price;
+                Status = GetStatus(binanceOrder.Status);
+                Filled = binanceOrder.ExecutedQuantity; 
             }
 
             public ApiOrder(OrderResponse or)
@@ -703,6 +722,7 @@ namespace SharpTrader
                 Status = GetStatus(or.Status);
                 Filled = or.ExecutedQuantity;
                 BinanceOrderId = or.OrderId;
+              
 
             }
 
@@ -783,13 +803,13 @@ namespace SharpTrader
             {
 
                 Market = "Binance";
-                Symbol = symbol;
-                Date = tr.Time;
+                Symbol = symbol; 
                 Type = tr.IsBuyer ? TradeType.Buy : TradeType.Sell;
                 Price = (double)tr.Price;
                 Amount = tr.Quantity;
                 Fee = tr.Commission;
                 FeeAsset = tr.CommissionAsset;
+                Time = tr.Time;
                 BinanceOrderId = -1;
                 BinanceTradeId = tr.Id;
             }
@@ -797,13 +817,13 @@ namespace SharpTrader
             public ApiTrade(BinanceTradeOrderData tr)
             {
                 Market = "Binance";
-                Symbol = tr.Symbol;
-                Date = tr.TimeStamp;
+                Symbol = tr.Symbol; 
                 Type = tr.Side == OrderSide.Buy ? TradeType.Buy : TradeType.Sell;
                 Price = (double)tr.PriceOfLastFilledTrade;
                 Amount = tr.QuantityOfLastFilledTrade;
                 Fee = Fee;
                 FeeAsset = FeeAsset;
+                Time = tr.TimeStamp;
                 BinanceOrderId = tr.OrderId;
                 BinanceTradeId = tr.TradeId;
             }
@@ -814,9 +834,7 @@ namespace SharpTrader
             public string OrderId => BinanceOrderId.ToString();
 
             public decimal Amount { get; set; }
-
-            public DateTime Date { get; set; }
-
+             
             public decimal Fee { get; set; }
 
             public string Market { get; set; }
@@ -826,12 +844,12 @@ namespace SharpTrader
             public string Symbol { get; set; }
 
             public TradeType Type { get; set; }
-
-
-
+              
             public string FeeAsset { get; set; }
 
             public IOrder Order { get; set; }
+
+            public DateTime Time { get; set; }
         }
     }
 }

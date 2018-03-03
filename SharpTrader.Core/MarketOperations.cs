@@ -131,8 +131,8 @@ namespace SharpTrader
         decimal Amount { get; }
         double Price { get; }
         decimal Fee { get; }
-        TradeType Type { get; }
-        DateTime Date { get; }
+        TradeType Type { get; } 
         IOrder Order { get; }
+        DateTime Time { get; }
     }
 }

@@ -427,7 +427,7 @@ namespace SharpTrader
             {
                 Market = market;
                 Symbol = symbol;
-                Date = time;
+                Time = time;
                 Type = type;
                 Price = price;
                 Amount = amount;
@@ -438,7 +438,7 @@ namespace SharpTrader
             public string Id { get; private set; }
             public decimal Amount { get; private set; }
 
-            public DateTime Date { get; private set; }
+            public DateTime Time { get; private set; }
 
             public decimal Fee { get; private set; }
 

@@ -30,10 +30,10 @@ namespace SharpTrader
                 }
                 else
                 {
-                    var arrival = new Point(newTrade.Date, newTrade.Price);
+                    var arrival = new Point(newTrade.Time, newTrade.Price);
                     foreach (var tr in TradesToAdd)
                     {
-                        var start = new Point(tr.Date, tr.Price);
+                        var start = new Point(tr.Time, tr.Price);
                         if (tr.Price == 0)
                             Console.WriteLine("price 0");
                         var color = arrival.Y * (1 - 0.002) > start.Y ?
@@ -105,8 +105,8 @@ namespace SharpTrader
 
         public void PlotOperation(ITrade buy, ITrade sell)
         {
-            var start = new Point(buy.Date, buy.Price);
-            var arrival = new Point(sell.Date, sell.Price);
+            var start = new Point(buy.Time, buy.Price);
+            var arrival = new Point(sell.Time, sell.Price);
             var color = arrival.Y * (1 - 0.002) > start.Y ?
                 new ColorARGB(255, 10, 10, 255) : new ColorARGB(255, 255, 10, 10);
             this.Lines.Add(new Line() { Color = color, Points = new List<Point>() { start, arrival } });
