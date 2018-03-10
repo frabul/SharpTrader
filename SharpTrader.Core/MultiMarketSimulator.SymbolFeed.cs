@@ -113,7 +113,7 @@ namespace SharpTrader
                 }
             }
 
-            public decimal GetBalance(string asset)
+            public decimal GetFreeBalance(string asset)
             {
                 _Balances.TryGetValue(asset, out var res);
                 return res.Free;

@@ -36,8 +36,8 @@ namespace SharpTrader
         private BinanceClient Client;
         private DisposableBinanceWebSocketClient WSClient;
         private ExchangeInfoResponse ExchangeInfo;
-        private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
-
+        //private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
+        private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
         private System.Timers.Timer HearthBeatTimer;
         private SymbolsTable SymbolsTable = new SymbolsTable();
 
@@ -53,7 +53,7 @@ namespace SharpTrader
 
         public IEnumerable<ITrade> Trades => throw new NotImplementedException();
 
-        public (string Symbol, decimal balance)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
+        public (string Symbol, decimal balance)[] FreeBalances => _Balances.Select(kv => (kv.Key, kv.Value.Free)).ToArray();
 
         public IEnumerable<IOrder> OpenOrders
         {
@@ -188,7 +188,12 @@ namespace SharpTrader
                     {
                         var accountInfo = Client.GetAccountInformation().Result;
                         foreach (var bal in accountInfo.Balances)
-                            this._Balances[bal.Asset] = bal.Free;
+                            this._Balances[bal.Asset] = new AssetBalance
+                            {
+                                Asset = bal.Asset,
+                                Free = bal.Free,
+                                Locked = bal.Locked
+                            };
                     }
                     catch (Exception ex)
                     {
@@ -244,7 +249,8 @@ namespace SharpTrader
             {
                 foreach (var bal in msg.Balances)
                 {
-                    this._Balances[bal.Asset] = bal.Free;
+                    this._Balances[bal.Asset].Free = bal.Free;
+                    this._Balances[bal.Asset].Locked = bal.Locked;
                 }
             }
 
@@ -307,24 +313,49 @@ namespace SharpTrader
         {
             long? id = null;
             if (fromId != null)
-                id = long.Parse(fromId); 
+                id = long.Parse(fromId);
             var binTrades = Client.GetAccountTrades(new AllTradesRequest { Symbol = symbol, Limit = count, FromId = id }).Result;
             return binTrades.Select(tr => new ApiTrade(symbol, tr));
         }
 
-        public decimal GetBalance(string asset)
+        public decimal GetFreeBalance(string asset)
         {
             lock (LockObject)
             {
                 if (_Balances.ContainsKey(asset))
-                    return _Balances[asset];
+                    return _Balances[asset].Free;
             }
             return 0;
         }
 
         public decimal GetEquity(string asset)
         {
-            throw new NotImplementedException();
+            var allPrices = Client.GetSymbolsPriceTicker().Result;
+            lock (LockObject)
+            {
+                decimal val = 0;
+                foreach (var kv in _Balances)
+                {
+                    if (kv.Key == asset)
+                        val += kv.Value.Free;
+                    else if (kv.Value.Total != 0)
+                    {
+                        var sym1 = (kv.Key + asset);
+                        var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == sym1);
+                        if (price1 != null)
+                        {
+                            val += ((decimal)price1.Price * kv.Value.Total);
+                        }
+                        var sym2 = asset + kv.Key;
+                        var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == sym2);
+                        if (price2 != null)
+                        {
+                            val += (kv.Value.Total / price2.Price);
+                        }
+                    }
+                }
+                return val;
+            }
         }
 
         public ISymbolFeed GetSymbolFeed(string symbol)
@@ -406,11 +437,19 @@ namespace SharpTrader
                     this._OpenOrders.Add(apiOrder);
                     this.Orders.Add(apiOrder);
 
+                    var quoteBal = _Balances[feed.QuoteAsset];
+                    var assetBal = _Balances[feed.Asset];
+                    /*
                     if (side == OrderSide.Buy)
-                        _Balances[feed.QuoteAsset] -= apiOrder.Amount;
+                    {
+                        quoteBal.Free -= apiOrder.Amount * apiOrder.Price;
+                        assetBal.Free +=
+                    }
                     else if (side == OrderSide.Sell)
+                    {
                         _Balances[feed.Asset] -= apiOrder.Amount;
-
+                    }
+                    */
                     return new MarketOperation<IOrder>(MarketOperationStatus.Completed, apiOrder);
                 }
             }
@@ -438,10 +477,17 @@ namespace SharpTrader
                     }).Result;
 
                     var feed = GetSymbolFeed(order.Symbol);
+                    var quoteBal = _Balances[feed.QuoteAsset];
+                    var assetBal = _Balances[feed.Asset];
+
                     if (order.TradeType == TradeType.Buy)
-                        _Balances[feed.QuoteAsset] += order.Amount - order.Filled;
+                    {
+                        quoteBal.Free += (order.Amount - order.Filled) * (decimal) order.Price;
+                    }
                     else if (order.TradeType == TradeType.Sell)
-                        _Balances[feed.Asset] += order.Amount - order.Filled;
+                    {
+                        assetBal.Free += order.Amount - order.Filled;
+                    }
                 }
             }
             //else
@@ -694,7 +740,7 @@ namespace SharpTrader
                 ClientId = binanceOrder.ClientOrderId;
                 Symbol = binanceOrder.Symbol;
                 Market = "Binance";
-          
+
             }
             public ApiOrder(ResultCreateOrderResponse binanceOrder)
             {
@@ -708,7 +754,7 @@ namespace SharpTrader
                 Amount = binanceOrder.OriginalQuantity;
                 Price = (double)binanceOrder.Price;
                 Status = GetStatus(binanceOrder.Status);
-                Filled = binanceOrder.ExecutedQuantity; 
+                Filled = binanceOrder.ExecutedQuantity;
             }
 
             public ApiOrder(OrderResponse or)
@@ -722,7 +768,7 @@ namespace SharpTrader
                 Status = GetStatus(or.Status);
                 Filled = or.ExecutedQuantity;
                 BinanceOrderId = or.OrderId;
-              
+
 
             }
 
@@ -803,7 +849,7 @@ namespace SharpTrader
             {
 
                 Market = "Binance";
-                Symbol = symbol; 
+                Symbol = symbol;
                 Type = tr.IsBuyer ? TradeType.Buy : TradeType.Sell;
                 Price = (double)tr.Price;
                 Amount = tr.Quantity;
@@ -817,7 +863,7 @@ namespace SharpTrader
             public ApiTrade(BinanceTradeOrderData tr)
             {
                 Market = "Binance";
-                Symbol = tr.Symbol; 
+                Symbol = tr.Symbol;
                 Type = tr.Side == OrderSide.Buy ? TradeType.Buy : TradeType.Sell;
                 Price = (double)tr.PriceOfLastFilledTrade;
                 Amount = tr.QuantityOfLastFilledTrade;
@@ -834,7 +880,7 @@ namespace SharpTrader
             public string OrderId => BinanceOrderId.ToString();
 
             public decimal Amount { get; set; }
-             
+
             public decimal Fee { get; set; }
 
             public string Market { get; set; }
@@ -844,12 +890,21 @@ namespace SharpTrader
             public string Symbol { get; set; }
 
             public TradeType Type { get; set; }
-              
+
             public string FeeAsset { get; set; }
 
             public IOrder Order { get; set; }
 
             public DateTime Time { get; set; }
         }
+
+        class AssetBalance
+        {
+            public string Asset;
+            public decimal Free;
+            public decimal Locked;
+            public decimal Total => Free + Locked;
+        }
+
     }
 }
