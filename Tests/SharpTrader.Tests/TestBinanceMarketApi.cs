@@ -35,7 +35,7 @@ namespace SharpTrader.Tests
                     "1y4h4Pi7MvxG5MKZm1FrbAFXRG3sc8kGwuSDeQpxj3imMJn6XXWKebBzIYxNbcsn",
                     "1QNCYC26iNzFwYlKGFfo7iAAkZGmcPkGknH2956jYqPPJk8sOb2RTwaVCDDEqbzb"
                     );
-            var bal = api2.GetBalance("ETH");
+            var bal = api2.GetEquity("ETH");
             var prec = api2.GetSymbolPrecision("ETHBTC");
 
             var feed = api2.GetSymbolFeed("ADAETH");
