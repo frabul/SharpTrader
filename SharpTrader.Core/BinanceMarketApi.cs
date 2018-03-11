@@ -482,7 +482,7 @@ namespace SharpTrader
 
                     if (order.TradeType == TradeType.Buy)
                     {
-                        quoteBal.Free += (order.Amount - order.Filled) * (decimal) order.Price;
+                        quoteBal.Free += (order.Amount - order.Filled) * (decimal)order.Price;
                     }
                     else if (order.TradeType == TradeType.Sell)
                     {
@@ -630,7 +630,7 @@ namespace SharpTrader
                 {
                     KlineListen();
                 }
-                if (PartialDepthWatchDog.ElapsedMilliseconds > 40000)
+                if (PartialDepthWatchDog.ElapsedMilliseconds > 50000)
                 {
 
                     PartialDepthListen();
@@ -658,22 +658,10 @@ namespace SharpTrader
                         WebSocketClient.CloseWebSocketInstance(PartialDepthSocket);
                 }
                 catch { }
-                PartialDepthSocket = WebSocketClient.ConnectToPartialDepthWebSocket(this.Symbol.ToLower(), 5, HandlePartialDepthUpdate);
+                PartialDepthSocket = WebSocketClient.ConnectToPartialDepthWebSocket(this.Symbol.ToLower(), PartialDepthLevels.Five, HandlePartialDepthUpdate);
                 PartialDepthWatchDog.Restart();
             }
-            private void HandleDepthUpdate(BinanceDepthData messageData)
-            {
-                PartialDepthWatchDog.Restart();
-                var bid = (double)messageData.BidDepthDeltas.Where(level => level.Quantity != 0).Max(l => l.Quantity);
-                var ask = (double)messageData.AskDepthDeltas.Where(level => level.Quantity != 0).Min(l => l.Quantity);
-                if (bid != 0 && ask != 0)
-                {
-                    this.Bid = bid;
-                    this.Ask = ask;
-                    Spread = Ask - Bid;
-                    SignalTick();
-                }
-            }
+     
             private void HandlePartialDepthUpdate(BinancePartialData messageData)
             {
                 PartialDepthWatchDog.Restart();
