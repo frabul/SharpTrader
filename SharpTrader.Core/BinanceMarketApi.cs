@@ -337,7 +337,7 @@ namespace SharpTrader
                 foreach (var kv in _Balances)
                 {
                     if (kv.Key == asset)
-                        val += kv.Value.Free;
+                        val += kv.Value.Total;
                     else if (kv.Value.Total != 0)
                     {
                         var sym1 = (kv.Key + asset);
@@ -346,19 +346,24 @@ namespace SharpTrader
                         {
                             val += ((decimal)price1.Price * kv.Value.Total);
                         }
-                        var sym2 = asset + kv.Key;
-                        var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == sym2);
-                        if (price2 != null)
+                        else
                         {
-                            val += (kv.Value.Total / price2.Price);
-                        }
+                            var sym2 = asset + kv.Key;
+                            var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == sym2);
+                            if (price2 != null)
+                            {
+                                val += (kv.Value.Total / price2.Price);
+                            }
+                        } 
                     }
                 }
                 return val;
             }
         }
 
-        public ISymbolFeed GetSymbolFeed(string symbol)
+        public ISymbolFeed GetSymbolFeed(string symbol) => GetSymbolFeed(symbol, TimeSpan.MaxValue);
+
+        public ISymbolFeed GetSymbolFeed(string symbol, TimeSpan warmup)
         {
             lock (Feeds)
             {
@@ -366,7 +371,7 @@ namespace SharpTrader
                 if (feed == null)
                 {
                     var (Asset, Quote) = SymbolsTable[symbol];
-                    feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, Asset, Quote);
+                    feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, Asset, Quote, warmup);
                     Feeds.Add(feed);
                 }
                 return feed;
@@ -593,7 +598,7 @@ namespace SharpTrader
             public double Spread { get; set; }
             public double Volume24H { get; private set; }
 
-            public SymbolFeed(BinanceClient client, HistoricalRateDataBase hist, string market, string symbol, string asset, string quoteAsset)
+            public SymbolFeed(BinanceClient client, HistoricalRateDataBase hist, string market, string symbol, string asset, string quoteAsset, TimeSpan historyToLoad)
             {
                 HistoryDb = hist;
                 this.Client = client;
@@ -605,14 +610,18 @@ namespace SharpTrader
                 //load missing data to hist db 
                 Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
 
+                //--- download latest data
+                var loadStart = TimeSpan.FromDays(1) < historyToLoad ? TimeSpan.FromDays(1) : historyToLoad;
                 var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
                 downloader.DownloadCompleteSymbolHistory(Symbol, TimeSpan.FromDays(1));
 
+                //--- load the history into this 
                 ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
-
+                symbolHistory.Ticks.SeekNearestBefore(DateTime.UtcNow - historyToLoad);
                 while (symbolHistory.Ticks.Next())
                     this.Ticks.AddRecord(symbolHistory.Ticks.Tick);
 
+                //---- connect the sockets -----
                 PartialDepthListen();
                 KlineListen();
                 HearthBeatTimer = new Timer(5000)
@@ -661,7 +670,7 @@ namespace SharpTrader
                 PartialDepthSocket = WebSocketClient.ConnectToPartialDepthWebSocket(this.Symbol.ToLower(), PartialDepthLevels.Five, HandlePartialDepthUpdate);
                 PartialDepthWatchDog.Restart();
             }
-     
+
             private void HandlePartialDepthUpdate(BinancePartialData messageData)
             {
                 PartialDepthWatchDog.Restart();
