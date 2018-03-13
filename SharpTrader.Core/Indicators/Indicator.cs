@@ -40,7 +40,7 @@ namespace SharpTrader.Indicators
 
         public double Peek(double nextSignalSample)
         {
-            var nextFilter = Calculate(nextSignalSample);
+            var nextFilter = CalculatePeek(nextSignalSample);
             return nextFilter;
         }
 
@@ -58,7 +58,7 @@ namespace SharpTrader.Indicators
 
         protected abstract double Calculate();
 
-        protected abstract double Calculate(double sample);
+        protected abstract double CalculatePeek(double sample);
 
         protected double GetSignal(int ind) => Selector(Signal.GetFromCursor(ind));
 

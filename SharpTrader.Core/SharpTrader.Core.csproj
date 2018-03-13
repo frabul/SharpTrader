@@ -54,6 +54,7 @@
     <Compile Include="ILogger.cs" />
     <Compile Include="IMarketApi.cs" />
     <Compile Include="IMarketsManager.cs" />
+    <Compile Include="Indicators\ATR.cs" />
     <Compile Include="Indicators\BollingerBands.cs" />
     <Compile Include="Indicators\FisherN.cs" />
     <Compile Include="Indicators\HighPass.cs" />
@@ -61,7 +62,7 @@
     <Compile Include="Indicators\Indicator.cs" />
     <Compile Include="Indicators\MMI.cs" />
     <Compile Include="Indicators\Normalize.cs" />
-    <Compile Include="Indicators\Variance.cs" />
+    <Compile Include="Indicators\MeanAndVariance.cs" />
     <Compile Include="ISignalNavigator.cs" />
     <Compile Include="MultiMarketSimulator.cs" />
     <Compile Include="MultiMarketSimulator.SymbolFeed.cs" />

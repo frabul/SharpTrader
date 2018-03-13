@@ -45,23 +45,46 @@ namespace SharpTrader.Utils
             var toDownload = symbols.Where(sp => sp.Symbol.EndsWith("BTC")).Select(sp => sp.Symbol);
             toDownload = toDownload.Concat(symbols.Where(sp => sp.Symbol.EndsWith("USDT")).Select(sp => sp.Symbol));
             foreach (var symbol in toDownload)
-                DownloadCompleteSymbolHistory(symbol, TimeSpan.FromDays(1));
+                DownloadHistory(symbol, TimeSpan.MaxValue, TimeSpan.FromDays(1));
         }
 
-        public void DownloadCompleteSymbolHistory(string symbol, TimeSpan preload)
+        public void DownloadHistory(string symbol, TimeSpan fromTime, TimeSpan redownloadTime)
         {
             Console.WriteLine($"Downloading history for {symbol}");
             DateTime endTime = DateTime.UtcNow.Subtract(TimeSpan.FromSeconds(60));
             List<SharpTrader.Candlestick> AllCandles = new List<SharpTrader.Candlestick>();
 
             //we need to convert all in UTC time 
-            var startTime = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
+            var startTime = DateTime.UtcNow - fromTime; //  
+            var epoch = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
+            if (startTime < epoch)
+                startTime = epoch;
+
             //try to get the start time
             var symbolHistory = HistoryDB.GetSymbolHistory(MarketName, symbol, TimeSpan.FromSeconds(60));
 
-            if (symbolHistory.Ticks.Count > 0)
-                startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(preload);
 
+            if (symbolHistory.Ticks.Count > 0)
+            {
+                if (startTime > symbolHistory.Ticks.FirstTickTime) //if startTime is after the first tick we are ready to go
+                    startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(redownloadTime);
+                else
+                {
+                    var firstCandle = Client.GetKlinesCandlesticks(
+                        new GetKlinesCandlesticksRequest
+                        {
+                            Symbol = symbol,
+                            StartTime = startTime,
+                            Interval = KlineInterval.OneMinute,
+                            EndTime = DateTime.MaxValue,
+                            Limit = 10
+                        }).Result.FirstOrDefault();
+
+                    if (firstCandle != null && firstCandle.CloseTime + TimeSpan.FromSeconds(1) >= symbolHistory.Ticks.FirstTickTime)
+                        startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(redownloadTime);
+
+                }
+            }
 
             while (AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime)
             {
@@ -88,7 +111,7 @@ namespace SharpTrader.Utils
 
                 AllCandles.AddRange(batch);
                 if (AllCandles.Count > 1)
-                    startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime + TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc); 
+                    startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime - TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
             }
             //---
             HistoryDB.AddCandlesticks(MarketName, symbol, AllCandles);

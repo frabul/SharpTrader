@@ -57,7 +57,7 @@ namespace SharpTrader.Indicators
             return value;
         }
 
-        protected override double Calculate(double sample)
+        protected override double CalculatePeek(double sample)
         {
             var value = 0d;
             if (GetSignalCursor() > 3)

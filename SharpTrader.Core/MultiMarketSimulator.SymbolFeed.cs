@@ -42,6 +42,11 @@ namespace SharpTrader
                 SymbolsTable = Newtonsoft.Json.JsonConvert.DeserializeObject<SymbolsTable>(text);
             }
 
+            public ISymbolFeed GetSymbolFeed(string symbol, TimeSpan warmup)
+            {
+                throw new NotImplementedException();
+            }
+
             public ISymbolFeed GetSymbolFeed(string symbol)
             {
                 var feedFound = SymbolsFeed.TryGetValue(symbol, out SymbolFeed feed);

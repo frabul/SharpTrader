@@ -39,7 +39,7 @@ namespace SharpTrader.Indicators
                 return 0;
         }
 
-        protected override double Calculate(double sample)
+        protected override double CalculatePeek(double sample)
         {
             throw new NotImplementedException();
         }
@@ -80,7 +80,7 @@ namespace SharpTrader.Indicators
 
         }
 
-        protected override double Calculate(double sample)
+        protected override double CalculatePeek(double sample)
         {
             throw new NotImplementedException();
         }
@@ -121,7 +121,7 @@ namespace SharpTrader.Indicators
 
         }
 
-        protected override double Calculate(double sample)
+        protected override double CalculatePeek(double sample)
         {
             throw new NotImplementedException();
         }

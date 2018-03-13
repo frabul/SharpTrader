@@ -64,6 +64,8 @@ namespace SharpTrader
             }
         }
 
+        public IEnumerable<string> Symbols => ExchangeInfo.Symbols.Select(sym => sym.Symbol);
+
         public BinanceMarketApi(string apiKey, string apiSecret)
         {
 
@@ -112,15 +114,16 @@ namespace SharpTrader
                     try
                     {
                         _OpenOrders.Clear();
-                        OrderResponse[] currOrders;
+
+                        SymbolFeed[] feeds;
                         lock (Feeds)
                         {
-                            currOrders = Feeds
+                            feeds = Feeds.ToArray();
+                        }
+                        OrderResponse[] currOrders = feeds
                                 .SelectMany(feed =>
                                     Client.GetCurrentOpenOrders(new CurrentOpenOrdersRequest() { Symbol = feed.Symbol }).Result)
                                 .ToArray();
-                        }
-
                         foreach (var foundOrder in currOrders)
                         {
                             var to = new ApiOrder(foundOrder);
@@ -354,14 +357,14 @@ namespace SharpTrader
                             {
                                 val += (kv.Value.Total / price2.Price);
                             }
-                        } 
+                        }
                     }
                 }
                 return val;
             }
         }
 
-        public ISymbolFeed GetSymbolFeed(string symbol) => GetSymbolFeed(symbol, TimeSpan.MaxValue);
+        public ISymbolFeed GetSymbolFeed(string symbol) => GetSymbolFeed(symbol, TimeSpan.FromDays(1000));
 
         public ISymbolFeed GetSymbolFeed(string symbol, TimeSpan warmup)
         {
@@ -611,20 +614,19 @@ namespace SharpTrader
                 Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
 
                 //--- download latest data
-                var loadStart = TimeSpan.FromDays(1) < historyToLoad ? TimeSpan.FromDays(1) : historyToLoad;
+                var loadStart = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(6) : historyToLoad;
                 var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
-                downloader.DownloadCompleteSymbolHistory(Symbol, TimeSpan.FromDays(1));
+                downloader.DownloadHistory(Symbol, historyToLoad, loadStart);
 
                 //--- load the history into this 
                 ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
-                symbolHistory.Ticks.SeekNearestBefore(DateTime.UtcNow - historyToLoad);
+                symbolHistory.Ticks.SeekNearestAfter(DateTime.UtcNow - historyToLoad);
                 while (symbolHistory.Ticks.Next())
                     this.Ticks.AddRecord(symbolHistory.Ticks.Tick);
 
-                //---- connect the sockets -----
-                PartialDepthListen();
-                KlineListen();
-                HearthBeatTimer = new Timer(5000)
+                this.Ask = this.Bid = Ticks.LastTick.Close;
+
+                HearthBeatTimer = new Timer(1000)
                 {
                     AutoReset = false,
                     Enabled = true,
@@ -635,11 +637,11 @@ namespace SharpTrader
 
             void HearthBeat(object state, ElapsedEventArgs args)
             {
-                if (KlineWatchdog.ElapsedMilliseconds > 70000)
+                if (!KlineWatchdog.IsRunning || KlineWatchdog.ElapsedMilliseconds > 70000)
                 {
                     KlineListen();
                 }
-                if (PartialDepthWatchDog.ElapsedMilliseconds > 50000)
+                if (!PartialDepthWatchDog.IsRunning || PartialDepthWatchDog.ElapsedMilliseconds > 50000)
                 {
 
                     PartialDepthListen();

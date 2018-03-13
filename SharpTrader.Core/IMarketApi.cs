@@ -31,6 +31,8 @@ namespace SharpTrader
         /// </summary> 
         ISymbolFeed GetSymbolFeed(string symbol);
 
+        ISymbolFeed GetSymbolFeed(string symbol, TimeSpan warmup);
+
         /// <summary>
         /// Get all currently open orders
         /// </summary> 
@@ -40,12 +42,12 @@ namespace SharpTrader
 
         IEnumerable<ITrade> Trades { get; }
 
-        decimal GetFreeBalance(string asset); 
+        decimal GetFreeBalance(string asset);
 
         decimal GetEquity(string asset);
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
         decimal GetSymbolPrecision(string symbol);
-    
+
         decimal GetMinNotional(string asset);
 
         IEnumerable<ITrade> GetLastTrades(string symbol, int count, string fromId);
