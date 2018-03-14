@@ -27,20 +27,27 @@ namespace SharpTrader
         IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null);
 
         /// <summary>
-        /// Subscribes to updates from a given symbol in a given market
+        /// Gets the feed for the given symbol
         /// </summary> 
         ISymbolFeed GetSymbolFeed(string symbol);
 
-        ISymbolFeed GetSymbolFeed(string symbol, TimeSpan warmup);
+        /// <summary>
+        /// Gets the real time data feed for the given symbol
+        /// </summary>
+        /// <param name="symbol">symbol </param>
+        /// <param name="pastDataToLoad">past data to load</param>
+        /// <returns></returns>
+        ISymbolFeed GetSymbolFeed(string symbol, TimeSpan pastDataToLoad);
 
         /// <summary>
         /// Get all currently open orders
         /// </summary> 
-        IEnumerable<IOrder> OpenOrders { get; }
-
-        IEnumerable<ISymbolFeed> ActiveFeeds { get; }
-
-        IEnumerable<ITrade> Trades { get; }
+        IEnumerable<IOrder> OpenOrders { get; } 
+        IEnumerable<ISymbolFeed> ActiveFeeds { get; } 
+        IEnumerable<ITrade> Trades { get; } 
+        IMarketOperation OrderCancel(string id);
+        IMarketOperation<IEnumerable<ITrade>> GetLastTrades(string symbol, int count, string fromId);
+        IMarketOperation<IOrder> QueryOrder(string symbol, string id);
 
         decimal GetFreeBalance(string asset);
 
@@ -50,9 +57,6 @@ namespace SharpTrader
 
         decimal GetMinNotional(string asset);
 
-        IEnumerable<ITrade> GetLastTrades(string symbol, int count, string fromId);
-        void OrderCancel(string id);
-        IOrder QueryOrder(string symbol, string id);
     }
 
     public interface ISymbolFeed
@@ -77,11 +81,17 @@ namespace SharpTrader
         void OnNewCandle(ISymbolFeed sender, ICandlestick newCandle);
     }
 
-    public interface IMarketOperation<T>
+    public interface IMarketOperation<T> : IMarketOperation
     {
-        MarketOperationStatus Status { get; }
         T Result { get; }
     }
+
+    public interface IMarketOperation
+    {
+        MarketOperationStatus Status { get; }
+        string ErrorInfo { get; }
+    }
+
     public enum MarketOperationStatus
     {
         Completed,

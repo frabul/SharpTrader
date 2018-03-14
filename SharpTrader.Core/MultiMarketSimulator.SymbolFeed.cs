@@ -258,7 +258,7 @@ namespace SharpTrader
                 return (0, 0);
             }
 
-            public void OrderCancel(string id)
+            public IMarketOperation OrderCancel(string id)
             {
                 lock (LockObject)
                 {
@@ -290,9 +290,9 @@ namespace SharpTrader
                             Debug.Assert(bal.Locked >= -0.0000001m, "Incoerent locked amount");
                             ClosedOrders.Add(order);
                         }
-
                     }
                 }
+                return new MarketOperation<object>(MarketOperationStatus.Completed, null);
             }
 
 
@@ -313,12 +313,12 @@ namespace SharpTrader
                 _Balances[asset].Free += amount;
             }
 
-            public IEnumerable<ITrade> GetLastTrades(string symbol, int count, string fromId)
+            public IMarketOperation<IEnumerable<ITrade>> GetLastTrades(string symbol, int count, string fromId)
             {
                 throw new NotImplementedException();
             }
 
-            public IOrder QueryOrder(string symbol, string id)
+            public IMarketOperation<IOrder> QueryOrder(string symbol, string id)
             {
                 throw new NotImplementedException();
             }
@@ -459,15 +459,19 @@ namespace SharpTrader
 
             IOrder ITrade.Order => Order;
         }
+
         class MarketOperation<T> : IMarketOperation<T>
         {
+            public MarketOperationStatus Status { get; internal set; }
+            public T Result { get; }
+            public string ErrorInfo { get; internal set; }
+
             public MarketOperation(MarketOperationStatus status, T res)
             {
                 Status = status;
                 Result = res;
             }
-            public MarketOperationStatus Status { get; internal set; }
-            public T Result { get; }
+
         }
 
         class MarketConfiguration
