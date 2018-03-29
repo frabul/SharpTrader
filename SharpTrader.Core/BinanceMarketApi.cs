@@ -446,7 +446,7 @@ namespace SharpTrader
                 string msg = "One or more errors: ";
                 foreach (var e in ae.InnerExceptions)
                 {
-                    msg += "\n\t" + ex.Message;
+                    msg += "\n\t" + e.Message;
                 }
                 return msg;
             }
