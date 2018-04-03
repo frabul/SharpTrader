@@ -68,14 +68,14 @@ namespace SharpTrader
             {
                 var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, (double)rate);
 
-                RegisterOrder(order);
+                var res = RegisterOrder(order);
                 lock (LockObject)
                     this.PendingOrders.Add(order);
                 return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
 
             }
 
-            private void RegisterOrder(Order order)
+            private (bool result, string error) RegisterOrder(Order order)
             {
                 var ass = SymbolsTable[order.Symbol];
                 AssetBalance bal;
@@ -90,12 +90,15 @@ namespace SharpTrader
                     bal = _Balances[ass.Quote];
                     amount = order.Amount * (decimal)order.Price;
                 }
-
                 if (bal.Free < amount)
-                    throw new Exception("Insufficient balance");
+                {
+                    return (false, "Insufficient balance");
+                }
 
                 bal.Free -= amount;
                 bal.Locked += amount;
+                return (true, null);
+
             }
 
             public IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount, string clientOrderId = null)
@@ -106,7 +109,12 @@ namespace SharpTrader
                     var price = type == TradeType.Buy ? feed.Ask : feed.Bid;
                     var order = new Order(this.MarketName, symbol, type, OrderType.Market, amount, price);
 
-                    RegisterOrder(order);
+
+
+                    var (result, error) = RegisterOrder(order);
+                    if (!result)
+                        return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null) { ErrorInfo = error };
+
                     var trade = new Trade(
                         this.MarketName, symbol, this.Time,
                         type, price, amount,
@@ -179,6 +187,7 @@ namespace SharpTrader
                                     order: order
                                 );
                                 RegisterTrade(feed, trade);
+                                ClosedOrders.Add(PendingOrders[i]);
                                 PendingOrders.RemoveAt(i--);
                             }
                         }
@@ -255,7 +264,7 @@ namespace SharpTrader
 
             public (decimal min, decimal step) GetMinTradable(string tradeSymbol)
             {
-                return (0, 0);
+                return (0.00000001m, 0.00000001m);
             }
 
             public IMarketOperation OrderCancel(string id)
@@ -315,12 +324,21 @@ namespace SharpTrader
 
             public IMarketOperation<IEnumerable<ITrade>> GetLastTrades(string symbol, int count, string fromId)
             {
-                throw new NotImplementedException();
+                IEnumerable<ITrade> trades;
+                if (fromId != null)
+                    trades = Trades.Where(t => t.Symbol == symbol && (long.Parse(t.Id) > long.Parse(fromId)));
+                else
+                    trades = Trades.Where(t => t.Symbol == symbol);
+                return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, trades);
             }
 
             public IMarketOperation<IOrder> QueryOrder(string symbol, string id)
             {
-                throw new NotImplementedException();
+                var ord = ClosedOrders.Concat(OpenOrders).Where(o => o.Symbol == symbol && o.Id == id).FirstOrDefault();
+                if (ord != null)
+                    return new MarketOperation<IOrder>(MarketOperationStatus.Completed, ord);
+                else
+                    return new MarketOperation<IOrder>(MarketOperationStatus.Failed, ord);
             }
         }
 
