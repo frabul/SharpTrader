@@ -480,8 +480,7 @@ namespace SharpTrader
                                 Type = be.Enums.OrderType.Market,
                                 Quantity = (decimal)amount / 1.00000000000000m,
                                 NewClientOrderId = clientOrderId,
-                                NewOrderResponseType = NewOrderResponseType.Result,
-                                TimeInForce = TimeInForce.GTC,
+                                NewOrderResponseType = NewOrderResponseType.Result, 
                                 Price = (decimal)(side == OrderSide.Buy ? feed.Ask : feed.Bid)
 
                             }).Result;
