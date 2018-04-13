@@ -445,11 +445,19 @@ namespace SharpTrader
             if (ex is AggregateException ae)
             {
                 string msg = "One or more errors: ";
-                foreach (var e in ae.InnerExceptions)
+                foreach (var innerExc in ae.InnerExceptions)
                 {
-                    msg += "\n\t" + e.Message;
+                    msg += "\n\t" + GetExceptionErrorInfo(innerExc).Replace("\n", "\n\t");
+                    //if (ex is BinanceException binanceExc)
+                    //    msg += binanceExc.ErrorDetails.ToString();
+                    //else
+                    //    msg += "\n\t" + e.Message;
                 }
                 return msg;
+            }
+            else if (ex is BinanceException binanceExc)
+            {
+                return binanceExc.ErrorDetails.ToString();
             }
             else
                 return ex.Message;
@@ -469,6 +477,7 @@ namespace SharpTrader
                             {
                                 Symbol = symbol,
                                 Side = side,
+                                Type = be.Enums.OrderType.Market,
                                 Quantity = (decimal)amount / 1.00000000000000m,
                                 NewClientOrderId = clientOrderId,
                                 NewOrderResponseType = NewOrderResponseType.Result,
