@@ -33,7 +33,7 @@ namespace SharpTrader
         private Stopwatch BalanceUpdateWatchdog = new Stopwatch();
         private Stopwatch SynchOrdersWatchdog = new Stopwatch();
         private Stopwatch TimerUserDataWebSocket = new Stopwatch();
-        private HistoricalRateDataBase HistoryDb = new HistoricalRateDataBase(".\\Data\\");
+        private HistoricalRateDataBase HistoryDb;
         private BinanceClient Client;
         private DisposableBinanceWebSocketClient WSClient;
         private ExchangeInfoResponse ExchangeInfo;
@@ -67,8 +67,9 @@ namespace SharpTrader
 
         public IEnumerable<string> Symbols => ExchangeInfo.Symbols.Select(sym => sym.Symbol);
 
-        public BinanceMarketApi(string apiKey, string apiSecret)
+        public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb)
         {
+            this.HistoryDb = historyDb;
 
             Client = new BinanceClient(new ClientConfiguration()
             {
