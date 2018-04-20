@@ -685,7 +685,7 @@ namespace SharpTrader
                 //--- download latest data
                 var loadStart = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(6) : historyToLoad;
                 var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
-                downloader.DownloadHistory(Symbol, historyToLoad, loadStart);
+                downloader.DownloadHistoryAsync(Symbol, historyToLoad, loadStart);
 
                 //--- load the history into this 
                 ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));

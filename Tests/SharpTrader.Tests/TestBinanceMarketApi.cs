@@ -33,8 +33,8 @@ namespace SharpTrader.Tests
             BinanceMarketApi api2 =
                 new BinanceMarketApi(
                     "1y4h4Pi7MvxG5MKZm1FrbAFXRG3sc8kGwuSDeQpxj3imMJn6XXWKebBzIYxNbcsn",
-                    "1QNCYC26iNzFwYlKGFfo7iAAkZGmcPkGknH2956jYqPPJk8sOb2RTwaVCDDEqbzb"
-                    );
+                    "1QNCYC26iNzFwYlKGFfo7iAAkZGmcPkGknH2956jYqPPJk8sOb2RTwaVCDDEqbzb",
+                     new HistoricalRateDataBase(".\\Data\\"));
             var bal = api2.GetEquity("ETH");
             var prec = api2.GetSymbolPrecision("ETHBTC");
 

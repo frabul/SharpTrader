@@ -151,7 +151,7 @@ namespace SharpTrader
                         }
                         else
                             sdata.Ticks.Add(toAdd);
-                    } 
+                    }
                 }
             }
         }
@@ -193,8 +193,6 @@ namespace SharpTrader
 
         private void Save(SymbolHistoryRaw sdata) => SaveProtobuf(sdata);
 
-      
-
         private void SaveProtobuf(SymbolHistoryRaw data)
         {
 
@@ -215,7 +213,7 @@ namespace SharpTrader
         }
 
 
-        [ ProtoContract]
+        [ProtoContract]
         class SymbolHistoryRaw
         {
             private List<Candlestick> _Ticks;
@@ -225,7 +223,7 @@ namespace SharpTrader
 
             }
 
-            [ ProtoIgnore]
+            [ProtoIgnore]
             public readonly object Locker = new object();
 
             [ProtoMember(6)]
@@ -234,10 +232,10 @@ namespace SharpTrader
             [ProtoMember(1)]
             public virtual string Market { get; set; }
 
-            [ ProtoMember(2)]
+            [ProtoMember(2)]
             public virtual string Symbol { get; set; }
 
-            [ ProtoMember(3)]
+            [ProtoMember(3)]
             public virtual TimeSpan Timeframe { get; set; }
 
             [ProtoMember(4)]
@@ -255,7 +253,7 @@ namespace SharpTrader
                 }
             }
 
-            [ ProtoMember(5)]
+            [ProtoMember(5)]
             public virtual double Spread { get; set; }
 
 
@@ -281,8 +279,7 @@ namespace SharpTrader
                 Ticks = new TimeSerieNavigator<ICandlestick>(raw.Ticks);
                 Spread = raw.Spread;
             }
-        }
-
+        } 
     }
 
     public interface ISymbolHistory
@@ -291,9 +288,7 @@ namespace SharpTrader
         string Symbol { get; }
         TimeSpan Timeframe { get; }
         TimeSerieNavigator<ICandlestick> Ticks { get; }
-        double Spread { get; }
-
-
+        double Spread { get; } 
     }
 
 
