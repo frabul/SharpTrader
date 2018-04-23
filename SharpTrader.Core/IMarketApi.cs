@@ -29,7 +29,7 @@ namespace SharpTrader
         /// <summary>
         /// Gets the feed for the given symbol
         /// </summary> 
-        ISymbolFeed GetSymbolFeed(string symbol);
+        Task<ISymbolFeed> GetSymbolFeedAsync(string symbol);
 
         /// <summary>
         /// Gets the real time data feed for the given symbol
@@ -37,14 +37,14 @@ namespace SharpTrader
         /// <param name="symbol">symbol </param>
         /// <param name="pastDataToLoad">past data to load</param>
         /// <returns></returns>
-        ISymbolFeed GetSymbolFeed(string symbol, TimeSpan pastDataToLoad);
+        Task<ISymbolFeed> GetSymbolFeedAsync(string symbol, DateTime warmup);
 
         /// <summary>
         /// Get all currently open orders
         /// </summary> 
-        IEnumerable<IOrder> OpenOrders { get; } 
-        IEnumerable<ISymbolFeed> ActiveFeeds { get; } 
-        IEnumerable<ITrade> Trades { get; } 
+        IEnumerable<IOrder> OpenOrders { get; }
+        IEnumerable<ISymbolFeed> ActiveFeeds { get; }
+        IEnumerable<ITrade> Trades { get; }
         IMarketOperation OrderCancel(string id);
         IMarketOperation<IEnumerable<ITrade>> GetLastTrades(string symbol, int count, string fromId);
         IMarketOperation<IOrder> QueryOrder(string symbol, string id);
@@ -74,6 +74,8 @@ namespace SharpTrader
         string QuoteAsset { get; }
         TimeSerieNavigator<ICandlestick> GetNavigator(TimeSpan timeframe);
         void SubscribeToNewCandle(IChartDataListener subscriber, TimeSpan timeframe);
+
+        Task SetHistoryStartAsync();
     }
 
     public interface IChartDataListener

@@ -376,22 +376,22 @@ namespace SharpTrader
             }
         }
 
-        public ISymbolFeed GetSymbolFeed(string symbol) => GetSymbolFeed(symbol, TimeSpan.FromDays(1000));
+        public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol) => await GetSymbolFeedAsync(symbol, DateTime.UtcNow - (TimeSpan.FromDays(1000)));
 
-        public ISymbolFeed GetSymbolFeed(string symbol, TimeSpan warmup)
+        public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol, DateTime warmup)
         {
+            SymbolFeed feed;
             lock (Feeds)
+                feed = Feeds.Where(sf => sf.Symbol == symbol).FirstOrDefault();
+            if (feed == null)
             {
-                var feed = Feeds.Where(sf => sf.Symbol == symbol).FirstOrDefault();
-                if (feed == null)
-                {
-                    var (Asset, Quote) = SymbolsTable[symbol];
-                    feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, Asset, Quote, warmup);
+                var (Asset, Quote) = SymbolsTable[symbol];
+                feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, Asset, Quote);
+                await feed.Initialize(warmup);
+                lock (Feeds)
                     Feeds.Add(feed);
-                }
-                return feed;
             }
-
+            return feed;
         }
 
         public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
@@ -420,10 +420,7 @@ namespace SharpTrader
                 System.Threading.Thread.Sleep(250);
                 lock (LockObject)
                 {
-                    var feed = GetSymbolFeed(symbol);
                     var apiOrder = Orders.FirstOrDefault(o => o.Id == newOrd.OrderId.ToString());
-
-
                     if (apiOrder == null)
                     {
                         apiOrder = new ApiOrder(newOrd);
@@ -468,7 +465,8 @@ namespace SharpTrader
             var side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell;
             try
             {
-                var feed = GetSymbolFeed(symbol);
+                var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == symbol);
+              
                 ApiOrder apiOrder = null;
                 lock (LockObject)
                 {
@@ -480,14 +478,14 @@ namespace SharpTrader
                                 Type = be.Enums.OrderType.Market,
                                 Quantity = (decimal)amount / 1.00000000000000m,
                                 NewClientOrderId = clientOrderId,
-                                NewOrderResponseType = NewOrderResponseType.Result,   
+                                NewOrderResponseType = NewOrderResponseType.Result,
                             }).Result;
                     apiOrder = new ApiOrder(ord);
                     this._OpenOrders.Add(apiOrder);
                     this.Orders.Add(apiOrder);
 
-                    var quoteBal = _Balances[feed.QuoteAsset];
-                    var assetBal = _Balances[feed.Asset];
+                    var quoteBal = _Balances[symbolInfo.QuoteAsset];
+                    var assetBal = _Balances[symbolInfo.BaseAsset];
                     /*
                     if (side == OrderSide.Buy)
                     {
@@ -527,9 +525,9 @@ namespace SharpTrader
                             OrderId = order.BinanceOrderId,
                         }).Result;
 
-                        var feed = GetSymbolFeed(order.Symbol);
-                        var quoteBal = _Balances[feed.QuoteAsset];
-                        var assetBal = _Balances[feed.Asset];
+                        var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == order.Symbol);
+                        var quoteBal = _Balances[symbolInfo.QuoteAsset];
+                        var assetBal = _Balances[symbolInfo.BaseAsset];
 
                         if (order.TradeType == TradeType.Buy)
                         {
@@ -670,7 +668,7 @@ namespace SharpTrader
             public double Spread { get; set; }
             public double Volume24H { get; private set; }
 
-            public SymbolFeed(BinanceClient client, HistoricalRateDataBase hist, string market, string symbol, string asset, string quoteAsset, TimeSpan historyToLoad)
+            public SymbolFeed(BinanceClient client, HistoricalRateDataBase hist, string market, string symbol, string asset, string quoteAsset)
             {
                 HistoryDb = hist;
                 this.Client = client;
@@ -679,13 +677,19 @@ namespace SharpTrader
                 this.Market = market;
                 this.QuoteAsset = quoteAsset;
                 this.Asset = asset;
+
+            }
+
+            internal async Task Initialize(DateTime historyStart)
+            {
                 //load missing data to hist db 
                 Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
 
+                var historyToLoad = DateTime.UtcNow - historyStart;
                 //--- download latest data
-                var loadStart = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(6) : historyToLoad;
+                var refreshTime = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(6) : historyToLoad;
                 var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
-                downloader.DownloadHistoryAsync(Symbol, historyToLoad, loadStart);
+                await downloader.DownloadHistoryAsync(Symbol, historyStart, refreshTime);
 
                 //--- load the history into this 
                 ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
@@ -701,10 +705,10 @@ namespace SharpTrader
                     Enabled = true,
                 };
                 HearthBeatTimer.Elapsed += HearthBeat;
+
             }
 
-
-            void HearthBeat(object state, ElapsedEventArgs args)
+            private void HearthBeat(object state, ElapsedEventArgs args)
             {
                 if (!KlineWatchdog.IsRunning || KlineWatchdog.ElapsedMilliseconds > 70000)
                 {
@@ -718,7 +722,7 @@ namespace SharpTrader
                 HearthBeatTimer.Start();
             }
 
-            void KlineListen()
+            private void KlineListen()
             {
                 try
                 {
@@ -733,7 +737,7 @@ namespace SharpTrader
                 }
             }
 
-            void PartialDepthListen()
+            private void PartialDepthListen()
             {
                 try
                 {
@@ -788,6 +792,11 @@ namespace SharpTrader
                     SignalTick();
                 }
                 RaisePendingEvents(this);
+            }
+
+            public Task SetHistoryStartAsync()
+            {
+                throw new NotImplementedException();
             }
         }
 

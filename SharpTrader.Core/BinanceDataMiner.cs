@@ -22,6 +22,11 @@ namespace SharpTrader.Utils
         private BinanceClient Client;
         private HistoricalRateDataBase HistoryDB;
         private string DataDir;
+        private int MaxRequestsPerMinute = 1200;
+        private static Queue<DateTime> RequestsPer30Seconds = new Queue<DateTime>();
+        private static object QueueLock = new object();
+
+
         public BinanceDataDownloader(string dataDir)
         {
             DataDir = dataDir;
@@ -59,7 +64,7 @@ namespace SharpTrader.Utils
                 if (tasks.Count < 10)
                 {
                     var symbol = downloadQueue.Dequeue();
-                    var task = DownloadHistoryAsync(symbol, TimeSpan.FromDays(360), TimeSpan.FromDays(1));
+                    var task = DownloadHistoryAsync(symbol, DateTime.UtcNow.Subtract(TimeSpan.FromDays(360)), TimeSpan.FromDays(1));
                     tasks.Add(task);
 
                 }
@@ -81,7 +86,7 @@ namespace SharpTrader.Utils
                 System.Threading.Thread.Sleep(1);
         }
 
-        public async Task DownloadHistoryAsync(string symbol, TimeSpan fromTime, TimeSpan redownloadTime)
+        public async Task DownloadHistoryAsync(string symbol, DateTime fromTime, TimeSpan redownloadStart)
         {
             try
             {
@@ -90,7 +95,7 @@ namespace SharpTrader.Utils
                 List<SharpTrader.Candlestick> AllCandles = new List<SharpTrader.Candlestick>();
 
                 //we need to convert all in UTC time 
-                var startTime = DateTime.UtcNow - fromTime; //  
+                var startTime = fromTime; //  
                 var epoch = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
                 if (startTime < epoch)
                     startTime = epoch;
@@ -102,7 +107,7 @@ namespace SharpTrader.Utils
                 if (symbolHistory.Ticks.Count > 0)
                 {
                     if (startTime > symbolHistory.Ticks.FirstTickTime) //if startTime is after the first tick we are ready to go
-                        startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(redownloadTime);
+                        startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
                     else
                     {
                         await RateLimitAsync();
@@ -117,7 +122,7 @@ namespace SharpTrader.Utils
                             })).FirstOrDefault();
 
                         if (firstCandle != null && firstCandle.CloseTime + TimeSpan.FromSeconds(1) >= symbolHistory.Ticks.FirstTickTime)
-                            startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(redownloadTime);
+                            startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
 
                     }
                 }
@@ -181,9 +186,7 @@ namespace SharpTrader.Utils
             System.IO.File.WriteAllText(DataDir + "BinanceSymbolsTable.json", json);
         }
 
-        int MaxRequestsPerMinute = 1200;
-        Queue<DateTime> RequestsPer30Seconds = new Queue<DateTime>();
-        private object QueueLock = new object();
+
         private async Task RateLimitAsync()
         {
 

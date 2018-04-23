@@ -42,12 +42,12 @@ namespace SharpTrader
                 SymbolsTable = Newtonsoft.Json.JsonConvert.DeserializeObject<SymbolsTable>(text);
             }
 
-            public ISymbolFeed GetSymbolFeed(string symbol, TimeSpan warmup)
+            public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol, DateTime warmup)
             {
                 throw new NotImplementedException();
             }
 
-            public ISymbolFeed GetSymbolFeed(string symbol)
+            public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)
             {
                 var feedFound = SymbolsFeed.TryGetValue(symbol, out SymbolFeed feed);
                 if (!feedFound)
@@ -414,6 +414,10 @@ namespace SharpTrader
                 SignalTick();
             }
 
+            public Task SetHistoryStartAsync()
+            {
+                throw new NotImplementedException();
+            }
         }
 
         class Order : IOrder
