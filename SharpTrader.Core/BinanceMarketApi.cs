@@ -67,6 +67,16 @@ namespace SharpTrader
 
         public IEnumerable<string> Symbols => ExchangeInfo.Symbols.Select(sym => sym.Symbol);
 
+        public IEnumerable<SymbolInfo> GetSymbols()
+        {
+            return ExchangeInfo.Symbols.Select(sym => new SymbolInfo
+            {
+                Asset = sym.BaseAsset,
+                QuoteAsset = sym.QuoteAsset,
+                Symbol = sym.Symbol,
+            });
+        }
+
         public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb)
         {
             this.HistoryDb = historyDb;
@@ -466,7 +476,7 @@ namespace SharpTrader
             try
             {
                 var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == symbol);
-              
+
                 ApiOrder apiOrder = null;
                 lock (LockObject)
                 {

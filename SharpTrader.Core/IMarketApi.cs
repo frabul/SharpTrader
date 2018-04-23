@@ -40,6 +40,12 @@ namespace SharpTrader
         Task<ISymbolFeed> GetSymbolFeedAsync(string symbol, DateTime warmup);
 
         /// <summary>
+        /// Get all available symbols for in this market
+        /// </summary>
+        /// <returns></returns>
+        IEnumerable<SymbolInfo> GetSymbols();
+
+        /// <summary>
         /// Get all currently open orders
         /// </summary> 
         IEnumerable<IOrder> OpenOrders { get; }
@@ -57,6 +63,13 @@ namespace SharpTrader
 
         decimal GetMinNotional(string asset);
 
+    }
+
+    public class SymbolInfo
+    {
+        public string Symbol { get; set; }
+        public string Asset { get; set; }
+        public string QuoteAsset { get; set; }
     }
 
     public interface ISymbolFeed
