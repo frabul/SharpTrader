@@ -14,6 +14,7 @@ namespace SharpTrader
 
         private static readonly CandlestickTimeComparer<Candlestick> CandlestickTimeComparer = new CandlestickTimeComparer<Candlestick>();
         string BaseDirectory;
+        private object SymbolsDataLocker = new object();
         List<SymbolHistoryRaw> SymbolsData = new List<SymbolHistoryRaw>();
 
         public HistoricalRateDataBase(string dataDir)
@@ -38,13 +39,17 @@ namespace SharpTrader
         public void Delete(string market, string symbol, TimeSpan time)
         {
             string fileName = GetFileName(market, symbol, time);
-            for (int i = 0; i < SymbolsData.Count; i++)
+            lock (SymbolsDataLocker)
             {
-                if (SymbolsData[i].FileName == fileName)
-                    SymbolsData.RemoveAt(i--);
+                for (int i = 0; i < SymbolsData.Count; i++)
+                {
+                    if (SymbolsData[i].FileName == fileName)
+                        SymbolsData.RemoveAt(i--);
+                }
+
+                if (File.Exists(BaseDirectory + fileName))
+                    File.Delete(BaseDirectory + fileName);
             }
-            if (File.Exists(BaseDirectory + fileName))
-                File.Delete(BaseDirectory + fileName);
         }
 
         public (string market, string symbol, TimeSpan time)[] ListAvailableData()
@@ -82,41 +87,44 @@ namespace SharpTrader
         {
             //check if we already have some records and load them 
             var fileName = GetFileName(market, symbol, timeframe);
-            var sdata = SymbolsData.FirstOrDefault(sd => sd.FileName == fileName);
-            if (sdata == null)
+            SymbolHistoryRaw sdata = null;
+            lock (SymbolsDataLocker)
             {
-                //check if we have it on disk
-                if (File.Exists(BaseDirectory + fileName))
+                sdata = SymbolsData.FirstOrDefault(sd => sd.FileName == fileName);
+                if (sdata == null)
                 {
-                    using (var fs = File.Open(BaseDirectory + fileName, FileMode.Open))
-                        sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
+                    //check if we have it on disk
+                    if (File.Exists(BaseDirectory + fileName))
+                    {
+                        using (var fs = File.Open(BaseDirectory + fileName, FileMode.Open))
+                            sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
+                    }
+                    else
+                    {
+                        sdata = new SymbolHistoryRaw()
+                        {
+                            FileName = fileName,
+                            Market = market,
+                            Spread = 0,
+                            Symbol = symbol,
+                            Ticks = new List<Candlestick>(),
+                            Timeframe = timeframe,
+                        };
+                    }
+
+                    SymbolsData.Add(sdata);
                 }
                 else
                 {
-                    sdata = new SymbolHistoryRaw()
+                    if (sdata.Ticks.Count > 0)
                     {
-                        FileName = fileName,
-                        Market = market,
-                        Spread = 0,
-                        Symbol = symbol,
-                        Ticks = new List<Candlestick>(),
-                        Timeframe = timeframe,
-                    };
+                        var tf = sdata.Ticks.FirstOrDefault()?.Timeframe;
+                        if (tf != timeframe)
+                            throw new InvalidOperationException("Bad timeframe for candle");
+                    }
+
                 }
-
-                SymbolsData.Add(sdata);
             }
-            else
-            {
-                if (sdata.Ticks.Count > 0)
-                {
-                    var tf = sdata.Ticks.FirstOrDefault()?.Timeframe;
-                    if (tf != timeframe)
-                        throw new InvalidOperationException("Bad timeframe for candle");
-                }
-
-            }
-
             return sdata;
         }
 
@@ -174,21 +182,25 @@ namespace SharpTrader
 
         public void SaveAll()
         {
-            foreach (var sdata in this.SymbolsData)
-                Save(sdata);
+            lock (SymbolsDataLocker)
+                foreach (var sdata in this.SymbolsData)
+                    Save(sdata);
         }
 
         public void Save(string market, string symbol, TimeSpan timeframe)
         {
-            var fileName = GetFileName(market, symbol, timeframe);
-            var sdata = SymbolsData.FirstOrDefault(sd => sd.FileName == fileName);
+            lock (SymbolsDataLocker)
+            {
+                var fileName = GetFileName(market, symbol, timeframe);
+                var sdata = SymbolsData.FirstOrDefault(sd => sd.FileName == fileName);
 
-            if (sdata == null)
-                throw new Exception("symbol history not found");
+                if (sdata == null)
+                    throw new Exception("symbol history not found");
 
-            Save(sdata);
+                Save(sdata);
 
-            this.SymbolsData.Remove(sdata);
+                this.SymbolsData.Remove(sdata);
+            }
         }
 
         private void Save(SymbolHistoryRaw sdata) => SaveProtobuf(sdata);
@@ -279,7 +291,7 @@ namespace SharpTrader
                 Ticks = new TimeSerieNavigator<ICandlestick>(raw.Ticks);
                 Spread = raw.Spread;
             }
-        } 
+        }
     }
 
     public interface ISymbolHistory
@@ -288,7 +300,7 @@ namespace SharpTrader
         string Symbol { get; }
         TimeSpan Timeframe { get; }
         TimeSerieNavigator<ICandlestick> Ticks { get; }
-        double Spread { get; } 
+        double Spread { get; }
     }
 
 

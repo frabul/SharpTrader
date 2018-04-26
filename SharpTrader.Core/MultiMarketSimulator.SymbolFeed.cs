@@ -340,6 +340,16 @@ namespace SharpTrader
                 else
                     return new MarketOperation<IOrder>(MarketOperationStatus.Failed, ord);
             }
+
+            public IEnumerable<SymbolInfo> GetSymbols()
+            {
+                return SymbolsTable.Select(s => new SymbolInfo
+                {
+                    Asset = s.Value.Asset,
+                    QuoteAsset = s.Value.Quote,
+                    Symbol = s.Key
+                });
+            }
         }
 
         public decimal GetEquity(string baseAsset)
