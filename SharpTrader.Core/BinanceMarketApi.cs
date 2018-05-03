@@ -26,7 +26,7 @@ namespace SharpTrader
     public class BinanceMarketApi : IMarketApi
     {
         public event Action<IMarketApi, ITrade> OnNewTrade;
-
+        private Dictionary<string, ApiTrade> TradesPerSymbol = new Dictionary<string, ApiTrade>();
         private List<ApiOrder> _OpenOrders = new List<ApiOrder>();
         private List<ApiOrder> Orders = new List<ApiOrder>();
         private Stopwatch LastListenTry = new Stopwatch();
@@ -53,6 +53,8 @@ namespace SharpTrader
         public IEnumerable<ISymbolFeed> ActiveFeeds => throw new NotImplementedException();
 
         public IEnumerable<ITrade> Trades => throw new NotImplementedException();
+
+
 
         public (string Symbol, decimal balance)[] FreeBalances => _Balances.Select(kv => (kv.Key, kv.Value.Free)).ToArray();
 
@@ -327,6 +329,7 @@ namespace SharpTrader
 
         public IMarketOperation<IEnumerable<ITrade>> GetLastTrades(string symbol, int count, string fromId)
         {
+            //todo - cache results
             try
             {
                 long? id = null;
@@ -341,6 +344,27 @@ namespace SharpTrader
                 return new MarketOperation<IEnumerable<ITrade>>(GetExceptionErrorInfo(ex));
             }
 
+        }
+
+        public async Task<IMarketOperation<IEnumerable<ITrade>>> GetAllTradesAsync(string symbol)
+        {
+            //todo - cache results
+            try
+            {
+                var binTrades = await Client.GetAccountTrades(new AllTradesRequest { Symbol = symbol, FromId = 0 });
+                var trades = binTrades.ToList();
+                while (binTrades.Count > 0)
+                {
+                    binTrades = await Client.GetAccountTrades(new AllTradesRequest { Symbol = symbol, FromId = trades.Last().Id + 1 });
+                    trades.AddRange(binTrades);
+                }
+                var result = trades.Select(tr => new ApiTrade(symbol, tr));
+                return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
+            }
+            catch (Exception ex)
+            {
+                return new MarketOperation<IEnumerable<ITrade>>(GetExceptionErrorInfo(ex));
+            }
         }
 
         public decimal GetFreeBalance(string asset)
