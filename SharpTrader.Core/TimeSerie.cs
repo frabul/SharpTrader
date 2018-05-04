@@ -26,10 +26,10 @@ namespace SharpTrader
 
         }
 
-        public void AddRecord(T historyRecord)
+        public void AddRecord(T historyRecord, bool scatteredOrder = false)
         {
             var time = historyRecord.Time;
-            if (Records.Count > 0 && LastTickTime > time)
+            if (!scatteredOrder && Records.Count > 0 && LastTickTime > time)
                 throw new Exception("you cannot add a tick that's preceding the last one ");
 
 
@@ -55,6 +55,6 @@ namespace SharpTrader
                 }
             this.PositionPop();
             return res;
-        } 
+        }
     }
 }

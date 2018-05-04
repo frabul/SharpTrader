@@ -692,6 +692,7 @@ namespace SharpTrader
             private Stopwatch KlineWatchdog = new Stopwatch();
             private Stopwatch PartialDepthWatchDog = new Stopwatch();
             private Timer HearthBeatTimer;
+            private bool TicksInitialized;
 
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
@@ -716,23 +717,13 @@ namespace SharpTrader
 
             internal async Task Initialize(DateTime historyStart)
             {
-                //load missing data to hist db 
-                Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
 
-                var historyToLoad = DateTime.UtcNow - historyStart;
-                //--- download latest data
-                var refreshTime = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(6) : historyToLoad;
-                var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
-                await downloader.DownloadHistoryAsync(Symbol, historyStart, refreshTime);
+                if (Ticks.Count > 0)
+                    this.Ask = this.Bid = Ticks.LastTick.Close;
 
-                //--- load the history into this 
-                ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
-                symbolHistory.Ticks.SeekNearestAfter(DateTime.UtcNow - historyToLoad);
-                while (symbolHistory.Ticks.Next())
-                    this.Ticks.AddRecord(symbolHistory.Ticks.Tick);
-
-                this.Ask = this.Bid = Ticks.LastTick.Close;
-
+                var book = await Client.GetOrderBook(Symbol, false);
+                Ask = (double)book.Asks.First().Price;
+                Bid = (double)book.Bids.First().Price;
                 HearthBeatTimer = new Timer(1000)
                 {
                     AutoReset = false,
@@ -802,6 +793,32 @@ namespace SharpTrader
 
             }
 
+            public override TimeSerieNavigator<ICandlestick> GetNavigator(TimeSpan timeframe)
+            {
+                if (!TicksInitialized)
+                {
+                    //load missing data to hist db 
+                    Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
+                    DateTime historyStart = new DateTime(2017, 01, 01); //todo put in parameters
+                    var historyToLoad = DateTime.UtcNow - historyStart;
+                    //--- download latest data
+                    var refreshTime = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(6) : historyToLoad;
+                    var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
+                    downloader.DownloadHistoryAsync(Symbol, historyStart, refreshTime).Wait(); //todo make async
+
+                    //--- load the history into this 
+                    ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
+                    symbolHistory.Ticks.SeekNearestAfter(DateTime.UtcNow - historyToLoad);
+                    lock (Locker)
+                    {
+                        while (symbolHistory.Ticks.Next())
+                            this.Ticks.AddRecord(symbolHistory.Ticks.Tick, true);
+                    }
+                    TicksInitialized = true;
+                }
+                return base.GetNavigator(timeframe);
+            }
+
             private void HandleKlineEvent(BinanceKlineData msg)
             {
                 KlineWatchdog.Restart();
@@ -821,9 +838,12 @@ namespace SharpTrader
                         Volume = (double)msg.Kline.Volume
                     };
                     BaseTimeframe = candle.CloseTime - candle.OpenTime;
-                    Ticks.AddRecord(candle);
-                    UpdateDerivedCharts(candle);
-                    SignalTick();
+                    lock (Locker)
+                    {
+                        Ticks.AddRecord(candle);
+                        UpdateDerivedCharts(candle);
+                        SignalTick();
+                    }
                 }
                 RaisePendingEvents(this);
             }
