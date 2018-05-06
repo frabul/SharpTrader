@@ -393,27 +393,27 @@ namespace SharpTrader
                 var previousTime = newCandle.OpenTime;
                 Volume24H += newCandle.Volume;
                 //let's calculate the volume
-                if (Ticks.Count > 0)
-                {
-                    Ticks.PositionPush();
-                    Ticks.SeekLast();
-                    previousTime = Ticks.Tick.CloseTime;
-                    var delta = newCandle.CloseTime - previousTime;
-                    var timeAt24 = newCandle.CloseTime - TimeSpan.FromHours(24);
-                    var removeStart = timeAt24 - delta;
-                    if (removeStart < Ticks.FirstTickTime)
-                        Ticks.SeekFirst();
-                    else
-                        Ticks.SeekNearestBefore(timeAt24 - delta);
+                //if (Ticks.Count > 0)
+                //{
+                //    Ticks.PositionPush();
+                //    Ticks.SeekLast();
+                //    previousTime = Ticks.Tick.CloseTime;
+                //    var delta = newCandle.CloseTime - previousTime;
+                //    var timeAt24 = newCandle.CloseTime - TimeSpan.FromHours(24);
+                //    var removeStart = timeAt24 - delta;
+                //    if (removeStart < Ticks.FirstTickTime)
+                //        Ticks.SeekFirst();
+                //    else
+                //        Ticks.SeekNearestBefore(timeAt24 - delta);
 
-                    //todo 
-                    //while (Ticks.Tick.OpenTime < timeAt24)
-                    //{
-                    //    Volume24H -= Ticks.Tick.Volume;
-                    //    Ticks.Next();
-                    //}
-                    Ticks.PositionPop();
-                }
+                //    //todo 
+                //    //while (Ticks.Tick.OpenTime < timeAt24)
+                //    //{
+                //    //    Volume24H -= Ticks.Tick.Volume;
+                //    //    Ticks.Next();
+                //    //}
+                //    Ticks.PositionPop();
+                //}
 
                 Ticks.AddRecord(newCandle);
 

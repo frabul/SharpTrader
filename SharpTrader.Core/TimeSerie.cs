@@ -28,18 +28,25 @@ namespace SharpTrader
 
         public void AddRecord(T historyRecord, bool scatteredOrder = false)
         {
-            var time = historyRecord.Time;
-            if (!scatteredOrder && Records.Count > 0 && LastTickTime > time)
-                throw new Exception("you cannot add a tick that's preceding the last one ");
-
-
-            int index = Records.BinarySearch(time);
-            if (index > -1)
-                Records[index] = historyRecord;
+             
+            if (scatteredOrder)
+            {
+                int index = Records.BinarySearch(historyRecord.Time);
+                if (index > -1)
+                    Records[index] = historyRecord;
+                else
+                {
+                    Records.Add(historyRecord);
+                } 
+            }
             else
             {
+                if (Records.Count > 0 && LastTickTime > historyRecord.Time)
+                    throw new Exception("you cannot add a tick that's preceding the last one ");
                 Records.Add(historyRecord);
             }
+
+
         }
 
         public T GetLast(Func<T, bool> criteria)

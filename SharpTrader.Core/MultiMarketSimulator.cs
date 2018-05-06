@@ -29,7 +29,7 @@ namespace SharpTrader
             int i = 0;
             foreach (var mc in Config.Markets)
             {
-                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory );
+                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory);
                 _Markets[i++] = market;
             }
         }
@@ -57,31 +57,39 @@ namespace SharpTrader
             }
         }
 
+        DateTime FirstTickTime = DateTime.MaxValue;
+        TimeSpan Delta = TimeSpan.Zero;
         public bool NextTick(bool raiseEvents)
         {
-            //find the nearest candle of all SymbolsData between the symbols that have been requested
-            DateTime nextTick = DateTime.MaxValue;
-            foreach (var market in _Markets)
-                foreach (var feed in market.Feeds)
-                {
-                    var key = market.MarketName + "_" + feed.Symbol;
-                    SymbolsData.TryGetValue(key, out var sdata);
-                    if (sdata == null)
-                    {
-                        sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60));
-                        SymbolsData.Add(key, sdata);
-                    }
-                    if (!sdata.Ticks.EndOfSerie && nextTick > sdata.Ticks.NextTick.CloseTime)
-                        nextTick = sdata.Ticks.NextTick.CloseTime;
-                }
+            if (FirstTickTime == DateTime.MaxValue)
+            {
+                //find the nearest candle of all SymbolsData between the symbols that have been requested
 
-            if (nextTick == DateTime.MaxValue)
-                return false;
+                foreach (var market in _Markets)
+                    foreach (var feed in market.Feeds)
+                    {
+                        var key = market.MarketName + "_" + feed.Symbol;
+                        SymbolsData.TryGetValue(key, out var sdata);
+                        if (sdata == null)
+                        {
+                            sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60));
+                            SymbolsData.Add(key, sdata);
+                        }
+                        if (sdata.Ticks.Count > 0)
+                            FirstTickTime = FirstTickTime > sdata.Ticks.FirstTickTime ? sdata.Ticks.FirstTickTime : FirstTickTime;
+                    }
+            }
+            if (FirstTickTime == DateTime.MaxValue)
+                throw new Exception("Error...FirstTickTime not found");
+            Delta = Delta + TimeSpan.FromSeconds(60);
+            var nextTick = FirstTickTime + Delta;
+
 
             //update market time
             this.Time = nextTick;
 
             //add new candle to all symbol feeds that have it
+            bool oneAdded = false;
             foreach (var market in _Markets)
                 foreach (var feed in market.Feeds)
                 {
@@ -91,8 +99,10 @@ namespace SharpTrader
                         {
                             data.Ticks.Next();
                             market.AddNewCandle(feed as SymbolFeed, new Candlestick(data.Ticks.Tick));
+                            oneAdded = true;
                         }
                 }
+
             foreach (var market in _Markets)
                 market.ResolveOrders();
 
@@ -102,6 +112,7 @@ namespace SharpTrader
                 foreach (var market in _Markets)
                     market.RaisePendingEvents();
             }
+
             return true;
         }
 
@@ -109,7 +120,7 @@ namespace SharpTrader
         {
             _Markets.Where(m => m.MarketName == market).First().AddBalance(asset, amount);
         }
- 
+
 
         class Configuration
         {

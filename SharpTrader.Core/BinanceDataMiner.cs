@@ -138,7 +138,7 @@ namespace SharpTrader.Utils
                         Interval = KlineInterval.OneMinute,
                         EndTime = DateTime.MaxValue
                     });
-                    System.Threading.Thread.Sleep(60);
+                    await Task.Delay(10);
                     var batch = candles.Select(
                         c => new SharpTrader.Candlestick()
                         {
