@@ -31,13 +31,7 @@ namespace SharpTrader
         /// </summary> 
         Task<ISymbolFeed> GetSymbolFeedAsync(string symbol);
 
-        /// <summary>
-        /// Gets the real time data feed for the given symbol
-        /// </summary>
-        /// <param name="symbol">symbol </param>
-        /// <param name="pastDataToLoad">past data to load</param>
-        /// <returns></returns>
-        Task<ISymbolFeed> GetSymbolFeedAsync(string symbol, DateTime warmup);
+   
 
         /// <summary>
         /// Get all available symbols for in this market
@@ -81,20 +75,20 @@ namespace SharpTrader
 
         double Spread { get; }
         double Bid { get; }
-        double Ask { get; }
-        double Volume24H { get; }
+        double Ask { get; } 
         string Asset { get; }
         string QuoteAsset { get; }
-        TimeSerieNavigator<ICandlestick> GetNavigator(TimeSpan timeframe);
-        void SubscribeToNewCandle(IChartDataListener subscriber, TimeSpan timeframe);
+        /// <summary>
+        /// Returns maker data history ( candlesticks ) with provided timeframe 
+        /// </summary>  
+        Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe);
+        /// <summary>
+        /// Returns maker data history ( candlesticks ) with provided timeframe 
+        /// </summary>  
+        Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime);
 
-        Task SetHistoryStartAsync();
     }
 
-    public interface IChartDataListener
-    {
-        void OnNewCandle(ISymbolFeed sender, ICandlestick newCandle);
-    }
 
     public interface IMarketOperation<T> : IMarketOperation
     {

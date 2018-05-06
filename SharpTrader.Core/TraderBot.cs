@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-    public abstract class TraderBot : IChartDataListener
+    public abstract class TraderBot    
     {
     
 
@@ -39,12 +39,7 @@ namespace SharpTrader
         }
 
         public abstract void OnStart();
-
-        public abstract void OnNewCandle(ISymbolFeed sender, ICandlestick newCandle);
-
-       
-
-      
+         
     }
 
 

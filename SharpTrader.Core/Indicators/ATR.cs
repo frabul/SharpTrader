@@ -14,9 +14,7 @@ namespace SharpTrader.Indicators
 
 
         public override bool IsReady => Candles.Count > 1;
-        private double RollingSum;
-
-
+  
         public TrueRange(TimeSerieNavigator<T> signal) : base("ATR")
         {
 

@@ -11,8 +11,7 @@ namespace SharpTrader
     {
         public event Action<ISymbolFeed> OnTick;
         private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
-        private List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)> NewCandleSubscribers =
-            new List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)>();
+
 
         private bool onTickPending = false;
         private object Locker = new object();
@@ -33,8 +32,9 @@ namespace SharpTrader
 
 
 
-        public virtual TimeSerieNavigator<ICandlestick> GetNavigator(TimeSpan timeframe)
+        public virtual async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
         {
+            await Task.CompletedTask; //workaround to remove the warning 
             if (BaseTimeframe == timeframe)
             {
                 return Ticks;
@@ -129,28 +129,5 @@ namespace SharpTrader
         {
             onTickPending = true;
         }
-
-        public void SubscribeToNewCandle(IChartDataListener subscriber, TimeSpan timeframe)
-        {
-            lock (Locker)
-            {
-                var (_, subs) = NewCandleSubscribers.FirstOrDefault(el => el.Timeframe == timeframe);
-                if (subs == null)
-                    NewCandleSubscribers.Add((timeframe, subs = new List<WeakReference<IChartDataListener>>()));
-
-                for (int i = 0; i < subs.Count; i++)
-                {
-                    if (!subs[i].TryGetTarget(out var obj))
-                        subs.RemoveAt(i--);
-                }
-
-                if (!subs.Any(it => it.TryGetTarget(out var sub) && sub.Equals(subscriber)))
-                {
-                    subs.Add(new WeakReference<IChartDataListener>(subscriber));
-                }
-            }
-        }
-
-
     }
 }

@@ -410,9 +410,9 @@ namespace SharpTrader
             }
         }
 
-        public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol) => await GetSymbolFeedAsync(symbol, DateTime.UtcNow - (TimeSpan.FromDays(1000)));
+         
 
-        public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol, DateTime warmup)
+        public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol )
         {
             SymbolFeed feed;
             lock (Feeds)
@@ -421,7 +421,7 @@ namespace SharpTrader
             {
                 var (Asset, Quote) = SymbolsTable[symbol];
                 feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, Asset, Quote);
-                await feed.Initialize(warmup);
+                await feed.Initialize( );
                 lock (Feeds)
                     Feeds.Add(feed);
             }
@@ -715,7 +715,7 @@ namespace SharpTrader
 
             }
 
-            internal async Task Initialize(DateTime historyStart)
+            internal async Task Initialize( )
             {
 
                 if (Ticks.Count > 0)
@@ -741,7 +741,6 @@ namespace SharpTrader
                 }
                 if (!PartialDepthWatchDog.IsRunning || PartialDepthWatchDog.ElapsedMilliseconds > 50000)
                 {
-
                     PartialDepthListen();
                 }
                 HearthBeatTimer.Start();
@@ -793,30 +792,9 @@ namespace SharpTrader
 
             }
 
-            public override TimeSerieNavigator<ICandlestick> GetNavigator(TimeSpan timeframe)
+            public override async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
             {
-                if (!TicksInitialized)
-                {
-                    //load missing data to hist db 
-                    Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
-                    DateTime historyStart = new DateTime(2017, 01, 01); //todo put in parameters
-                    var historyToLoad = DateTime.UtcNow - historyStart;
-                    //--- download latest data
-                    var refreshTime = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(6) : historyToLoad;
-                    var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
-                    downloader.DownloadHistoryAsync(Symbol, historyStart, refreshTime).Wait(); //todo make async
-
-                    //--- load the history into this 
-                    ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
-                    symbolHistory.Ticks.SeekNearestAfter(DateTime.UtcNow - historyToLoad);
-                    lock (Locker)
-                    {
-                        while (symbolHistory.Ticks.Next())
-                            this.Ticks.AddRecord(symbolHistory.Ticks.Tick, true);
-                    }
-                    TicksInitialized = true;
-                }
-                return base.GetNavigator(timeframe);
+                return await GetNavigatorAsync(timeframe, new DateTime(2016, 1, 1));
             }
 
             private void HandleKlineEvent(BinanceKlineData msg)
@@ -824,7 +802,7 @@ namespace SharpTrader
                 KlineWatchdog.Restart();
                 this.Bid = (double)msg.Kline.Close;
 
-                if (msg.Kline.IsBarFinal)
+                if (msg.Kline.IsBarFinal && TicksInitialized)
                 {
 
                     var candle = new Candlestick()
@@ -848,9 +826,31 @@ namespace SharpTrader
                 RaisePendingEvents(this);
             }
 
-            public Task SetHistoryStartAsync()
+
+            public async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
             {
-                throw new NotImplementedException();
+                if (!TicksInitialized)
+                {
+                    //load missing data to hist db 
+                    Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
+
+                    var historyToLoad = DateTime.UtcNow - historyStartTime;
+                    //--- download latest data
+                    var refreshTime = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(6) : historyToLoad;
+                    var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
+                    await downloader.DownloadHistoryAsync(Symbol, historyStartTime, refreshTime); //todo make async
+
+                    //--- load the history into this 
+                    ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
+                    symbolHistory.Ticks.SeekNearestAfter(DateTime.UtcNow - historyToLoad);
+                    lock (Locker)
+                    {
+                        while (symbolHistory.Ticks.Next())
+                            this.Ticks.AddRecord(symbolHistory.Ticks.Tick, true);
+                    }
+                    TicksInitialized = true;
+                }
+                return await base.GetNavigatorAsync(timeframe);
             }
         }
 

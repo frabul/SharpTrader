@@ -361,10 +361,7 @@ namespace SharpTrader
         {
 
             private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
-            public List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)> NewCandleSubscribers =
-                new List<(TimeSpan Timeframe, List<WeakReference<IChartDataListener>> Subs)>();
-
-
+         
             private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
             private object Locker = new object();
 
@@ -425,6 +422,11 @@ namespace SharpTrader
             }
 
             public Task SetHistoryStartAsync()
+            {
+                throw new NotImplementedException();
+            }
+
+            public Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
             {
                 throw new NotImplementedException();
             }

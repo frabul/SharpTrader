@@ -89,7 +89,7 @@ namespace SharpTrader
             this.Time = nextTick;
 
             //add new candle to all symbol feeds that have it
-            bool oneAdded = false;
+     
             foreach (var market in _Markets)
                 foreach (var feed in market.Feeds)
                 {
@@ -99,7 +99,7 @@ namespace SharpTrader
                         {
                             data.Ticks.Next();
                             market.AddNewCandle(feed as SymbolFeed, new Candlestick(data.Ticks.Tick));
-                            oneAdded = true;
+                        
                         }
                 }
 
