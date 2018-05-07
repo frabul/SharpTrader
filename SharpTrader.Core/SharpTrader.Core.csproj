@@ -54,6 +54,7 @@
     <Compile Include="ILogger.cs" />
     <Compile Include="IMarketApi.cs" />
     <Compile Include="IMarketsManager.cs" />
+    <Compile Include="Indicators\ActualizedMean.cs" />
     <Compile Include="Indicators\ATR.cs" />
     <Compile Include="Indicators\BollingerBands.cs" />
     <Compile Include="Indicators\FisherN.cs" />

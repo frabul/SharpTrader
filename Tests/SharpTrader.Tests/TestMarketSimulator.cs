@@ -34,7 +34,7 @@ namespace SharpTrader
                 bot.Start();
 
             var simStart = new DateTime(2017, 09, 10);
-            var simEnd = new DateTime(2018, 02, 28);
+            var simEnd = new DateTime(2018, 06, 28);
 
             bool raiseEvents = false;
             int steps = 1;

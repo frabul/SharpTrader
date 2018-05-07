@@ -38,7 +38,7 @@ namespace SharpTrader.Tests
             var bal = api2.GetEquity("ETH");
             var prec = api2.GetSymbolPrecision("ETHBTC");
 
-            var feed = api2.GetSymbolFeed("ADAETH");
+            var feed = api2.GetSymbolFeedAsync("ADAETH").Result;
             feed.OnTick += Feed_OnTick;
         }
 

@@ -15,22 +15,17 @@ namespace SharpTrader
             Market = MarketsManager.GetMarketApi("Binance");
         }
 
-        public override void OnNewCandle(ISymbolFeed sender, ICandlestick newCandle)
-        {
-
-        }
 
         public override void OnStart()
         {
-            Feed = Market.GetSymbolFeed("XRPBTC");
-            var feedNav = Feed.GetNavigator(TimeSpan.FromMinutes(5));
-            Indicators.HighPass<ICandlestick> HighPass = new Indicators.HighPass<ICandlestick>(
-                feedNav, c => c.Close, 20);
+            Feed = Market.GetSymbolFeedAsync("BCPTETH").Result;
+            var feedNav = Feed.GetNavigatorAsync(TimeSpan.FromMinutes(5)).Result;
+            Indicators.ActualizedMean indi = new Indicators.ActualizedMean(24, feedNav);
 
             Drawer.Candles = feedNav;
             var color = new ColorARGB(255, 110, 200, 160);
-           
-            Drawer.PlotLines(HighPass.GetNavigator(), color, e => new[] { e.Value }, true);
+
+            Drawer.PlotLines(indi.GetNavigator(), color, e => new[] { e.Mean }, false);
         }
     }
 }

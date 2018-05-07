@@ -12,9 +12,7 @@ namespace TestConsole
     {
         static void Main(string[] args)
         {
-            TestBinanceMarketApi.Test();
-            while (true)
-                Thread.Sleep(100);
+            
             TestMarketSimulator tms = new TestMarketSimulator();
             tms.Test();
         }
