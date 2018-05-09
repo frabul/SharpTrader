@@ -15,7 +15,7 @@ namespace SharpTrader
         private const string MarketName = "Binance";
         private HistoricalRateDataBase HistoryDB;
 
-        private const string DataDir = ".\\Data\\";
+        private const string DataDir = "d:\\progettiBck\\sharpTraderBots\\bin\\Data\\";
 
         public void Test()
         {

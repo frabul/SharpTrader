@@ -184,7 +184,6 @@ namespace SharpTrader
             {
                 var time = Client.GetServerTime().Result;
                 var delta = time.ServerTime - DateTime.UtcNow;
-                //if (delta > TimeSpan.Zero)
                 Client.TimestampOffset = time.ServerTime - DateTime.UtcNow;
             }
             catch (Exception ex)
@@ -327,7 +326,7 @@ namespace SharpTrader
             OnNewTrade?.Invoke(this, trade);
         }
 
-        public IMarketOperation<IEnumerable<ITrade>> GetLastTrades(string symbol, int count, string fromId)
+        public async Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
         {
             //todo - cache results
             try
@@ -335,7 +334,7 @@ namespace SharpTrader
                 long? id = null;
                 if (fromId != null)
                     id = long.Parse(fromId);
-                var binTrades = Client.GetAccountTrades(new AllTradesRequest { Symbol = symbol, Limit = count, FromId = id }).Result;
+                var binTrades = await Client.GetAccountTrades(new AllTradesRequest { Symbol = symbol, Limit = count, FromId = id });
                 var result = binTrades.Select(tr => new ApiTrade(symbol, tr));
                 return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
             }
@@ -410,9 +409,7 @@ namespace SharpTrader
             }
         }
 
-         
-
-        public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol )
+        public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)
         {
             SymbolFeed feed;
             lock (Feeds)
@@ -421,37 +418,36 @@ namespace SharpTrader
             {
                 var (Asset, Quote) = SymbolsTable[symbol];
                 feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, Asset, Quote);
-                await feed.Initialize( );
+                await feed.Initialize();
                 lock (Feeds)
                     Feeds.Add(feed);
             }
             return feed;
         }
 
-        public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
+        public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
         {
             ResultCreateOrderResponse newOrd;
             var side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell;
             try
             {
-                lock (LockObject)
-                {
-                    newOrd = (ResultCreateOrderResponse)Client.CreateOrder(
-                        new CreateOrderRequest()
-                        {
-                            Symbol = symbol,
-                            Side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell,
-                            Quantity = amount / 1.00000000000000000000000000m,
-                            NewClientOrderId = clientOrderId,
-                            NewOrderResponseType = NewOrderResponseType.Result,
-                            Price = rate / 1.00000000000000000000000000000m,
-                            Type = be.Enums.OrderType.Limit,
-                            TimeInForce = TimeInForce.GTC
-                        }).Result;
+
+                newOrd = (ResultCreateOrderResponse)await Client.CreateOrder(
+                    new CreateOrderRequest()
+                    {
+                        Symbol = symbol,
+                        Side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell,
+                        Quantity = amount / 1.00000000000000000000000000m,
+                        NewClientOrderId = clientOrderId,
+                        NewOrderResponseType = NewOrderResponseType.Result,
+                        Price = rate / 1.00000000000000000000000000000m,
+                        Type = be.Enums.OrderType.Limit,
+                        TimeInForce = TimeInForce.GTC
+                    });
 
 
-                }
-                System.Threading.Thread.Sleep(250);
+
+                await Task.Delay(300);
                 lock (LockObject)
                 {
                     var apiOrder = Orders.FirstOrDefault(o => o.Id == newOrd.OrderId.ToString());
@@ -469,7 +465,6 @@ namespace SharpTrader
                 return new MarketOperation<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
-
 
         private static string GetExceptionErrorInfo(Exception ex)
         {
@@ -494,7 +489,7 @@ namespace SharpTrader
                 return ex.Message;
         }
 
-        public IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount, string clientOrderId = null)
+        public async Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeType type, decimal amount, string clientOrderId = null)
         {
             var side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell;
             try
@@ -502,18 +497,19 @@ namespace SharpTrader
                 var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == symbol);
 
                 ApiOrder apiOrder = null;
+
+                var ord = (ResultCreateOrderResponse)await Client.CreateOrder(
+                        new CreateOrderRequest()
+                        {
+                            Symbol = symbol,
+                            Side = side,
+                            Type = be.Enums.OrderType.Market,
+                            Quantity = (decimal)amount / 1.00000000000000m,
+                            NewClientOrderId = clientOrderId,
+                            NewOrderResponseType = NewOrderResponseType.Result,
+                        });
                 lock (LockObject)
                 {
-                    var ord = (ResultCreateOrderResponse)Client.CreateOrder(
-                            new CreateOrderRequest()
-                            {
-                                Symbol = symbol,
-                                Side = side,
-                                Type = be.Enums.OrderType.Market,
-                                Quantity = (decimal)amount / 1.00000000000000m,
-                                NewClientOrderId = clientOrderId,
-                                NewOrderResponseType = NewOrderResponseType.Result,
-                            }).Result;
                     apiOrder = new ApiOrder(ord);
                     this._OpenOrders.Add(apiOrder);
                     this.Orders.Add(apiOrder);
@@ -541,24 +537,26 @@ namespace SharpTrader
             }
         }
 
-        public IMarketOperation OrderCancel(string id)
+        public async Task<IMarketOperation> OrderCancelAsync(string id)
         {
             try
             {
+                ApiOrder order = null;
                 lock (LockObject)
                 {
                     var orders = this.Orders.Where(or => or.Id == id);
                     Debug.Assert(orders.Count() < 2, "Two orders with same id");
-                    var order = orders.FirstOrDefault();
-
-                    if (order != null)
+                    order = orders.FirstOrDefault();
+                }
+                if (order != null)
+                {
+                    var cancel = await this.Client.CancelOrder(new CancelOrderRequest()
                     {
-                        var cancel = this.Client.CancelOrder(new CancelOrderRequest()
-                        {
-                            Symbol = order.Symbol,
-                            OrderId = order.BinanceOrderId,
-                        }).Result;
-
+                        Symbol = order.Symbol,
+                        OrderId = order.BinanceOrderId,
+                    });
+                    lock (LockObject)
+                    {
                         var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == order.Symbol);
                         var quoteBal = _Balances[symbolInfo.QuoteAsset];
                         var assetBal = _Balances[symbolInfo.BaseAsset];
@@ -573,9 +571,10 @@ namespace SharpTrader
                         }
                         return new MarketOperation<object>(MarketOperationStatus.Completed, order);
                     }
-                    else
-                        return new MarketOperation<object>($"Unknown order {id}");
                 }
+                else
+                    return new MarketOperation<object>($"Unknown order {id}");
+
             }
             catch (Exception ex)
             {
@@ -622,11 +621,11 @@ namespace SharpTrader
             return 0;
         }
 
-        public IMarketOperation<IOrder> QueryOrder(string symbol, string id)
+        public async Task<IMarketOperation<IOrder>> QueryOrderAsync(string symbol, string id)
         {
             try
             {
-                var binOrd = Client.QueryOrder(new QueryOrderRequest() { OrderId = long.Parse(id), Symbol = symbol }).Result;
+                var binOrd =await Client.QueryOrder(new QueryOrderRequest() { OrderId = long.Parse(id), Symbol = symbol })  ;
                 var ord = new ApiOrder(binOrd);
                 lock (LockObject)
                 {
@@ -715,7 +714,7 @@ namespace SharpTrader
 
             }
 
-            internal async Task Initialize( )
+            internal async Task Initialize()
             {
 
                 if (Ticks.Count > 0)

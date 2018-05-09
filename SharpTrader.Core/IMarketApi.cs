@@ -19,12 +19,12 @@ namespace SharpTrader
         /// <summary>
         /// Put a market order
         /// </summary> 
-        IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount, string clientOrderId = null);
+        Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeType type, decimal amount, string clientOrderId = null);
 
         /// <summary>
         /// Puts a limit order on the market
         /// </summary> 
-        IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null);
+        Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null);
 
         /// <summary>
         /// Gets the feed for the given symbol
@@ -45,9 +45,11 @@ namespace SharpTrader
         IEnumerable<IOrder> OpenOrders { get; }
         IEnumerable<ISymbolFeed> ActiveFeeds { get; }
         IEnumerable<ITrade> Trades { get; }
-        IMarketOperation OrderCancel(string id);
-        IMarketOperation<IEnumerable<ITrade>> GetLastTrades(string symbol, int count, string fromId);
-        IMarketOperation<IOrder> QueryOrder(string symbol, string id);
+
+        Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId);
+        Task<IMarketOperation<IOrder>> QueryOrderAsync(string symbol, string id);
+
+        Task<IMarketOperation> OrderCancelAsync(string id);
 
         decimal GetFreeBalance(string asset);
 

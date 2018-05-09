@@ -73,7 +73,7 @@ namespace SharpTrader.Indicators
                 bool subtract = TrueRanges.Count > Steps;
                 if (subtract)
                 {
-                    RollingSum -= TrueRanges.GetFromCursor(Steps + 1).Value;
+                    RollingSum -= TrueRanges.GetFromCursor(Steps).Value;
                 }
                 Value = RollingSum / stepsCnt;
             }

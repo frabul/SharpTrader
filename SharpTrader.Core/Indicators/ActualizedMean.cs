@@ -3,29 +3,34 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
+using static System.Math;
 namespace SharpTrader.Indicators
 {
     /// <summary>
     /// This indicator computes the n-period population variance.
     /// </summary>
-    public class ActualizedMean : Indicator
+    public class ZeroLagMA : Indicator
     {
         private double _rollingSum;
         private double _rollingSumOfSquares;
-        public int Period { get; private set; }
+        public int Period { get; private set; } = 5;
+        public int SlopeSmoothingSteps { get; set; } = 3;
         private TimeSerie<Record> Records = new TimeSerie<Record>();
         private TimeSerieNavigator<ICandlestick> Chart;
 
-        public struct Record : ITimeRecord
+        public class Record : ITimeRecord
         {
-            public DateTime Time { get; set; }
-            public double Mean { get; set; }
-            public double Variance { get; set; }
-            public Record(DateTime time, double mean, double variance) : this()
+            public DateTime Time { get; internal set; }
+            public double ZMA { get; internal set; }
+            public double Variance { get; internal set; }
+            internal double MA { get; set; }
+            public double StdDev { get; internal set; }
+
+            public Record(DateTime time)
             {
-                Mean = mean;
-                Variance = variance;
+                ZMA = 0;
+                Variance = 0;
+                MA = 0;
                 Time = time;
             }
         }
@@ -38,14 +43,14 @@ namespace SharpTrader.Indicators
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified period.
         /// </summary>  
-        public ActualizedMean(int period, TimeSerieNavigator<ICandlestick> chart) : this("Variance_" + period, period, chart)
+        public ZeroLagMA(int period, TimeSerieNavigator<ICandlestick> chart) : this("Variance_" + period, period, chart)
         {
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified name and period.
         /// </summary>  
-        public ActualizedMean(string name, int period, TimeSerieNavigator<ICandlestick> chart) : base(name)
+        public ZeroLagMA(string name, int period, TimeSerieNavigator<ICandlestick> chart) : base(name)
         {
             Chart = new TimeSerieNavigator<ICandlestick>(chart);
             Period = period;
@@ -65,32 +70,45 @@ namespace SharpTrader.Indicators
                 var chartTick = Chart.Tick;
                 var valToAdd = Chart.Tick.Close;
 
-                _rollingSum += valToAdd;
-                _rollingSumOfSquares += valToAdd * valToAdd;
 
-                if (Chart.Count < 2)
-                    return;
-
-                var indexToRemove = Period;
-                if (Chart.Position < indexToRemove)
-                    indexToRemove = (int)Chart.Position + 1;
-                var valToRemove = 0d;
-                if (indexToRemove == Period && indexToRemove <= Chart.Position)
+                double valToRemove = 0;
+                double sqrToRemve = 0;
+                if (Period < Chart.Count)
                 {
-                    valToRemove = Chart.GetFromCursor(indexToRemove).Close;
-                    _rollingSum -= valToRemove;
-                    _rollingSumOfSquares -= valToRemove * valToRemove;
+                    var oldTick = Chart.GetFromCursor(Period);
+                    valToRemove = oldTick.Close;
+                    var oldZma = Records.GetFromLast(Period - 1).ZMA;
+                    var oldDiff = Max(Abs(oldTick.High - oldZma), Abs(oldTick.Low - oldZma));
+                    sqrToRemve = oldDiff * oldDiff;
                 }
-                var slope = (valToAdd - valToRemove) / Period;
-                var mean = _rollingSum / indexToRemove + slope * (Period - 1) / 2;
-                var meanOfSquares = _rollingSumOfSquares / indexToRemove;
+                _rollingSum += valToAdd;
+                _rollingSum -= valToRemove;
+                var ma = _rollingSum / Period;
 
 
-                var variance = meanOfSquares - mean * mean;
+                double slope = 0;
+                if (Records.Count > SlopeSmoothingSteps)
+                {
+                    slope += ma - Records.GetFromLast(0).MA;
+                    slope += Enumerable.Range(0, SlopeSmoothingSteps - 1).Sum(i => Records.GetFromLast(i).MA - Records.GetFromLast(i + 1).MA);
+                    slope /= SlopeSmoothingSteps;
+                }
+                var zma = ma + slope * (Period - 1) / 2;
+                var diff = Max(Abs(chartTick.High - zma), Abs(chartTick.Low - zma));
+                var diffSqr = diff * diff;
 
-                Records.AddRecord(
-                    new Record(chartTick.CloseTime, mean, variance)
-                );
+                _rollingSumOfSquares = _rollingSumOfSquares + diffSqr - sqrToRemve;
+
+                var variance = _rollingSumOfSquares / Period;
+
+                var record = new Record(chartTick.CloseTime)
+                {
+                    MA = ma,
+                    ZMA = zma,
+                    Variance = variance,
+                    StdDev = Math.Sqrt(variance)
+                };
+                Records.AddRecord(record);
             }
 
         }

@@ -61,10 +61,11 @@ namespace SharpTrader
                     _Balances.Add(feed.Asset, new AssetBalance());
                 if (!_Balances.ContainsKey(feed.QuoteAsset))
                     _Balances.Add(feed.QuoteAsset, new AssetBalance());
+                await Task.CompletedTask;
                 return feed;
             }
 
-            public IMarketOperation<IOrder> LimitOrder(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
+            public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
             {
                 var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, (double)rate);
 
@@ -101,7 +102,7 @@ namespace SharpTrader
 
             }
 
-            public IMarketOperation<IOrder> MarketOrder(string symbol, TradeType type, decimal amount, string clientOrderId = null)
+            public Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeType type, decimal amount, string clientOrderId = null)
             {
                 lock (LockObject)
                 {
@@ -267,7 +268,7 @@ namespace SharpTrader
                 return (0.00000001m, 0.00000001m);
             }
 
-            public IMarketOperation OrderCancel(string id)
+            public IMarketOperation OrderCancelAsync(string id)
             {
                 lock (LockObject)
                 {
@@ -332,7 +333,7 @@ namespace SharpTrader
                 return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, trades);
             }
 
-            public IMarketOperation<IOrder> QueryOrder(string symbol, string id)
+            public IMarketOperation<IOrder> QueryOrderAsync(string symbol, string id)
             {
                 var ord = ClosedOrders.Concat(OpenOrders).Where(o => o.Symbol == symbol && o.Id == id).FirstOrDefault();
                 if (ord != null)
@@ -349,6 +350,23 @@ namespace SharpTrader
                     QuoteAsset = s.Value.Quote,
                     Symbol = s.Key
                 });
+            }
+
+    
+
+            public Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
+            {
+                throw new NotImplementedException();
+            }
+
+            Task<IMarketOperation<IOrder>> IMarketApi.QueryOrderAsync(string symbol, string id)
+            {
+                throw new NotImplementedException();
+            }
+
+            Task<IMarketOperation> IMarketApi.OrderCancelAsync(string id)
+            {
+                throw new NotImplementedException();
             }
         }
 
