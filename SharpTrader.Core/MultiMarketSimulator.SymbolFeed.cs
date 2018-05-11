@@ -102,8 +102,8 @@ namespace SharpTrader
 
             }
 
-            public Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeType type, decimal amount, string clientOrderId = null)
-            {
+            public async Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeType type, decimal amount, string clientOrderId = null)
+            { 
                 lock (LockObject)
                 {
                     var feed = SymbolsFeed[symbol];
@@ -352,7 +352,7 @@ namespace SharpTrader
                 });
             }
 
-    
+
 
             public Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
             {
@@ -379,7 +379,7 @@ namespace SharpTrader
         {
 
             private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
-         
+
             private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
             private object Locker = new object();
 
