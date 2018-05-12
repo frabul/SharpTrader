@@ -17,7 +17,7 @@ namespace SharpTrader
 
         public IEnumerable<IMarketApi> Markets => _Markets;
         public DateTime Time { get; private set; }
-
+        public DateTime StartOfSimulation { get; set; } = new DateTime(2000, 1, 1);
 
         public MultiMarketSimulator(string dataDirectory, HistoricalRateDataBase historyDb)
         {
@@ -72,7 +72,7 @@ namespace SharpTrader
                         SymbolsData.TryGetValue(key, out var sdata);
                         if (sdata == null)
                         {
-                            sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60));
+                            sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60),StartOfSimulation);
                             SymbolsData.Add(key, sdata);
                         }
                         if (sdata.Ticks.Count > 0)
@@ -89,7 +89,7 @@ namespace SharpTrader
             this.Time = nextTick;
 
             //add new candle to all symbol feeds that have it
-     
+
             foreach (var market in _Markets)
                 foreach (var feed in market.Feeds)
                 {
@@ -98,8 +98,8 @@ namespace SharpTrader
                         while (data.Ticks.NextTickTime <= this.Time)
                         {
                             data.Ticks.Next();
-                            market.AddNewCandle(feed as SymbolFeed, new Candlestick(data.Ticks.Tick));
-                        
+                            var candle = data.Ticks.Tick is Candlestick c ? c : new Candlestick(data.Ticks.Tick);
+                            market.AddNewCandle(feed as SymbolFeed, candle);// new Candlestick(data.Ticks.Tick)); //use less memory
                         }
                 }
 

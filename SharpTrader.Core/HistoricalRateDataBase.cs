@@ -76,7 +76,30 @@ namespace SharpTrader
                 }
             }
         }
-
+        public ISymbolHistory GetSymbolHistory(string market, string symbol, TimeSpan timeframe, DateTime startOfData)
+        {
+            var fileName = GetFileName(market, symbol, timeframe);
+            SymbolHistoryRaw sdata;
+            if (File.Exists(BaseDirectory + fileName))
+            {
+                using (var fs = File.Open(BaseDirectory + fileName, FileMode.Open))
+                    sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
+            }
+            else
+            {
+                sdata = new SymbolHistoryRaw()
+                {
+                    FileName = fileName,
+                    Market = market,
+                    Spread = 0,
+                    Symbol = symbol,
+                    Ticks = new List<Candlestick>(),
+                    Timeframe = timeframe,
+                };
+                //throw new Exception("History data not found");
+            }
+            return new SymbolHistory(sdata, startOfData);
+        }
         public ISymbolHistory GetSymbolHistory(string market, string symbol, TimeSpan timeframe)
         {
             SymbolHistoryRaw sdata = GetHistoryRaw(market, symbol, timeframe);
@@ -282,7 +305,15 @@ namespace SharpTrader
             public TimeSerieNavigator<ICandlestick> Ticks { get; }
 
             public double Spread { get; }
+            public SymbolHistory(SymbolHistoryRaw raw, DateTime startOfData)
+            {
+                Market = raw.Market;
+                Symbol = raw.Symbol;
+                Timeframe = raw.Timeframe;
 
+                Ticks = new TimeSerieNavigator<ICandlestick>(raw.Ticks.Where(t => t.Time >= startOfData));
+                Spread = raw.Spread;
+            }
             public SymbolHistory(SymbolHistoryRaw raw)
             {
                 Market = raw.Market;

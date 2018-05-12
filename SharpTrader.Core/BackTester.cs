@@ -27,11 +27,13 @@ namespace SharpTrader
         public BackTester(MultiMarketSimulator simulator, TraderBot bot)
         {
             Simulator = simulator;
+
             Bot = bot;
         }
 
         public void Start()
         {
+            Simulator.StartOfSimulation = StartTime - TimeSpan.FromDays(10);
             if (Started)
                 return;
             Started = true;
