@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset, string Quote)>;
-
+#pragma warning disable CS1998
 namespace SharpTrader
 {
     public partial class MultiMarketSimulator
@@ -243,7 +243,7 @@ namespace SharpTrader
                 foreach (var kv in _Balances)
                 {
                     if (kv.Key == asset)
-                        val += kv.Value.Free;
+                        val += kv.Value.Total;
                     else if (kv.Value.Total != 0)
                     {
                         var symbol = (kv.Key + asset);
@@ -268,7 +268,7 @@ namespace SharpTrader
                 return (0.00000001m, 0.00000001m);
             }
 
-            public IMarketOperation OrderCancelAsync(string id)
+            public async Task<IMarketOperation> OrderCancelAsync(string id)
             {
                 lock (LockObject)
                 {
@@ -302,6 +302,7 @@ namespace SharpTrader
                         }
                     }
                 }
+                
                 return new MarketOperation<object>(MarketOperationStatus.Completed, null);
             }
 
@@ -323,7 +324,7 @@ namespace SharpTrader
                 _Balances[asset].Free += amount;
             }
 
-            public IMarketOperation<IEnumerable<ITrade>> GetLastTrades(string symbol, int count, string fromId)
+            public async Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
             {
                 IEnumerable<ITrade> trades;
                 if (fromId != null)
@@ -333,7 +334,7 @@ namespace SharpTrader
                 return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, trades);
             }
 
-            public IMarketOperation<IOrder> QueryOrderAsync(string symbol, string id)
+            public async Task<IMarketOperation<IOrder>> QueryOrderAsync(string symbol, string id)
             {
                 var ord = ClosedOrders.Concat(OpenOrders).Where(o => o.Symbol == symbol && o.Id == id).FirstOrDefault();
                 if (ord != null)
@@ -352,22 +353,7 @@ namespace SharpTrader
                 });
             }
 
-
-
-            public Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
-            {
-                throw new NotImplementedException();
-            }
-
-            Task<IMarketOperation<IOrder>> IMarketApi.QueryOrderAsync(string symbol, string id)
-            {
-                throw new NotImplementedException();
-            }
-
-            Task<IMarketOperation> IMarketApi.OrderCancelAsync(string id)
-            {
-                throw new NotImplementedException();
-            }
+         
         }
 
         public decimal GetEquity(string baseAsset)

@@ -64,6 +64,7 @@
     <Compile Include="Indicators\MMI.cs" />
     <Compile Include="Indicators\Normalize.cs" />
     <Compile Include="Indicators\MeanAndVariance.cs" />
+    <Compile Include="Indicators\SweptArea.cs" />
     <Compile Include="ISignalNavigator.cs" />
     <Compile Include="MultiMarketSimulator.cs" />
     <Compile Include="MultiMarketSimulator.SymbolFeed.cs" />

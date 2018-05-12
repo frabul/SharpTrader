@@ -11,7 +11,7 @@ namespace SharpTrader
 
 
         public bool Active { get; set; }
-        public IMarketsManager MarketsManager { get; }
+        public IMarketsManager MarketsManager { get; set; }
         public IMarketApi Market { get; set; }
         public PlotHelper Drawer { get; } = new PlotHelper();
 
