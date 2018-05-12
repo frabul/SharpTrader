@@ -22,7 +22,7 @@ namespace SharpTrader
         public decimal MaxDrowDown { get; private set; }
         public decimal MaxDrowDownPrc { get; private set; }
 
-        ILogger Logger { get; set; }
+        ILogger Logger { get; set; } = new ConsoleLogger();
 
         public BackTester(MultiMarketSimulator simulator, TraderBot bot)
         {
@@ -36,7 +36,7 @@ namespace SharpTrader
                 return;
             Started = true;
 
-            Bot.Start();
+            Bot.Start().Wait();
 
             bool raiseEvents = false;
             int steps = 1;
@@ -71,7 +71,8 @@ namespace SharpTrader
             var totalBuys = Simulator.Trades.Where(tr => tr.Type == TradeType.Buy).Count();
 
             Logger?.LogInfo($"Balance: {totalBal} - Trades:{Simulator.Trades.Count()} - Lost in fee:{lostInFee}");
-            Logger?.LogInfo($"Profit/buy: {(totalBal - startingBal) / totalBuys:F8} - MaxDrawDown:{MaxDrowDown} - Max DD %:{MaxDrowDownPrc * 100}");
+            if (totalBuys > 0)
+                Logger?.LogInfo($"Profit/buy: {(totalBal - startingBal) / totalBuys:F8} - MaxDrawDown:{MaxDrowDown} - Max DD %:{MaxDrowDownPrc * 100}");
 
             //foreach (var bot in theBots)
             //{
@@ -121,7 +122,7 @@ namespace SharpTrader
                 var buysCnt = sim.Trades.Where(tr => tr.Type == TradeType.Buy).Count();
                 var msg = $"\n\nOptimization array:{ tostr }";
                 msg += $"\n\tBalance: {sim.GetEquity(BaseAsset)} - MaxDrawDown:{backTester.MaxDrowDown}";
-                if(buysCnt> 0)
+                if (buysCnt > 0)
                     msg += $" - Profit/buy: {(totalBal - startingEquity) / buysCnt:F8} ";
                 msg += $"\n\tTrades:{sim.Trades.Count()}- Max DD %:{backTester.MaxDrowDownPrc * 100}";
                 Logger?.LogInfo(msg);

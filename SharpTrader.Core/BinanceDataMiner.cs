@@ -17,14 +17,11 @@ namespace SharpTrader.Utils
     {
         private const string MarketName = "Binance";
 
-
-
         private BinanceClient Client;
         private HistoricalRateDataBase HistoryDB;
         private string DataDir;
-        private int MaxRequestsPerMinute = 1200;
-        private static Queue<DateTime> RequestsPer30Seconds = new Queue<DateTime>();
-        private static object QueueLock = new object();
+
+
 
 
         public BinanceDataDownloader(string dataDir)
@@ -74,11 +71,7 @@ namespace SharpTrader.Utils
                     if (t.Exception != null)
                         Console.WriteLine("A task terminated with an exception");
                 }
-                if (swReportRate.ElapsedMilliseconds > 10000)
-                {
-                    Console.WriteLine($"Current rate {RequestsPer30Seconds.Count * 2} requests/min");
-                    swReportRate.Restart();
-                }
+
 
                 System.Threading.Thread.Sleep(1);
             }
@@ -110,7 +103,7 @@ namespace SharpTrader.Utils
                         startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
                     else
                     {
-                        await RateLimitAsync();
+
                         var firstCandle = (await Client.GetKlinesCandlesticks(
                             new GetKlinesCandlesticksRequest
                             {
@@ -130,7 +123,7 @@ namespace SharpTrader.Utils
                 while (AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime)
                 {
                     //Console.WriteLine($"Downloading history for {symbol} - {startTime}");
-                    await RateLimitAsync();
+
                     var candles = await Client.GetKlinesCandlesticks(new GetKlinesCandlesticksRequest
                     {
                         Symbol = symbol,
@@ -138,7 +131,7 @@ namespace SharpTrader.Utils
                         Interval = KlineInterval.OneMinute,
                         EndTime = DateTime.MaxValue
                     });
-                    await Task.Delay(10);
+
                     var batch = candles.Select(
                         c => new SharpTrader.Candlestick()
                         {
@@ -187,24 +180,5 @@ namespace SharpTrader.Utils
         }
 
 
-        private async Task RateLimitAsync()
-        {
-
-            while (RequestsPer30Seconds.Count > (MaxRequestsPerMinute / 2))
-            {
-                lock (QueueLock)
-                {
-                    while (RequestsPer30Seconds.Count > 0 && DateTime.Now - RequestsPer30Seconds.Peek() > TimeSpan.FromSeconds(30))
-                        RequestsPer30Seconds.Dequeue();
-                }
-                await Task.Delay(1000);
-            }
-            lock (QueueLock)
-            {
-                RequestsPer30Seconds.Enqueue(DateTime.Now);
-                while (RequestsPer30Seconds.Count > 0 && DateTime.Now - RequestsPer30Seconds.Peek() > TimeSpan.FromSeconds(30))
-                    RequestsPer30Seconds.Dequeue();
-            }
-        }
     }
 }
