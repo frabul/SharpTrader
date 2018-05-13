@@ -4,12 +4,14 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SymbolsTable = System.Collections.Generic.Dictionary<string, (string Asset, string Quote)>;
+using SymbolsTable = System.Collections.Generic.Dictionary<string, SharpTrader.SymbolInfo>;
 #pragma warning disable CS1998
 namespace SharpTrader
 {
     public partial class MultiMarketSimulator
     {
+
+
         public IEnumerable<ITrade> Trades => Markets.SelectMany(m => m.Trades);
 
         class Market : IMarketApi
@@ -24,6 +26,7 @@ namespace SharpTrader
             private List<ITrade> TradesToSignal = new List<ITrade>();
             private SymbolsTable SymbolsTable;
 
+
             public string MarketName { get; private set; }
             public double MakerFee { get; private set; } = 0.0015;
             public double TakerFee { get; private set; } = 0.0025;
@@ -35,6 +38,7 @@ namespace SharpTrader
 
             public Market(string name, double makerFee, double takerFee, string dataDir)
             {
+
                 MarketName = name;
                 MakerFee = makerFee;
                 TakerFee = takerFee;
@@ -52,8 +56,8 @@ namespace SharpTrader
                 var feedFound = SymbolsFeed.TryGetValue(symbol, out SymbolFeed feed);
                 if (!feedFound)
                 {
-                    (var asset, var counterAsset) = SymbolsTable[symbol];
-                    feed = new SymbolFeed(this.MarketName, symbol, asset, counterAsset);
+                    var sInfo = SymbolsTable[symbol];
+                    feed = new SymbolFeed(this.MarketName, symbol, sInfo.Asset, sInfo.QuoteAsset);
                     lock (LockObject)
                         SymbolsFeed.Add(symbol, feed);
                 }
@@ -88,7 +92,7 @@ namespace SharpTrader
                 }
                 else
                 {
-                    bal = _Balances[ass.Quote];
+                    bal = _Balances[ass.QuoteAsset];
                     amount = order.Amount * (decimal)order.Price;
                 }
                 if (bal.Free < amount)
@@ -103,7 +107,7 @@ namespace SharpTrader
             }
 
             public async Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeType type, decimal amount, string clientOrderId = null)
-            { 
+            {
                 lock (LockObject)
                 {
                     var feed = SymbolsFeed[symbol];
@@ -290,7 +294,7 @@ namespace SharpTrader
                             }
                             else
                             {
-                                bal = _Balances[ass.Quote];
+                                bal = _Balances[ass.QuoteAsset];
                                 amount = order.Amount * (decimal)order.Price;
                             }
 
@@ -302,7 +306,7 @@ namespace SharpTrader
                         }
                     }
                 }
-                
+
                 return new MarketOperation<object>(MarketOperationStatus.Completed, null);
             }
 
@@ -345,15 +349,10 @@ namespace SharpTrader
 
             public IEnumerable<SymbolInfo> GetSymbols()
             {
-                return SymbolsTable.Select(s => new SymbolInfo
-                {
-                    Asset = s.Value.Asset,
-                    QuoteAsset = s.Value.Quote,
-                    Symbol = s.Key
-                });
+                return SymbolsTable.Values;
             }
 
-         
+
         }
 
         public decimal GetEquity(string baseAsset)

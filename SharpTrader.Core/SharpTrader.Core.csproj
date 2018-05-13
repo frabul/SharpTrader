@@ -61,6 +61,8 @@
     <Compile Include="Indicators\HighPass.cs" />
     <Compile Include="Indicators\Hurst.cs" />
     <Compile Include="Indicators\Indicator.cs" />
+    <Compile Include="Indicators\Max.cs" />
+    <Compile Include="Indicators\Min.cs" />
     <Compile Include="Indicators\MMI.cs" />
     <Compile Include="Indicators\Normalize.cs" />
     <Compile Include="Indicators\MeanAndVariance.cs" />

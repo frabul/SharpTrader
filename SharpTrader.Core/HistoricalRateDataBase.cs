@@ -79,25 +79,47 @@ namespace SharpTrader
         public ISymbolHistory GetSymbolHistory(string market, string symbol, TimeSpan timeframe, DateTime startOfData)
         {
             var fileName = GetFileName(market, symbol, timeframe);
-            SymbolHistoryRaw sdata;
-            if (File.Exists(BaseDirectory + fileName))
+
+            SymbolHistoryRaw sdata = null;
+            lock (SymbolsDataLocker)
             {
-                using (var fs = File.Open(BaseDirectory + fileName, FileMode.Open))
-                    sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
+                sdata = SymbolsData.FirstOrDefault(sd => sd.FileName == fileName);
+            }
+            if (sdata == null)
+            {
+                if (File.Exists(BaseDirectory + fileName))
+                {
+                    using (var fs = File.Open(BaseDirectory + fileName, FileMode.Open))
+                        sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
+
+                }
+                else
+                {
+                    sdata = new SymbolHistoryRaw()
+                    {
+                        FileName = fileName,
+                        Market = market,
+                        Spread = 0,
+                        Symbol = symbol,
+                        Ticks = new List<Candlestick>(),
+                        Timeframe = timeframe,
+                    };
+                    //throw new Exception("History data not found");
+                }
+                lock (SymbolsDataLocker)
+                    SymbolsData.Add(sdata);
             }
             else
             {
-                sdata = new SymbolHistoryRaw()
+                if (sdata.Ticks.Count > 0)
                 {
-                    FileName = fileName,
-                    Market = market,
-                    Spread = 0,
-                    Symbol = symbol,
-                    Ticks = new List<Candlestick>(),
-                    Timeframe = timeframe,
-                };
-                //throw new Exception("History data not found");
+                    var tf = sdata.Ticks.FirstOrDefault()?.Timeframe;
+                    if (tf != timeframe)
+                        throw new InvalidOperationException("Bad timeframe for candle");
+                }
             }
+
+
             return new SymbolHistory(sdata, startOfData);
         }
         public ISymbolHistory GetSymbolHistory(string market, string symbol, TimeSpan timeframe)

@@ -165,17 +165,23 @@ namespace SharpTrader.Utils
             }
         }
 
-        public void SynchSymbolsTable()
+        public void SynchSymbolsTable(string DataDir)
         {
-            Dictionary<string, (string Asset, string Quote)> dict = new Dictionary<string, (string Asset, string Quote)>();
+            Dictionary<string, SymbolInfo> dict = new Dictionary<string, SymbolInfo>();
             var tradingRules = Client.GetExchangeInfo().Result;
             foreach (var symb in tradingRules.Symbols)
             {
-                dict.Add(symb.Symbol, (symb.BaseAsset, symb.QuoteAsset));
+                dict.Add(symb.Symbol,
+                    new SymbolInfo
+                    {
+                        Asset = symb.BaseAsset,
+                        QuoteAsset = symb.QuoteAsset,
+                        Symbol = symb.Symbol
+                    });
 
             }
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict);
-            var deserialized = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, (string Asset, string Quote)>>(json);
+            var deserialized = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, SymbolInfo>>(json);
             System.IO.File.WriteAllText(DataDir + "BinanceSymbolsTable.json", json);
         }
 

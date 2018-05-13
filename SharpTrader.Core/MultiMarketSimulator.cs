@@ -35,10 +35,7 @@ namespace SharpTrader
         }
 
 
-        public IEnumerable<string> GetSymbols(string market)
-        {
-            throw new NotImplementedException();
-        }
+     
 
         public IMarketApi GetMarketApi(string marketName)
         {

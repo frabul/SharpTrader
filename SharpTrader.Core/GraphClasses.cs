@@ -48,6 +48,7 @@ namespace SharpTrader
 
 
         }
+
         public void PlotLine<T>(TimeSerieNavigator<T> timeSerie,
                                 ColorARGB color,
                                 Func<T, double> valuesSelector, bool dedicatedAxis = false) where T : ITimeRecord
