@@ -350,9 +350,7 @@ namespace SharpTrader
             public IEnumerable<SymbolInfo> GetSymbols()
             {
                 return SymbolsTable.Values;
-            }
-
-
+            } 
         }
 
         public decimal GetEquity(string baseAsset)

@@ -7,17 +7,10 @@ using System.Threading.Tasks;
 namespace SharpTrader
 {
     public abstract class TraderBot
-    {
-
-
-        public bool Active { get; set; }
-        public IMarketsManager MarketsManager { get; set; }
-        public IMarketApi Market { get; set; }
-        public PlotHelper Drawer { get; } = new PlotHelper();
-
-        public bool Started { get; private set; }
-
-
+    { 
+        public bool Active { get; set; } 
+        public PlotHelper Drawer { get; } = new PlotHelper(); 
+        public bool Started { get; private set; } 
         public async Task Start()
         {
             await OnStart();
@@ -25,7 +18,7 @@ namespace SharpTrader
         }
 
         public abstract Task OnStart();
-
+        public abstract Task OnTick();
     }
 
 

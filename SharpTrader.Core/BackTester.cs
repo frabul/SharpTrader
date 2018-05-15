@@ -48,6 +48,8 @@ namespace SharpTrader
             var startingBal = Simulator.GetEquity(BaseAsset);
             while (Simulator.NextTick(raiseEvents) && Simulator.Time < EndTime)
             {
+                if (raiseEvents)
+                    Bot.OnTick().Wait();
                 raiseEvents = StartTime <= Simulator.Time;
                 if (steps % 240 == 0 && raiseEvents)
                 {
