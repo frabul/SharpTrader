@@ -46,7 +46,7 @@ namespace SharpTrader.Indicators
     {
         private TimeSerie<FRecord> TrueRanges;
 
-        public override bool IsReady => TrueRanges.Count > Steps;
+        public override bool IsReady => TrueRanges.Count >= Steps;
         public int Steps { get; private set; }
         public double Value { get; private set; }
 
@@ -69,9 +69,8 @@ namespace SharpTrader.Indicators
             {
                 int stepsCnt = Math.Min(TrueRanges.Count, Steps);
 
-                RollingSum += TrueRanges.Tick.Value;
-                bool subtract = TrueRanges.Position >= Steps;
-                if (subtract)
+                RollingSum += TrueRanges.Tick.Value; 
+                if (TrueRanges.Position >= Steps)
                 {
                     RollingSum -= TrueRanges.GetFromCursor(Steps).Value;
                 }
