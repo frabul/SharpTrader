@@ -32,7 +32,7 @@ namespace SharpTrader.Indicators
 
         protected FRecord Calculate()
         {
-            if (Candles.Count < Steps)
+            if (Candles.Position < Steps)
                 return new FRecord() { Time = Candles.Tick.Time, Value = 0 };
             double min = double.MaxValue;
             double max = double.MinValue;

@@ -14,7 +14,7 @@ namespace SharpTrader.Indicators
 
 
         public override bool IsReady => Candles.Count > 1;
-  
+
         public TrueRange(TimeSerieNavigator<T> signal) : base("ATR")
         {
 
@@ -70,7 +70,7 @@ namespace SharpTrader.Indicators
                 int stepsCnt = Math.Min(TrueRanges.Count, Steps);
 
                 RollingSum += TrueRanges.Tick.Value;
-                bool subtract = TrueRanges.Count > Steps;
+                bool subtract = TrueRanges.Position >= Steps;
                 if (subtract)
                 {
                     RollingSum -= TrueRanges.GetFromCursor(Steps).Value;
