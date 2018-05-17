@@ -31,7 +31,7 @@ namespace SharpTrader
         /// </summary> 
         Task<ISymbolFeed> GetSymbolFeedAsync(string symbol);
 
-   
+         
 
         /// <summary>
         /// Get all available symbols for in this market

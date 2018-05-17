@@ -119,7 +119,7 @@ namespace SharpTrader
 
         private void SynchOrders(bool raiseEvents = true)
         {
-            if (!SynchOrdersWatchdog.IsRunning || SynchOrdersWatchdog.ElapsedMilliseconds > 30000)
+            if (!SynchOrdersWatchdog.IsRunning || SynchOrdersWatchdog.ElapsedMilliseconds > 60000)
             {
                 SynchOrdersWatchdog.Restart();
                 lock (LockObject)
