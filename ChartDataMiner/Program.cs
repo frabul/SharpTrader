@@ -13,7 +13,7 @@ namespace ChartDataMiner
         static void Main(string[] args)
         {
             BinanceDataDownloader dm = new BinanceDataDownloader(".\\Data\\");
-            dm.SynchSymbolsTable();
+            dm.SynchSymbolsTable(".\\Data\\");
             dm.MineBinance();
 
         }

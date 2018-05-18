@@ -1,111 +1,16 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <RuntimeIdentifiers>win</RuntimeIdentifiers>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{320B1902-461A-4B88-8852-D881DC4E5293}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SharpTrader</RootNamespace>
-    <AssemblyName>SharpTrader.Core</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
+    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <PackageReference Include="protobuf-net" Version="2.3.7" />
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="BackTester.cs" />
-    <Compile Include="BinanceDataMiner.cs" />
-    <Compile Include="BinanceMarketApi.cs" />
-    <Compile Include="CandlesticksSerieNavigator.cs" />
-    <Compile Include="ConsoleLogger.cs" />
-    <Compile Include="GraphClasses.cs" />
-    <Compile Include="HistoricalRateDataBase.cs" />
-    <Compile Include="ICandlestick.cs" />
-    <Compile Include="ILogger.cs" />
-    <Compile Include="IMarketApi.cs" />
-    <Compile Include="IMarketsManager.cs" />
-    <Compile Include="Indicators\ActualizedMean.cs" />
-    <Compile Include="Indicators\ATR.cs" />
-    <Compile Include="Indicators\BollingerBands.cs" />
-    <Compile Include="Indicators\FisherN.cs" />
-    <Compile Include="Indicators\HighPass.cs" />
-    <Compile Include="Indicators\Hurst.cs" />
-    <Compile Include="Indicators\Indicator.cs" />
-    <Compile Include="Indicators\Max.cs" />
-    <Compile Include="Indicators\Min.cs" />
-    <Compile Include="Indicators\MMI.cs" />
-    <Compile Include="Indicators\Normalize.cs" />
-    <Compile Include="Indicators\MeanAndVariance.cs" />
-    <Compile Include="Indicators\SweptArea.cs" />
-    <Compile Include="ISignalNavigator.cs" />
-    <Compile Include="MultiMarketSimulator.cs" />
-    <Compile Include="MultiMarketSimulator.SymbolFeed.cs" />
-    <Compile Include="Signal.cs" />
-    <Compile Include="SymbolFeedBoilerplate.cs" />
-    <Compile Include="TimeSerie.cs" />
-    <Compile Include="TimeSerieNavigator.cs" />
-    <Compile Include="MarketOperations.cs" />
-    <Compile Include="Candlestick.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TraderBot.cs" />
-    <Compile Include="Utils.cs" />
+    <ProjectReference Include="..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj">
-      <Project>{2a8f66f5-44a4-4618-b21e-3d9d1b86fb2d}</Project>
-      <Name>BinanceExchange.API</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="log4net">
-      <Version>2.0.8</Version>
-    </PackageReference>
-    <PackageReference Include="NLog">
-      <Version>4.5.4</Version>
-    </PackageReference>
-    <PackageReference Include="protobuf-net">
-      <Version>2.3.7</Version>
-    </PackageReference>
-    <PackageReference Include="System.ValueTuple">
-      <Version>4.4.0</Version>
-    </PackageReference>
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+
 </Project>
