@@ -31,8 +31,6 @@ namespace SharpTrader
         /// </summary> 
         Task<ISymbolFeed> GetSymbolFeedAsync(string symbol);
 
-         
-
         /// <summary>
         /// Get all available symbols for in this market
         /// </summary>
@@ -43,18 +41,21 @@ namespace SharpTrader
         /// Get all currently open orders
         /// </summary> 
         IEnumerable<IOrder> OpenOrders { get; }
-        IEnumerable<ISymbolFeed> ActiveFeeds { get; }
+
         IEnumerable<ITrade> Trades { get; }
 
         Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId);
-        Task<IMarketOperation<IOrder>> QueryOrderAsync(string symbol, string id);
+
+        Task<IMarketOperation<IOrder>> OrderSynchAsync(string id);
 
         Task<IMarketOperation> OrderCancelAsync(string id);
 
         decimal GetFreeBalance(string asset);
 
         decimal GetEquity(string asset);
+
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
+
         decimal GetSymbolPrecision(string symbol);
 
         decimal GetMinNotional(string asset);
@@ -77,7 +78,7 @@ namespace SharpTrader
 
         double Spread { get; }
         double Bid { get; }
-        double Ask { get; } 
+        double Ask { get; }
         string Asset { get; }
         string QuoteAsset { get; }
         /// <summary>

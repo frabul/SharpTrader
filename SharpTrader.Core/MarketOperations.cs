@@ -88,7 +88,7 @@ namespace SharpTrader
         double Price { get; }
         string Symbol { get; }
         string Market { get; }
-
+        string ClientId { get; }
     }
 
     public class MarginTrade
@@ -133,6 +133,6 @@ namespace SharpTrader
         decimal Fee { get; }
         TradeType Type { get; } 
         IOrder Order { get; }
-        DateTime Time { get; }
+        DateTime Time { get; } 
     }
 }

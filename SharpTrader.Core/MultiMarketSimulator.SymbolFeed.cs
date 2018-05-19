@@ -6,12 +6,11 @@ using System.Text;
 using System.Threading.Tasks;
 using SymbolsTable = System.Collections.Generic.Dictionary<string, SharpTrader.SymbolInfo>;
 #pragma warning disable CS1998
+using NLog;
 namespace SharpTrader
 {
     public partial class MultiMarketSimulator
     {
-
-
         public IEnumerable<ITrade> Trades => Markets.SelectMany(m => m.Trades);
 
         class Market : IMarketApi
@@ -25,7 +24,7 @@ namespace SharpTrader
             private List<Order> ClosedOrders = new List<Order>();
             private List<ITrade> TradesToSignal = new List<ITrade>();
             private SymbolsTable SymbolsTable;
-
+            private Logger Logger;
 
             public string MarketName { get; private set; }
             public double MakerFee { get; private set; } = 0.0015;
@@ -38,6 +37,7 @@ namespace SharpTrader
 
             public Market(string name, double makerFee, double takerFee, string dataDir)
             {
+                Logger = LogManager.GetCurrentClassLogger();
 
                 MarketName = name;
                 MakerFee = makerFee;
@@ -338,9 +338,9 @@ namespace SharpTrader
                 return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, trades);
             }
 
-            public async Task<IMarketOperation<IOrder>> QueryOrderAsync(string symbol, string id)
+            public async Task<IMarketOperation<IOrder>> OrderSynchAsync(string id)
             {
-                var ord = ClosedOrders.Concat(OpenOrders).Where(o => o.Symbol == symbol && o.Id == id).FirstOrDefault();
+                var ord = ClosedOrders.Concat(OpenOrders).Where(o => o.Id == id).FirstOrDefault();
                 if (ord != null)
                     return new MarketOperation<IOrder>(MarketOperationStatus.Completed, ord);
                 else
@@ -350,7 +350,7 @@ namespace SharpTrader
             public IEnumerable<SymbolInfo> GetSymbols()
             {
                 return SymbolsTable.Values;
-            } 
+            }
         }
 
         public decimal GetEquity(string baseAsset)
@@ -441,7 +441,7 @@ namespace SharpTrader
             public double Price { get; private set; }
             public decimal Amount { get; private set; }
             public string Id { get; private set; }
-
+            public string ClientId { get; private set; }
             public OrderStatus Status { get; internal set; } = OrderStatus.Pending;
 
             public TradeType TradeType { get; private set; }
