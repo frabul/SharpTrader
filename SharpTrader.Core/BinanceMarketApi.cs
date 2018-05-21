@@ -493,7 +493,7 @@ namespace SharpTrader
                 Trades.Update(trade);
             else
             {
-                Trades.Insert(trade);
+                Trades.Insert(tradeUpdate);
                 OnNewTrade?.Invoke(this, tradeUpdate);
             }
         }
@@ -923,7 +923,9 @@ namespace SharpTrader
                 try
                 {
                     if (KlineSocket != default(Guid))
-                        WebSocketClient.CloseWebSocketInstance(KlineSocket);
+                        try { WebSocketClient.CloseWebSocketInstance(KlineSocket); }
+                        catch { KlineSocket = default(Guid); }
+
                     KlineSocket = WebSocketClient.ConnectToKlineWebSocket(this.Symbol.ToLower(), KlineInterval.OneMinute, HandleKlineEvent);
                     KlineWatchdog.Restart();
                 }
@@ -938,7 +940,9 @@ namespace SharpTrader
                 try
                 {
                     if (PartialDepthSocket != default(Guid))
-                        WebSocketClient.CloseWebSocketInstance(PartialDepthSocket);
+                        try { WebSocketClient.CloseWebSocketInstance(PartialDepthSocket); }
+                        catch { PartialDepthSocket = default(Guid); }
+
                     PartialDepthSocket = WebSocketClient.ConnectToPartialDepthWebSocket(this.Symbol.ToLower(), PartialDepthLevels.Five, HandlePartialDepthUpdate);
                     PartialDepthWatchDog.Restart();
                 }
