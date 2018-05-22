@@ -80,7 +80,7 @@ namespace SharpTrader
             });
         }
 
-        public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb)
+        public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb, bool resynchTradesAndOrders = false)
         {
             Logger = LogManager.GetLogger("BinanceMarketApi");
             Logger.Info("starting initialization...");
@@ -92,29 +92,19 @@ namespace SharpTrader
 
 
 
-            if (!TradesAndOrdersDb.CollectionExists("Orders"))
-            {
-                Orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
-                Orders.EnsureIndex(o => o.Id, true);
-                Orders.EnsureIndex(o => o.Symbol);
-                Orders.EnsureIndex(o => o.Filled);
-                Orders.EnsureIndex(o => o.Status);
-            }
-            if (!TradesAndOrdersDb.CollectionExists("Trades"))
-            {
-                Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
-                Trades.EnsureIndex(o => o.Id, true);
-                Trades.EnsureIndex(o => o.Symbol);
-                Trades.EnsureIndex(o => o.OrderId);
-                Trades.EnsureIndex(o => o.TradeId);
-            }
 
-            if (Orders == null)
-                Orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
-            if (Trades == null)
-                Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
+            Orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
+            Orders.EnsureIndex(o => o.Id, true);
+            Orders.EnsureIndex(o => o.Symbol);
+            Orders.EnsureIndex(o => o.Filled);
+            Orders.EnsureIndex(o => o.Status);
 
 
+            Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
+            Trades.EnsureIndex(o => o.Id, true);
+            Trades.EnsureIndex(o => o.Symbol);
+            Trades.EnsureIndex(o => o.OrderId);
+            Trades.EnsureIndex(o => o.TradeId);
 
             Client = new BinanceClient(new ClientConfiguration()
             {
@@ -127,7 +117,8 @@ namespace SharpTrader
             WSClient = new DisposableBinanceWebSocketClient(Client);
             this.ServerTimeSynch().Wait();
             Logger.Info("synch all operations");
-            SynchAllOperations().Wait();
+            if (resynchTradesAndOrders)
+                SynchAllOperations().Wait();
 
 
             Task.WaitAll(ListenUserData(), SynchBalance());
@@ -227,6 +218,12 @@ namespace SharpTrader
             {
                 var responses = await Client.GetAccountTrades(new AllTradesRequest() { FromId = start, Symbol = sym });
                 var toInsert = responses.Select(or => new ApiTrade(sym, or)).OrderBy(o => o.TradeId).ToArray();
+                foreach (var tr in toInsert)
+                {
+                    var order = Orders.FindOne(o => o.OrderId == tr.OrderId);
+                    tr.ClientOrderId = order.ClientId;
+                }
+
                 trades.AddRange(toInsert);
                 if (toInsert.Length > 0)
                     start = toInsert.LastOrDefault().TradeId + 1;
@@ -1055,7 +1052,6 @@ namespace SharpTrader
                 Symbol = binanceOrder.Symbol;
                 Market = "Binance";
                 Id = Symbol + OrderId;
-
             }
 
             public ApiOrder(ResultCreateOrderResponse binanceOrder)
@@ -1188,6 +1184,7 @@ namespace SharpTrader
                 FeeAsset = FeeAsset;
                 Time = tr.TimeStamp;
                 OrderId = tr.OrderId;
+                ClientOrderId = tr.OriginalClientOrderId;
                 TradeId = tr.TradeId;
                 Id = Symbol + TradeId;
             }
@@ -1195,6 +1192,7 @@ namespace SharpTrader
             public string Id { get; set; }
             public long TradeId { get; set; }
             public long OrderId { get; set; }
+            public string ClientOrderId { get; set; }
             public decimal Amount { get; set; }
             public decimal Fee { get; set; }
             public string Market { get; set; }
@@ -1205,7 +1203,7 @@ namespace SharpTrader
             public DateTime Time { get; set; }
 
             [BsonIgnore]
-            IOrder ITrade.Order => throw new NotImplementedException();
+            string ITrade.OrderId => Symbol + OrderId;
         }
 
         class AssetBalance
