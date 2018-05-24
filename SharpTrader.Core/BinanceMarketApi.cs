@@ -36,7 +36,7 @@ namespace SharpTrader
         private LiteCollection<ApiOrder> Orders;
         private LiteCollection<ApiTrade> Trades;
         private List<ApiOrder> OrdersActive = new List<ApiOrder>();
-
+        private object LockOrdersTrades = new object();
         private Stopwatch StopwatchSocketClose = new Stopwatch();
         private Stopwatch UserDataPingStopwatch = new Stopwatch();
 
@@ -64,7 +64,7 @@ namespace SharpTrader
 
         IEnumerable<ITrade> IMarketApi.Trades => Trades.FindAll().ToArray();
 
-        IEnumerable<IOrder> IMarketApi.OpenOrders { get { lock (OrdersActive) return OrdersActive.ToArray(); } }
+        IEnumerable<IOrder> IMarketApi.OpenOrders { get { lock (LockOrdersTrades) return OrdersActive.ToArray(); } }
 
         public (string Symbol, decimal balance)[] FreeBalances { get { lock (_Balances) return _Balances.Select(kv => (kv.Key, kv.Value.Free)).ToArray(); } }
 
@@ -90,15 +90,11 @@ namespace SharpTrader
                 Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
             TradesAndOrdersDb = new LiteDatabase(dbPath);
 
-
-
-
             Orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
             Orders.EnsureIndex(o => o.Id, true);
             Orders.EnsureIndex(o => o.Symbol);
             Orders.EnsureIndex(o => o.Filled);
             Orders.EnsureIndex(o => o.Status);
-
 
             Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
             Trades.EnsureIndex(o => o.Id, true);
@@ -154,6 +150,13 @@ namespace SharpTrader
                     SynchOpenOrders().ContinueWith((t) => SynchTrades()).ContinueWith(t => TimerOrdersTradesSynch.Start());
                 };
             Logger.Info("initialization complete");
+        }
+
+        public void Dispose()
+        {
+            Trades = null;
+            Orders = null;
+            TradesAndOrdersDb.Dispose();
         }
 
         private async Task SynchAllOperations()
@@ -280,7 +283,7 @@ namespace SharpTrader
                 var resp = await Client.GetCurrentOpenOrders(new CurrentOpenOrdersRequest() { Symbol = null });
                 var allOpen = resp.Select(o => new ApiOrder(o));
                 ApiOrder[] toClose;
-                lock (OrdersActive)
+                lock (LockOrdersTrades)
                 {
                     foreach (var newOrder in allOpen)
                     {
@@ -323,7 +326,7 @@ namespace SharpTrader
                 try
                 {
                     bool hasActiveOrders = false;
-                    lock (OrdersActive)
+                    lock (LockOrdersTrades)
                         hasActiveOrders = OrdersActive.Any(o => o.Symbol == sym);
                     var sOrders = Orders.Find(o => o.Symbol == sym).OrderBy(o => o.OrderId);
                     var lastOrder = sOrders.LastOrDefault();
@@ -334,7 +337,7 @@ namespace SharpTrader
                         {
                             var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = 100 });
                             var trades = resp.Select(tr => new ApiTrade(sym, tr));
-                            foreach (var tr in trades)
+                            foreach (var tr in trades) 
                                 TradesUpdateOrInsert(tr);
                             //if has active orders we want it to continue updating when the active order becomes inactive
                             if (!hasActiveOrders)
@@ -424,9 +427,10 @@ namespace SharpTrader
         private void HandleOrderUpdateMsg(BinanceTradeOrderData msg)
         {
             var newOrder = new ApiOrder(msg);
-            //update or add in database
+            //update or add in database 
             OrdersUpdateOrInsert(newOrder);
             OrdersActiveInsertOrUpdate(newOrder);
+
         }
 
         private void HandleTradeUpdateMsg(BinanceTradeOrderData msg)
@@ -442,38 +446,42 @@ namespace SharpTrader
 
             if (!order.ResultingTrades.Contains(tradeUpdate.TradeId))
                 order.ResultingTrades.Add(tradeUpdate.TradeId);
-
-            OrdersUpdateOrInsert(order);
-            //-----
-            OrdersActiveInsertOrUpdate(order);
-            TradesUpdateOrInsert(tradeUpdate);
+            lock (LockOrdersTrades)
+            {
+                OrdersUpdateOrInsert(order);
+                //-----
+                OrdersActiveInsertOrUpdate(order);
+                TradesUpdateOrInsert(tradeUpdate);
+            }
         }
 
         private void OrdersUpdateOrInsert(ApiOrder newOrder)
         {
-            var ord = Orders.FindOne(o => o.Id == newOrder.Id);
-            if (ord != null)
+            lock (LockOrdersTrades)
             {
-                ord.Update(newOrder);
-                Orders.Update(newOrder);
-            }
-            else
-            {
-                Orders.Insert(newOrder);
+                var ord = Orders.FindOne(o => o.Id == newOrder.Id);
+                if (ord != null)
+                {
+                    ord.Update(newOrder);
+                    Orders.Update(newOrder);
+                }
+                else
+                {
+                    Orders.Insert(newOrder);
+                }
             }
         }
 
         private void OrdersActiveInsertOrUpdate(ApiOrder newOrder)
         {
             ApiOrder oldOpen;
-            lock (OrdersActive)
+            lock (LockOrdersTrades)
             {
                 oldOpen = OrdersActive.FirstOrDefault(oo => oo.Id == newOrder.Id);
                 if (oldOpen != null)
                 {
                     oldOpen.Update(newOrder);
                     if (oldOpen.Status > OrderStatus.PartiallyFilled)
-
                         OrdersActive.Remove(oldOpen);
                 }
                 else if (newOrder.Status <= OrderStatus.PartiallyFilled)
@@ -673,9 +681,7 @@ namespace SharpTrader
                 var no = new ApiOrder(newOrd);
                 OrdersUpdateOrInsert(no);
                 OrdersActiveInsertOrUpdate(no);
-
                 return new MarketOperation<IOrder>(MarketOperationStatus.Completed, no);
-
             }
             catch (Exception ex)
             {
