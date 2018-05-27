@@ -115,8 +115,8 @@ namespace SharpTrader
             Logger.Info("synch all operations");
             if (resynchTradesAndOrders)
                 SynchAllOperations().Wait();
-            //else
-            //    SynchTrades();
+            else
+                SynchTrades().Wait();
 
             Task.WaitAll(ListenUserData(), SynchBalance());
             TimerListenUserData = new System.Timers.Timer(30000)
@@ -341,8 +341,9 @@ namespace SharpTrader
                             foreach (var tr in trades)
                             {
                                 var order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
-                                if (order != null)
-                                    tr.ClientOrderId = order.ClientId;
+                                if (order == null) 
+                                      order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder; 
+                                tr.ClientOrderId = order.ClientId;
                                 TradesUpdateOrInsert(tr);
                             }
                             //if has active orders we want it to continue updating when the active order becomes inactive
@@ -497,16 +498,21 @@ namespace SharpTrader
             }
         }
 
-        private void TradesUpdateOrInsert(ApiTrade tradeUpdate)
+        private void TradesUpdateOrInsert(ApiTrade newTrade)
         {
-            var trade = Trades.FindOne(t => t.Id == tradeUpdate.Id);
-            Debug.Assert(tradeUpdate.ClientOrderId != null, "Client order id is null!!");
-            if (trade != null)
-                Trades.Update(trade);
+            var tradeInDb = Trades.FindOne(t => t.Id == newTrade.Id);
+            if (newTrade.ClientOrderId == null || newTrade.ClientOrderId == "null")
+            {
+                var order = Orders.FindOne(o => o.OrderId == newTrade.OrderId && o.Symbol == newTrade.Symbol);
+                newTrade.ClientOrderId = order?.ClientId;
+            }
+
+            if (tradeInDb != null)
+                Trades.Update(newTrade);
             else
             {
-                Trades.Insert(tradeUpdate);
-                OnNewTrade?.Invoke(this, tradeUpdate);
+                Trades.Insert(newTrade);
+                OnNewTrade?.Invoke(this, newTrade);
             }
         }
 
@@ -713,22 +719,26 @@ namespace SharpTrader
                             NewClientOrderId = clientOrderId,
                             NewOrderResponseType = NewOrderResponseType.Result,
                         });
-                lock (_Balances)
+
+                lock (LockOrdersTrades)
                 {
                     newOrd = new ApiOrder(ord);
                     var oldOrd = Orders.FindOne(o => o.Id == newOrd.Id);
                     if (oldOrd != null)
-                    {
                         newOrd = oldOrd;
-                    }
                     else
                         Orders.Insert(newOrd);
+                }
 
+                lock (_Balances)
+                {
                     var quoteBal = _Balances[symbolInfo.QuoteAsset];
                     var assetBal = _Balances[symbolInfo.BaseAsset];
-                    //todo update balance
-                    return new MarketOperation<IOrder>(MarketOperationStatus.Completed, newOrd);
                 }
+
+                //todo update balance
+                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, newOrd);
+
             }
             catch (Exception ex)
             {
@@ -1110,7 +1120,7 @@ namespace SharpTrader
                 Status = GetStatus(bo.OrderStatus);
                 Filled = bo.AccumulatedQuantityOfFilledTradesThisOrder;
                 Id = Symbol + OrderId;
-                ClientId = bo.OriginalClientOrderId;
+                ClientId = bo.NewClientOrderId;
             }
 
             private static OrderType GetOrderType(be.Enums.OrderType type)
@@ -1199,7 +1209,7 @@ namespace SharpTrader
                 FeeAsset = FeeAsset;
                 Time = tr.TimeStamp;
                 OrderId = tr.OrderId;
-                ClientOrderId = tr.OriginalClientOrderId;
+                ClientOrderId = tr.NewClientOrderId;
                 TradeId = tr.TradeId;
                 Id = Symbol + TradeId;
             }
