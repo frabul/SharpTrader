@@ -115,7 +115,8 @@ namespace SharpTrader
             Logger.Info("synch all operations");
             if (resynchTradesAndOrders)
                 SynchAllOperations().Wait();
-
+            //else
+            //    SynchTrades();
 
             Task.WaitAll(ListenUserData(), SynchBalance());
             TimerListenUserData = new System.Timers.Timer(30000)
@@ -337,8 +338,13 @@ namespace SharpTrader
                         {
                             var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = 100 });
                             var trades = resp.Select(tr => new ApiTrade(sym, tr));
-                            foreach (var tr in trades) 
+                            foreach (var tr in trades)
+                            {
+                                var order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
+                                if (order != null)
+                                    tr.ClientOrderId = order.ClientId;
                                 TradesUpdateOrInsert(tr);
+                            }
                             //if has active orders we want it to continue updating when the active order becomes inactive
                             if (!hasActiveOrders)
                                 UpdatedTrades[sym] = lastOrder.OrderId;
@@ -494,6 +500,7 @@ namespace SharpTrader
         private void TradesUpdateOrInsert(ApiTrade tradeUpdate)
         {
             var trade = Trades.FindOne(t => t.Id == tradeUpdate.Id);
+            Debug.Assert(tradeUpdate.ClientOrderId != null, "Client order id is null!!");
             if (trade != null)
                 Trades.Update(trade);
             else
@@ -508,7 +515,7 @@ namespace SharpTrader
             await Task.CompletedTask;
             try
             {
-                int? tradeId = null;
+                int tradeId = 0;
                 if (fromId != null)
                 {
                     var match = IdRegex.Match(fromId);
@@ -517,7 +524,7 @@ namespace SharpTrader
 
                     if (symbol != match.Groups[1].Value)
                         throw new ArgumentException("The provided fromId is not from same symbol");
-                    tradeId = int.Parse(match.Captures[2].Value);
+                    tradeId = int.Parse(match.Groups[2].Value);
                 }
                 var result = Trades.Find(tr => tr.TradeId >= tradeId && tr.Symbol == symbol);
                 return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
@@ -595,7 +602,7 @@ namespace SharpTrader
             if (!match.Success)
                 throw new ArgumentException("Bad id");
             var symbol = match.Groups[1].Value;
-            var id = int.Parse(match.Captures[2].Value);
+            var id = int.Parse(match.Groups[2].Value);
             return (symbol, id);
         }
 
@@ -1041,7 +1048,7 @@ namespace SharpTrader
             public long OrderId { get; set; }
             public decimal Filled { get; set; }
             public string Market { get; set; }
-            public double Price { get; set; }
+            public decimal Price { get; set; }
             public decimal Amount { get; set; }
             public string ClientId { get; set; }
             public TradeType TradeType { get; set; }
@@ -1070,7 +1077,7 @@ namespace SharpTrader
                 TradeType = binanceOrder.Side == OrderSide.Buy ? TradeType.Buy : TradeType.Sell;
                 Type = GetOrderType(binanceOrder.Type);
                 Amount = binanceOrder.OriginalQuantity;
-                Price = (double)binanceOrder.Price;
+                Price = binanceOrder.Price;
                 Status = GetStatus(binanceOrder.Status);
                 Filled = binanceOrder.ExecutedQuantity;
                 Id = Symbol + OrderId;
@@ -1083,11 +1090,12 @@ namespace SharpTrader
                 TradeType = or.Side == OrderSide.Buy ? TradeType.Buy : TradeType.Sell;
                 Type = GetOrderType(or.Type);
                 Amount = or.OriginalQuantity;
-                Price = (double)or.Price;
+                Price = or.Price;
                 Status = GetStatus(or.Status);
                 Filled = or.ExecutedQuantity;
                 OrderId = or.OrderId;
                 Id = Symbol + OrderId;
+                ClientId = or.ClientOrderId;
             }
 
             public ApiOrder(BinanceTradeOrderData bo)
@@ -1098,10 +1106,11 @@ namespace SharpTrader
                 TradeType = bo.Side == OrderSide.Buy ? TradeType.Buy : TradeType.Sell;
                 Type = GetOrderType(bo.Type);
                 Amount = bo.Quantity;
-                Price = (double)bo.Price;
+                Price = bo.Price;
                 Status = GetStatus(bo.OrderStatus);
                 Filled = bo.AccumulatedQuantityOfFilledTradesThisOrder;
                 Id = Symbol + OrderId;
+                ClientId = bo.OriginalClientOrderId;
             }
 
             private static OrderType GetOrderType(be.Enums.OrderType type)
@@ -1169,7 +1178,7 @@ namespace SharpTrader
                 Market = "Binance";
                 Symbol = symbol;
                 Type = tr.IsBuyer ? TradeType.Buy : TradeType.Sell;
-                Price = (double)tr.Price;
+                Price = tr.Price;
                 Amount = tr.Quantity;
                 Fee = tr.Commission;
                 FeeAsset = tr.CommissionAsset;
@@ -1184,7 +1193,7 @@ namespace SharpTrader
                 Market = "Binance";
                 Symbol = tr.Symbol;
                 Type = tr.Side == OrderSide.Buy ? TradeType.Buy : TradeType.Sell;
-                Price = (double)tr.PriceOfLastFilledTrade;
+                Price = tr.PriceOfLastFilledTrade;
                 Amount = tr.QuantityOfLastFilledTrade;
                 Fee = Fee;
                 FeeAsset = FeeAsset;
@@ -1202,7 +1211,7 @@ namespace SharpTrader
             public decimal Amount { get; set; }
             public decimal Fee { get; set; }
             public string Market { get; set; }
-            public double Price { get; set; }
+            public decimal Price { get; set; }
             public string Symbol { get; set; }
             public TradeType Type { get; set; }
             public string FeeAsset { get; set; }

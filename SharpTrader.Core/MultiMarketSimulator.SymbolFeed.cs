@@ -113,7 +113,7 @@ namespace SharpTrader
                     var feed = SymbolsFeed[symbol];
                     var price = type == TradeType.Buy ? feed.Ask : feed.Bid;
                     var order = new Order(this.MarketName, symbol, type, OrderType.Market, amount, price, clientOrderId);
-                     
+
                     var (result, error) = RegisterOrder(order);
                     if (!result)
                         return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null) { ErrorInfo = error };
@@ -174,8 +174,8 @@ namespace SharpTrader
                         var feed = SymbolsFeed[order.Symbol];
                         if (order.Type == OrderType.Limit)
                         {
-                            var willBuy = (order.TradeType == TradeType.Buy && feed.Ticks.LastTick.Low + feed.Spread <= order.Price);
-                            var willSell = (order.TradeType == TradeType.Sell && feed.Ticks.LastTick.High >= order.Price);
+                            var willBuy = (order.TradeType == TradeType.Buy && feed.Ticks.LastTick.Low + feed.Spread <= (double)order.Price);
+                            var willSell = (order.TradeType == TradeType.Sell && feed.Ticks.LastTick.High >= (double)order.Price);
 
                             if (willBuy || willSell)
                             {
@@ -183,10 +183,10 @@ namespace SharpTrader
                                     market: this.MarketName,
                                     symbol: feed.Symbol,
                                     time: feed.Ticks.LastTick.OpenTime.AddSeconds(feed.Ticks.LastTick.Timeframe.Seconds / 2),
-                                    price: order.Price,
+                                    price: (double)order.Price,
                                     amount: order.Amount,
                                     type: order.TradeType,
-                                    fee: order.Amount * (decimal)(this.MakerFee * order.Price),
+                                    fee: order.Amount * ((decimal)this.MakerFee * order.Price),
                                     order: order
                                 );
                                 RegisterTrade(feed, trade);
@@ -224,7 +224,7 @@ namespace SharpTrader
                     TradesToSignal.Add(trade);
                 }
             }
-            
+
             internal void AddNewCandle(SymbolFeed feed, Candlestick tick)
             {
                 Time = tick.CloseTime;
@@ -435,7 +435,7 @@ namespace SharpTrader
             private static int idCounter = 0;
             public string Symbol { get; private set; }
             public string Market { get; private set; }
-            public double Price { get; private set; }
+            public decimal Price { get; private set; }
             public decimal Amount { get; private set; }
             public string Id { get; private set; }
             public string ClientId { get; private set; }
@@ -451,7 +451,7 @@ namespace SharpTrader
                 TradeType = tradeSide;
                 Type = orderType;
                 Amount = amount;
-                Price = rate;
+                Price = (decimal)rate;
                 Id = (idCounter++).ToString();
             }
 
@@ -466,7 +466,7 @@ namespace SharpTrader
                 Symbol = symbol;
                 Time = time;
                 Type = type;
-                Price = price;
+                Price = (decimal)price;
                 Amount = amount;
                 Fee = fee;
                 Order = order;
@@ -481,7 +481,7 @@ namespace SharpTrader
 
             public string Market { get; private set; }
 
-            public double Price { get; private set; }
+            public decimal Price { get; private set; }
 
             public string Symbol { get; private set; }
 
