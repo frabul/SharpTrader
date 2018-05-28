@@ -11,4 +11,4 @@ Features:
   * more to come
 TODO - Add sample bot
 
-- Many thanks to the guy that stole the api key of my working bot, that i mistakenly committed here, and stole 6 ETH from me.
+Many thanks to the guy that stole the api key of my working bot, that i mistakenly committed here, and stole 6 ETH from me.
