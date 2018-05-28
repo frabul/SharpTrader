@@ -19,7 +19,7 @@ namespace SharpTrader
 
         public HistoricalRateDataBase(string dataDir)
         {
-            BaseDirectory = dataDir + "RatesDB\\";
+            BaseDirectory = Path.Combine(dataDir , "RatesDB");
             if (!Directory.Exists(BaseDirectory))
                 Directory.CreateDirectory(BaseDirectory);
         }

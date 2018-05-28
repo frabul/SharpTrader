@@ -85,7 +85,8 @@ namespace SharpTrader
             Logger = LogManager.GetLogger("BinanceMarketApi");
             Logger.Info("starting initialization...");
             this.HistoryDb = historyDb;
-            var dbPath = $".\\Data\\BinanceAccountsData\\{apiKey}_tnd.db";
+          
+            var dbPath = Path.Combine("Data", "BinanceAccountsData", $"{ apiKey}_tnd.db");
             if (!Directory.Exists(Path.GetDirectoryName(dbPath)))
                 Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
             TradesAndOrdersDb = new LiteDatabase(dbPath);
@@ -116,7 +117,7 @@ namespace SharpTrader
             if (resynchTradesAndOrders)
                 SynchAllOperations().Wait();
             else
-                SynchTrades().Wait();
+                SynchOpenOrders().ContinueWith((t) => SynchTrades()).Wait();
 
             Task.WaitAll(ListenUserData(), SynchBalance());
             TimerListenUserData = new System.Timers.Timer(30000)
@@ -225,6 +226,8 @@ namespace SharpTrader
                 foreach (var tr in toInsert)
                 {
                     var order = Orders.FindOne(o => o.OrderId == tr.OrderId);
+                    if (order == null)
+                        order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder;
                     tr.ClientOrderId = order.ClientId;
                 }
 
@@ -532,7 +535,7 @@ namespace SharpTrader
                         throw new ArgumentException("The provided fromId is not from same symbol");
                     tradeId = int.Parse(match.Groups[2].Value);
                 }
-                var result = Trades.Find(tr => tr.TradeId >= tradeId && tr.Symbol == symbol);
+                var result = Trades.Find(tr => tr.TradeId > tradeId && tr.Symbol == symbol);
                 return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
             }
             catch (Exception ex)
