@@ -19,7 +19,7 @@ namespace SharpTrader
 
         public HistoricalRateDataBase(string dataDir)
         {
-            BaseDirectory = Path.Combine(dataDir , "RatesDB");
+            BaseDirectory = Path.Combine(dataDir, "RatesDB");
             if (!Directory.Exists(BaseDirectory))
                 Directory.CreateDirectory(BaseDirectory);
         }
@@ -47,8 +47,8 @@ namespace SharpTrader
                         SymbolsData.RemoveAt(i--);
                 }
 
-                if (File.Exists(BaseDirectory + fileName))
-                    File.Delete(BaseDirectory + fileName);
+                if (File.Exists(Path.Combine(BaseDirectory, fileName)))
+                    File.Delete(Path.Combine(BaseDirectory, fileName));
             }
         }
 
@@ -87,9 +87,9 @@ namespace SharpTrader
             }
             if (sdata == null)
             {
-                if (File.Exists(BaseDirectory + fileName))
+                if (File.Exists(Path.Combine(BaseDirectory, fileName)))
                 {
-                    using (var fs = File.Open(BaseDirectory + fileName, FileMode.Open))
+                    using (var fs = File.Open(Path.Combine(BaseDirectory, fileName), FileMode.Open))
                         sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
 
                 }
@@ -139,9 +139,9 @@ namespace SharpTrader
                 if (sdata == null)
                 {
                     //check if we have it on disk
-                    if (File.Exists(BaseDirectory + fileName))
+                    if (File.Exists(Path.Combine(BaseDirectory, fileName)))
                     {
-                        using (var fs = File.Open(BaseDirectory + fileName, FileMode.Open))
+                        using (var fs = File.Open(Path.Combine(BaseDirectory, fileName), FileMode.Open))
                             sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
                     }
                     else
@@ -264,7 +264,7 @@ namespace SharpTrader
                     Ticks = data.Ticks.Select(c => new Candlestick(c)).ToList(),
                     Timeframe = data.Timeframe
                 };
-                using (var fs = File.Open(BaseDirectory + data.FileName, FileMode.Create))
+                using (var fs = File.Open(Path.Combine(BaseDirectory, data.FileName), FileMode.Create))
                     Serializer.Serialize<SymbolHistoryRaw>(fs, sdata);
             }
         }

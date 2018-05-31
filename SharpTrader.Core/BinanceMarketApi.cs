@@ -32,11 +32,15 @@ namespace SharpTrader
     {
         public event Action<IMarketApi, ITrade> OnNewTrade;
 
+        private object LockOrdersTrades = new object();
+        private object LockBalances = new object();
+
+
         private Dictionary<string, ApiTrade> TradesPerSymbol = new Dictionary<string, ApiTrade>();
         private LiteCollection<ApiOrder> Orders;
         private LiteCollection<ApiTrade> Trades;
         private List<ApiOrder> OrdersActive = new List<ApiOrder>();
-        private object LockOrdersTrades = new object();
+
         private Stopwatch StopwatchSocketClose = new Stopwatch();
         private Stopwatch UserDataPingStopwatch = new Stopwatch();
 
@@ -66,7 +70,14 @@ namespace SharpTrader
 
         IEnumerable<IOrder> IMarketApi.OpenOrders { get { lock (LockOrdersTrades) return OrdersActive.ToArray(); } }
 
-        public (string Symbol, decimal balance)[] FreeBalances { get { lock (_Balances) return _Balances.Select(kv => (kv.Key, kv.Value.Free)).ToArray(); } }
+        public (string Symbol, decimal balance)[] FreeBalances
+        {
+            get
+            {
+                lock (LockBalances)
+                    return _Balances.Select(kv => (kv.Key, kv.Value.Free)).ToArray();
+            }
+        }
 
         public IEnumerable<string> Symbols => ExchangeInfo.Symbols.Select(sym => sym.Symbol);
 
@@ -85,7 +96,7 @@ namespace SharpTrader
             Logger = LogManager.GetLogger("BinanceMarketApi");
             Logger.Info("starting initialization...");
             this.HistoryDb = historyDb;
-          
+
             var dbPath = Path.Combine("Data", "BinanceAccountsData", $"{ apiKey}_tnd.db");
             if (!Directory.Exists(Path.GetDirectoryName(dbPath)))
                 Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
@@ -327,38 +338,47 @@ namespace SharpTrader
         {
             foreach (var sym in ExchangeInfo.Symbols.Select(s => s.Symbol))
             {
-                try
+                await SynchTrades(sym);
+            }
+        }
+
+        public async Task SynchTrades(string sym, bool force = false)
+        {
+            if (sym == null)
+                throw new Exception("Parameter sym cannot be null");
+            try
+            {
+                bool hasActiveOrders = false;
+                lock (LockOrdersTrades)
+                    hasActiveOrders = OrdersActive.Any(o => o.Symbol == sym);
+
+                var sOrders = Orders.Find(o => o.Symbol == sym).OrderBy(o => o.OrderId);
+                var lastOrder = sOrders.LastOrDefault();
+
+                if (lastOrder != null)
                 {
-                    bool hasActiveOrders = false;
-                    lock (LockOrdersTrades)
-                        hasActiveOrders = OrdersActive.Any(o => o.Symbol == sym);
-                    var sOrders = Orders.Find(o => o.Symbol == sym).OrderBy(o => o.OrderId);
-                    var lastOrder = sOrders.LastOrDefault();
-                    if (lastOrder != null)
+                    var updatedAlready = UpdatedTrades.TryGetValue(sym, out long lastOrderUpdate);
+                    if (!updatedAlready || lastOrderUpdate != lastOrder.OrderId || hasActiveOrders || force)
                     {
-                        var updatedAlready = UpdatedTrades.TryGetValue(sym, out long lastOrderUpdate);
-                        if (!updatedAlready || lastOrderUpdate != lastOrder.OrderId || hasActiveOrders)
+                        var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = 100 });
+                        var trades = resp.Select(tr => new ApiTrade(sym, tr));
+                        foreach (var tr in trades)
                         {
-                            var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = 100 });
-                            var trades = resp.Select(tr => new ApiTrade(sym, tr));
-                            foreach (var tr in trades)
-                            {
-                                var order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
-                                if (order == null) 
-                                      order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder; 
-                                tr.ClientOrderId = order.ClientId;
-                                TradesUpdateOrInsert(tr);
-                            }
-                            //if has active orders we want it to continue updating when the active order becomes inactive
-                            if (!hasActiveOrders)
-                                UpdatedTrades[sym] = lastOrder.OrderId;
+                            var order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
+                            if (order == null)
+                                order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder;
+                            tr.ClientOrderId = order.ClientId;
+                            TradesUpdateOrInsert(tr);
                         }
+                        //if has active orders we want it to continue updating when the active order becomes inactive
+                        if (!hasActiveOrders)
+                            UpdatedTrades[sym] = lastOrder.OrderId;
                     }
                 }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"Error during {sym} trades synch: {GetExceptionErrorInfo(ex)}");
-                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Error during {sym} trades synch: {GetExceptionErrorInfo(ex)}");
             }
         }
 
@@ -424,7 +444,7 @@ namespace SharpTrader
 
         private void HandleAccountUpdatedMessage(BinanceAccountUpdateData msg)
         {
-            lock (_Balances)
+            lock (LockBalances)
             {
                 foreach (var bal in msg.Balances)
                 {
@@ -617,7 +637,7 @@ namespace SharpTrader
 
         public decimal GetFreeBalance(string asset)
         {
-            lock (_Balances)
+            lock (LockBalances)
             {
                 if (_Balances.ContainsKey(asset))
                     return _Balances[asset].Free;
@@ -628,7 +648,7 @@ namespace SharpTrader
         public decimal GetEquity(string asset)
         {
             var allPrices = Client.GetSymbolsPriceTicker().Result;
-            lock (_Balances)
+            lock (LockBalances)
             {
                 decimal val = 0;
                 foreach (var kv in _Balances)
@@ -661,14 +681,14 @@ namespace SharpTrader
         public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)
         {
             SymbolFeed feed;
-            lock (Feeds)
+            lock (LockBalances)
                 feed = Feeds.Where(sf => sf.Symbol == symbol).FirstOrDefault();
             if (feed == null)
             {
                 var symInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == symbol);
                 feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, symInfo.BaseAsset, symInfo.QuoteAsset);
                 await feed.Initialize();
-                lock (Feeds)
+                lock (LockBalances)
                     Feeds.Add(feed);
             }
             return feed;
@@ -733,7 +753,7 @@ namespace SharpTrader
                         Orders.Insert(newOrd);
                 }
 
-                lock (_Balances)
+                lock (LockBalances)
                 {
                     var quoteBal = _Balances[symbolInfo.QuoteAsset];
                     var assetBal = _Balances[symbolInfo.BaseAsset];
@@ -763,7 +783,7 @@ namespace SharpTrader
                         Symbol = order.Symbol,
                         OrderId = order.OrderId,
                     });
-                    lock (_Balances)
+                    lock (LockBalances)
                     {
                         var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == order.Symbol);
                         var quoteBal = _Balances[symbolInfo.QuoteAsset];
@@ -875,6 +895,7 @@ namespace SharpTrader
 
         class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
         {
+            private NLog.Logger Logger;
             private BinanceClient Client;
             private DisposableBinanceWebSocketClient WebSocketClient;
             private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
@@ -906,7 +927,7 @@ namespace SharpTrader
                 this.Market = market;
                 this.QuoteAsset = quoteAsset;
                 this.Asset = asset;
-
+                Logger   = LogManager.GetLogger("Bin" + Symbol + "Feed");
             }
 
             internal async Task Initialize()
@@ -930,11 +951,11 @@ namespace SharpTrader
 
             private void HearthBeat(object state, ElapsedEventArgs args)
             {
-                if (!KlineWatchdog.IsRunning || KlineWatchdog.ElapsedMilliseconds > 70000)
+                if (!KlineWatchdog.IsRunning || KlineWatchdog.ElapsedMilliseconds > 75000)
                 {
                     KlineListen();
                 }
-                if (!PartialDepthWatchDog.IsRunning || PartialDepthWatchDog.ElapsedMilliseconds > 50000)
+                if (!PartialDepthWatchDog.IsRunning || PartialDepthWatchDog.ElapsedMilliseconds > 75000)
                 {
                     PartialDepthListen();
                 }
@@ -954,7 +975,7 @@ namespace SharpTrader
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Exception during KlineListen: " + GetExceptionErrorInfo(ex));
+                    Logger.Error("Exception during KlineListen: " + GetExceptionErrorInfo(ex));
                 }
             }
 
@@ -971,7 +992,7 @@ namespace SharpTrader
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Exception during PartialDepthListen: " + GetExceptionErrorInfo(ex));
+                    Logger.Error("Exception during PartialDepthListen: " + GetExceptionErrorInfo(ex));
                 }
 
             }
