@@ -579,6 +579,7 @@ namespace SharpTrader
                 var binOrd = await Client.QueryOrder(new QueryOrderRequest() { OrderId = res.id, Symbol = res.symbol });
                 var result = new ApiOrder(binOrd);
                 OrdersUpdateOrInsert(result);
+                OrdersActiveInsertOrUpdate(result);
                 return new MarketOperation<IOrder>(MarketOperationStatus.Completed, result);
             }
             catch (Exception ex)
@@ -927,7 +928,7 @@ namespace SharpTrader
                 this.Market = market;
                 this.QuoteAsset = quoteAsset;
                 this.Asset = asset;
-                Logger   = LogManager.GetLogger("Bin" + Symbol + "Feed");
+                Logger = LogManager.GetLogger("Bin" + Symbol + "Feed");
             }
 
             internal async Task Initialize()
