@@ -62,6 +62,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj">
+      <Project>{2a8f66f5-44a4-4618-b21e-3d9d1b86fb2d}</Project>
+      <Name>BinanceExchange.API</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\SharpTrader.Core\SharpTrader.Core.csproj">
       <Project>{320b1902-461a-4b88-8852-d881dc4e5293}</Project>
       <Name>SharpTrader.Core</Name>

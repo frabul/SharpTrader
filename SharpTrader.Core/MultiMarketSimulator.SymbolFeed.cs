@@ -423,11 +423,7 @@ namespace SharpTrader
             {
                 throw new NotImplementedException();
             }
-
-            public Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
-            {
-                throw new NotImplementedException();
-            }
+            
         }
 
         class Order : IOrder
@@ -446,15 +442,15 @@ namespace SharpTrader
             public decimal Filled { get; set; }
             public Order(string market, string symbol, TradeType tradeSide, OrderType orderType, decimal amount, double rate, string clientId)
             {
+                Id = (idCounter++).ToString();
+                ClientId = clientId;
                 Symbol = symbol;
                 Market = market;
                 TradeType = tradeSide;
                 Type = orderType;
                 Amount = amount;
-                Price = (decimal)rate;
-                Id = (idCounter++).ToString();
-            }
-
+                Price = (decimal)rate; 
+            } 
         }
 
         class Trade : ITrade
@@ -491,9 +487,7 @@ namespace SharpTrader
 
             public string ClientOrderId => Order.ClientId;
 
-            public string OrderId => Order.Id;
-
-
+            public string OrderId => Order.Id; 
         }
 
         class MarketOperation<T> : IMarketOperation<T>

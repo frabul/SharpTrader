@@ -10,6 +10,7 @@ using BinanceExchange.API.Models.Request;
 using BinanceExchange.API.Enums;
 using BinanceExchange.API.Models.Response.Error;
 using System.Diagnostics;
+using BinanceExchange.API.Models.Response;
 
 namespace SharpTrader.Utils
 {
@@ -44,13 +45,13 @@ namespace SharpTrader.Utils
             HistoryDB = db;
         }
 
-        public void MineBinance()
+        public void DownloadSymbols(Func<ExchangeInfoSymbol, bool> filter)
         {
             var exchangeInfo = Client.GetExchangeInfo().Result;
             var symbols = exchangeInfo.Symbols;
 
             var toDownload = symbols
-                .Where(sp => sp.Symbol.EndsWith("ETH"))// || sp.Symbol.EndsWith("USDT"))
+                .Where(filter)
                 .Select(sp => sp.Symbol).ToList();
             var downloadQueue = new Queue<string>(toDownload);
             List<Task> tasks = new List<Task>();

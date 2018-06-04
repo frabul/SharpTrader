@@ -63,7 +63,11 @@ namespace SharpTrader
                 }
                 return new TimeSerieNavigator<ICandlestick>(der.Ticks);
             }
+        }
 
+        public async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
+        {
+            return await GetNavigatorAsync(timeframe);
         }
 
         private void AddTickToDerivedChart(DerivedChart der, ICandlestick newCandle)

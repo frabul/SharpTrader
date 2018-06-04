@@ -26,8 +26,7 @@ namespace SharpTrader
 
         public BackTester(MultiMarketSimulator simulator, TraderBot bot)
         {
-            Simulator = simulator;
-
+            Simulator = simulator; 
             Bot = bot;
         }
 

@@ -14,10 +14,23 @@ namespace SharpTrader
         private Dictionary<string, ISymbolHistory> SymbolsData = new Dictionary<string, ISymbolHistory>();
         private HistoricalRateDataBase HistoryDb;
         private Configuration Config;
+        private DateTime FirstTickTime = DateTime.MaxValue;
+        private TimeSpan Delta = TimeSpan.Zero;
+        private DateTime _startOfSimulation = new DateTime(2000, 1, 1);
 
         public IEnumerable<IMarketApi> Markets => _Markets;
         public DateTime Time { get; private set; }
-        public DateTime StartOfSimulation { get; set; } = new DateTime(2000, 1, 1);
+        public DateTime StartOfSimulation
+        {
+            get => _startOfSimulation; set
+            {
+                _startOfSimulation = value;
+                if (FirstTickTime == DateTime.MaxValue)
+                    this.Time = StartOfSimulation;
+                foreach (var market in _Markets)
+                    market.Time = this.Time;
+            }
+        }
 
         public MultiMarketSimulator(string dataDirectory, HistoricalRateDataBase historyDb)
         {
@@ -33,10 +46,7 @@ namespace SharpTrader
                 _Markets[i++] = market;
             }
         }
-
-
-     
-
+         
         public IMarketApi GetMarketApi(string marketName)
         {
             var market = Markets.Where(m => m.MarketName == marketName).FirstOrDefault();
@@ -53,9 +63,7 @@ namespace SharpTrader
                 raiseEvents = startTime <= this.Time;
             }
         }
-
-        DateTime FirstTickTime = DateTime.MaxValue;
-        TimeSpan Delta = TimeSpan.Zero;
+         
         public bool NextTick(bool raiseEvents)
         {
             if (FirstTickTime == DateTime.MaxValue)
@@ -69,7 +77,7 @@ namespace SharpTrader
                         SymbolsData.TryGetValue(key, out var sdata);
                         if (sdata == null)
                         {
-                            sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60),StartOfSimulation);
+                            sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60), StartOfSimulation);
                             SymbolsData.Add(key, sdata);
                         }
                         if (sdata.Ticks.Count > 0)
