@@ -128,7 +128,7 @@ namespace SharpTrader
             if (resynchTradesAndOrders)
                 SynchAllOperations().Wait();
             else
-                SynchOpenOrders().ContinueWith((t) => SynchTrades()).Wait();
+                SynchOpenOrders().ContinueWith((t) => SynchLastTrades()).Wait();
 
             Task.WaitAll(ListenUserData(), SynchBalance());
             TimerListenUserData = new System.Timers.Timer(30000)
@@ -151,7 +151,7 @@ namespace SharpTrader
                         .ContinueWith(t => TimerFastUpdates.Start());
                 };
 
-            TimerOrdersTradesSynch = new System.Timers.Timer(120000)
+            TimerOrdersTradesSynch = new System.Timers.Timer(60000)
             {
                 AutoReset = false,
                 Enabled = true,
@@ -160,7 +160,7 @@ namespace SharpTrader
                 (s, e) =>
                 {
                     Thread.MemoryBarrier();
-                    SynchOpenOrders().ContinueWith((t) => SynchTrades()).ContinueWith(t => TimerOrdersTradesSynch.Start());
+                    SynchOpenOrders().ContinueWith((t) => SynchLastTrades()).ContinueWith(t => TimerOrdersTradesSynch.Start());
                 };
             Logger.Info("initialization complete");
         }
@@ -196,7 +196,7 @@ namespace SharpTrader
                 {
                     while (tasks.Where(t => !t.IsCompleted).Count() > 5)
                         await Task.Delay(100);
-                    tasks.Add(SyncSymbolTrades(sym));
+                    tasks.Add(SynchAllSymbolTrades(sym));
                 }
             }
             await Task.WhenAll(tasks);
@@ -224,7 +224,7 @@ namespace SharpTrader
             //    OrdersC.InsertBulk(orders );
         }
 
-        private async Task SyncSymbolTrades(string sym)
+        private async Task SynchAllSymbolTrades(string sym)
         {
             var lastTrade = Trades.Find(o => o.Symbol == sym)?.OrderBy(o => o.TradeId).LastOrDefault();
             long start = (lastTrade != null) ? lastTrade.TradeId + 1 : 0;
@@ -334,15 +334,15 @@ namespace SharpTrader
             }
         }
 
-        private async Task SynchTrades()
+        private async Task SynchLastTrades()
         {
             foreach (var sym in ExchangeInfo.Symbols.Select(s => s.Symbol))
             {
-                await SynchTrades(sym);
+                await SynchLastTrades(sym);
             }
         }
 
-        public async Task SynchTrades(string sym, bool force = false)
+        public async Task SynchLastTrades(string sym, bool force = false)
         {
             if (sym == null)
                 throw new Exception("Parameter sym cannot be null");
