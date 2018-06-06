@@ -89,6 +89,7 @@ namespace SharpTrader
         string Symbol { get; }
         string Market { get; }
         string ClientId { get; }
+        DateTime Time { get; }
     }
 
     public class MarginTrade

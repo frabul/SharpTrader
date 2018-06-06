@@ -71,7 +71,7 @@ namespace SharpTrader
 
             public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
             {
-                var order = new Order(this.MarketName, symbol, type, OrderType.Limit, amount, (double)rate, clientOrderId);
+                var order = new Order(this.MarketName, symbol, Time, type, OrderType.Limit, amount, (double)rate, clientOrderId);
 
                 var res = RegisterOrder(order);
                 lock (LockObject)
@@ -112,7 +112,7 @@ namespace SharpTrader
                 {
                     var feed = SymbolsFeed[symbol];
                     var price = type == TradeType.Buy ? feed.Ask : feed.Bid;
-                    var order = new Order(this.MarketName, symbol, type, OrderType.Market, amount, price, clientOrderId);
+                    var order = new Order(this.MarketName, symbol, Time, type, OrderType.Market, amount, price, clientOrderId);
 
                     var (result, error) = RegisterOrder(order);
                     if (!result)
@@ -423,7 +423,7 @@ namespace SharpTrader
             {
                 throw new NotImplementedException();
             }
-            
+
         }
 
         class Order : IOrder
@@ -440,7 +440,8 @@ namespace SharpTrader
             public TradeType TradeType { get; private set; }
             public OrderType Type { get; private set; }
             public decimal Filled { get; set; }
-            public Order(string market, string symbol, TradeType tradeSide, OrderType orderType, decimal amount, double rate, string clientId)
+            public DateTime Time { get; set; }
+            public Order(string market, string symbol, DateTime time, TradeType tradeSide, OrderType orderType, decimal amount, double rate, string clientId)
             {
                 Id = (idCounter++).ToString();
                 ClientId = clientId;
@@ -449,8 +450,9 @@ namespace SharpTrader
                 TradeType = tradeSide;
                 Type = orderType;
                 Amount = amount;
-                Price = (decimal)rate; 
-            } 
+                Price = (decimal)rate;
+                Time = time;
+            }
         }
 
         class Trade : ITrade
@@ -487,7 +489,7 @@ namespace SharpTrader
 
             public string ClientOrderId => Order.ClientId;
 
-            public string OrderId => Order.Id; 
+            public string OrderId => Order.Id;
         }
 
         class MarketOperation<T> : IMarketOperation<T>

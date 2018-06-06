@@ -1090,6 +1090,7 @@ namespace SharpTrader
             public OrderType Type { get; set; }
             public OrderStatus Status { get; internal set; } = OrderStatus.Pending;
             public List<long> ResultingTrades { get; set; } = new List<long>();
+            public DateTime Time { get; set; }
 
             public ApiOrder() { }
 
@@ -1098,6 +1099,7 @@ namespace SharpTrader
                 OrderId = binanceOrder.OrderId;
                 ClientId = binanceOrder.ClientOrderId;
                 Symbol = binanceOrder.Symbol;
+                Time = binanceOrder.TransactionTime;
                 Market = "Binance";
                 Id = Symbol + OrderId;
             }
@@ -1116,6 +1118,7 @@ namespace SharpTrader
                 Status = GetStatus(binanceOrder.Status);
                 Filled = binanceOrder.ExecutedQuantity;
                 Id = Symbol + OrderId;
+                Time = binanceOrder.TransactionTime;
             }
 
             public ApiOrder(OrderResponse or)
@@ -1131,6 +1134,7 @@ namespace SharpTrader
                 OrderId = or.OrderId;
                 Id = Symbol + OrderId;
                 ClientId = or.ClientOrderId;
+                Time = or.Time;
             }
 
             public ApiOrder(BinanceTradeOrderData bo)
@@ -1146,6 +1150,7 @@ namespace SharpTrader
                 Filled = bo.AccumulatedQuantityOfFilledTradesThisOrder;
                 Id = Symbol + OrderId;
                 ClientId = bo.NewClientOrderId;
+                Time = bo.EventTime;
             }
 
             private static OrderType GetOrderType(be.Enums.OrderType type)
