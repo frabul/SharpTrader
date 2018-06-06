@@ -22,16 +22,17 @@ namespace SharpTrader
         public decimal MaxDrowDown { get; private set; }
         public decimal MaxDrowDownPrc { get; private set; }
 
-        ILogger Logger { get; set; } = new ConsoleLogger();
+        NLog.Logger Logger { get; set; }
 
         public BackTester(MultiMarketSimulator simulator, TraderBot bot)
         {
-            Simulator = simulator; 
+            Simulator = simulator;
             Bot = bot;
         }
 
         public void Start()
         {
+            Logger = NLog.LogManager.GetLogger("BackTester");
             Simulator.StartOfSimulation = StartTime - TimeSpan.FromDays(10);
             if (Started)
                 return;
@@ -73,9 +74,9 @@ namespace SharpTrader
 
             var totalBuys = Simulator.Trades.Where(tr => tr.Type == TradeType.Buy).Count();
 
-            Logger?.LogInfo($"Balance: {totalBal} - Trades:{Simulator.Trades.Count()} - Lost in fee:{lostInFee}");
+            Logger.Info($"Balance: {totalBal} - Trades:{Simulator.Trades.Count()} - Lost in fee:{lostInFee}");
             if (totalBuys > 0)
-                Logger?.LogInfo($"Profit/buy: {(totalBal - startingBal) / totalBuys:F8} - MaxDrawDown:{MaxDrowDown} - Max DD %:{MaxDrowDownPrc * 100}");
+                Logger.Info($"Profit/buy: {(totalBal - startingBal) / totalBuys:F8} - MaxDrawDown:{MaxDrowDown} - Max DD %:{MaxDrowDownPrc * 100}");
 
             //foreach (var bot in theBots)
             //{
@@ -92,43 +93,41 @@ namespace SharpTrader
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public string BaseAsset { get; set; }
-        public ILogger Logger { get; set; }
+        private NLog.Logger Logger;
 
         private OptimizationSpace BaseSpace;
 
         public void Start()
         {
+            Logger = NLog.LogManager.GetLogger("Optimizer");
+
             BaseSpace = new OptimizationSpace();
 
             var dummyMarket = MarketFactory();
             var dummyBot = BotFactory(dummyMarket, BaseSpace);
             var paramSets = BaseSpace.GetPermutations();
 
-
             Action<OptimizationSpace> act = paramSet =>
             {
                 var sim = MarketFactory();
                 var bot = BotFactory(sim, paramSet);
                 var startingEquity = sim.GetEquity(BaseAsset);
-                var backTester = new BackTester(sim, bot) { };
-                backTester.StartTime = StartTime;
-                backTester.EndTime = EndTime;
-                backTester.BaseAsset = BaseAsset;
-
-                backTester.Start();
-                //collect info 
-                var totalBal = sim.GetEquity(BaseAsset);
+                var backTester = new BackTester(sim, bot)
+                {
+                    StartTime = StartTime,
+                    EndTime = EndTime,
+                    BaseAsset = BaseAsset,
+                };
 
                 var tostr = "";
                 foreach (var pp in paramSet.ParamsSet)
-                    tostr += $"{pp.prop}: {pp.val}, ";
-                var buysCnt = sim.Trades.Where(tr => tr.Type == TradeType.Buy).Count();
-                var msg = $"\n\nOptimization array:{ tostr }";
-                msg += $"\n\tBalance: {sim.GetEquity(BaseAsset)} - MaxDrawDown:{backTester.MaxDrowDown}";
-                if (buysCnt > 0)
-                    msg += $" - Profit/buy: {(totalBal - startingEquity) / buysCnt:F8} ";
-                msg += $"\n\tTrades:{sim.Trades.Count()}- Max DD %:{backTester.MaxDrowDownPrc * 100}";
-                Logger?.LogInfo(msg);
+                    tostr += $"{pp.prop}: {pp.val} | ";
+                var msg = $"\nOptimization array: { tostr }";
+                Logger.Info($"\n--------------- {bot.ToString()} -------------------\n" + msg);
+
+                backTester.Start();
+                //collect info 
+
             };
             foreach (var ps in paramSets)
                 act(ps);
