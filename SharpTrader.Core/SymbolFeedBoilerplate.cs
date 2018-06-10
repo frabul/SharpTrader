@@ -32,12 +32,12 @@ namespace SharpTrader
 
 
 
-        public virtual async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
+        public virtual Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
         {
-            await Task.CompletedTask; //workaround to remove the warning 
+
             if (BaseTimeframe == timeframe)
             {
-                return Ticks;
+                return Task.FromResult<TimeSerieNavigator<ICandlestick>>(Ticks);
             }
             else
             {
@@ -61,7 +61,7 @@ namespace SharpTrader
                     }
                     DerivedTicks.Add(der);
                 }
-                return new TimeSerieNavigator<ICandlestick>(der.Ticks);
+                return Task.FromResult(new TimeSerieNavigator<ICandlestick>(der.Ticks));
             }
         }
 

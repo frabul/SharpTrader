@@ -107,7 +107,7 @@ namespace SharpTrader
             var dummyBot = BotFactory(dummyMarket, BaseSpace);
             var paramSets = BaseSpace.GetPermutations();
 
-            Action<OptimizationSpace> act = paramSet =>
+            void act(OptimizationSpace paramSet)
             {
                 var sim = MarketFactory();
                 var bot = BotFactory(sim, paramSet);
@@ -128,7 +128,7 @@ namespace SharpTrader
                 backTester.Start();
                 //collect info 
 
-            };
+            }
             foreach (var ps in paramSets)
                 act(ps);
             //Parallel.ForEach(paramSets, new ParallelOptions { MaxDegreeOfParallelism = 2 }, act);

@@ -32,8 +32,8 @@ namespace SharpTrader
     {
         public event Action<IMarketApi, ITrade> OnNewTrade;
 
-        private object LockOrdersTrades = new object();
-        private object LockBalances = new object();
+        private readonly object LockOrdersTrades = new object();
+        private readonly object LockBalances = new object();
 
 
         private Dictionary<string, ApiTrade> TradesPerSymbol = new Dictionary<string, ApiTrade>();
@@ -539,9 +539,9 @@ namespace SharpTrader
             }
         }
 
-        public async Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
+        public Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
         {
-            await Task.CompletedTask;
+
             try
             {
                 int tradeId = 0;
@@ -556,19 +556,22 @@ namespace SharpTrader
                     tradeId = int.Parse(match.Groups[2].Value);
                 }
                 var result = Trades.Find(tr => tr.TradeId > tradeId && tr.Symbol == symbol);
-                return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
+                var ret = new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
+                return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(ret);
             }
             catch (Exception ex)
             {
-                return new MarketOperation<IEnumerable<ITrade>>(GetExceptionErrorInfo(ex));
+                var ret = new MarketOperation<IEnumerable<ITrade>>(GetExceptionErrorInfo(ex));
+                return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(ret);
             }
         }
 
-        public async Task<IMarketOperation<IEnumerable<ITrade>>> GetAllTradesAsync(string symbol)
+        public Task<IMarketOperation<IEnumerable<ITrade>>> GetAllTradesAsync(string symbol)
         {
-            await Task.CompletedTask;
+
             var result = Trades.Find(tr => tr.Symbol == symbol).ToArray<ITrade>();
-            return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
+            return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(
+                new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result));
         }
 
         public async Task<IMarketOperation<IOrder>> OrderSynchAsync(string id)
@@ -608,21 +611,23 @@ namespace SharpTrader
             }
         }
 
-        public async Task<IMarketOperation<ITrade>> GetTradeAsync(string id)
+        public Task<IMarketOperation<ITrade>> GetTradeAsync(string id)
         {
             try
             {
-                await Task.CompletedTask;
                 var result = Trades.FindOne(o => o.Id == id);
                 if (result == null)
                 {
-                    return new MarketOperation<ITrade>($"Trade {id} not found");
+                    return Task.FromResult<IMarketOperation<ITrade>>(
+                        new MarketOperation<ITrade>($"Trade {id} not found"));
                 }
-                return new MarketOperation<ITrade>(MarketOperationStatus.Completed, result);
+                return Task.FromResult<IMarketOperation<ITrade>>(
+                    new MarketOperation<ITrade>(MarketOperationStatus.Completed, result));
             }
             catch (Exception ex)
             {
-                return new MarketOperation<ITrade>(GetExceptionErrorInfo(ex));
+                return Task.FromResult<IMarketOperation<ITrade>>(
+                    new MarketOperation<ITrade>(GetExceptionErrorInfo(ex)));
             }
         }
 

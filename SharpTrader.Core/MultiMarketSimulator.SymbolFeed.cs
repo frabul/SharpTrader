@@ -51,7 +51,7 @@ namespace SharpTrader
                 throw new NotImplementedException();
             }
 
-            public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)
+            public Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)
             {
                 var feedFound = SymbolsFeed.TryGetValue(symbol, out SymbolFeed feed);
                 if (!feedFound)
@@ -65,8 +65,8 @@ namespace SharpTrader
                     _Balances.Add(feed.Asset, new AssetBalance());
                 if (!_Balances.ContainsKey(feed.QuoteAsset))
                     _Balances.Add(feed.QuoteAsset, new AssetBalance());
-                await Task.CompletedTask;
-                return feed;
+
+                return Task.FromResult<ISymbolFeed>(feed);
             }
 
             public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
