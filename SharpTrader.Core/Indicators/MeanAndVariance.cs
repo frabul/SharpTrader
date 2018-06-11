@@ -39,7 +39,7 @@ namespace SharpTrader.Indicators
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified period.
         /// </summary>  
         public MeanAndVariance(int period, TimeSerieNavigator<ICandlestick> chart) : this("Variance_" + period, period, chart)
-        { 
+        {
         }
 
         /// <summary>
@@ -57,7 +57,9 @@ namespace SharpTrader.Indicators
         /// Gets a flag indicating when this indicator is ready and fully initialized
         /// </summary>
         public override bool IsReady => Records.Count >= Period;
-         
+
+        public Record Value => Records.Count > 0 ? Records.LastTick : default(Record);
+
         private void Calculate()
         {
             while (Chart.Next())
