@@ -123,7 +123,7 @@ namespace SharpTrader
                 foreach (var pp in paramSet.ParamsSet)
                     tostr += $"{pp.prop}: {pp.val} | ";
                 var msg = $"\nOptimization array: { tostr }";
-                Logger.Info($"\n--------------- {bot.ToString()} -------------------\n" + msg);
+                Logger.Info($"--------------- {bot.ToString()} -------------------" + msg);
 
                 backTester.Start();
                 //collect info 
