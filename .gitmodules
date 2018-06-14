@@ -1,3 +1,6 @@
 [submodule "BinanceDotNet"]
 	path = BinanceDotNet
 	url = https://github.com/N4rk0/BinanceDotNet.git
+[submodule "KrakenCore"]
+	path = KrakenCore
+	url = https://github.com/N4rk0/KrakenCore.git

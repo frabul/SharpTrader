@@ -653,35 +653,43 @@ namespace SharpTrader
 
         public decimal GetEquity(string asset)
         {
-            var allPrices = Client.GetSymbolsPriceTicker().Result;
-            lock (LockBalances)
+            try
             {
-                decimal val = 0;
-                foreach (var kv in _Balances)
+                var allPrices = Client.GetSymbolsPriceTicker().Result;
+                lock (LockBalances)
                 {
-                    if (kv.Key == asset)
-                        val += kv.Value.Total;
-                    else if (kv.Value.Total != 0)
+                    decimal val = 0;
+                    foreach (var kv in _Balances)
                     {
-                        var sym1 = (kv.Key + asset);
-                        var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == sym1);
-                        if (price1 != null)
+                        if (kv.Key == asset)
+                            val += kv.Value.Total;
+                        else if (kv.Value.Total != 0)
                         {
-                            val += ((decimal)price1.Price * kv.Value.Total);
-                        }
-                        else
-                        {
-                            var sym2 = asset + kv.Key;
-                            var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == sym2);
-                            if (price2 != null)
+                            var sym1 = (kv.Key + asset);
+                            var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == sym1);
+                            if (price1 != null)
                             {
-                                val += (kv.Value.Total / price2.Price);
+                                val += ((decimal)price1.Price * kv.Value.Total);
+                            }
+                            else
+                            {
+                                var sym2 = asset + kv.Key;
+                                var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == sym2);
+                                if (price2 != null)
+                                {
+                                    val += (kv.Value.Total / price2.Price);
+                                }
                             }
                         }
                     }
+                    return val;
                 }
-                return val;
             }
+            catch(Exception ex)
+            {
+                todo
+            }
+            
         }
 
         public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)
