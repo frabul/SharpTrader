@@ -238,7 +238,7 @@ namespace SharpTrader
                 public decimal Total => Free + Locked;
             }
 
-            public decimal GetEquity(string asset)
+            public Task<IMarketOperation<decimal>> GetEquity(string asset)
             {
                 decimal val = 0;
                 foreach (var kv in _Balances)
@@ -261,7 +261,7 @@ namespace SharpTrader
                         }
                     }
                 }
-                return val;
+                return Task.FromResult<IMarketOperation<decimal>>(MarketOperation<decimal>.Completed(val));
             }
 
             public (decimal min, decimal step) GetMinTradable(string tradeSymbol)
@@ -352,7 +352,7 @@ namespace SharpTrader
 
         public decimal GetEquity(string baseAsset)
         {
-            return Markets.Sum(m => m.GetEquity(baseAsset));
+            return Markets.Sum(m => m.GetEquity(baseAsset).Result.Result);
         }
 
         class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
@@ -504,6 +504,10 @@ namespace SharpTrader
                 Result = res;
             }
 
+            public static IMarketOperation<T> Completed<T>(T val)
+            {
+                return new MarketOperation<T>(MarketOperationStatus.Completed, val);
+            }
         }
 
         class MarketConfiguration

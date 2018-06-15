@@ -651,11 +651,11 @@ namespace SharpTrader
             return 0;
         }
 
-        public decimal GetEquity(string asset)
+        public async Task<IMarketOperation<decimal>> GetEquity(string asset)
         {
             try
             {
-                var allPrices = Client.GetSymbolsPriceTicker().Result;
+                var allPrices = await Client.GetSymbolsPriceTicker();
                 lock (LockBalances)
                 {
                     decimal val = 0;
@@ -682,14 +682,14 @@ namespace SharpTrader
                             }
                         }
                     }
-                    return val;
+                    return new MarketOperation<decimal>(MarketOperationStatus.Completed, val);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                todo
+                return new MarketOperation<decimal>(MarketOperationStatus.Failed);
             }
-            
+
         }
 
         public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)

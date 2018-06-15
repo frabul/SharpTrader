@@ -52,7 +52,7 @@ namespace SharpTrader
 
         decimal GetFreeBalance(string asset);
 
-        decimal GetEquity(string asset);
+        Task<IMarketOperation<decimal>> GetEquity(string asset);
 
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
 
