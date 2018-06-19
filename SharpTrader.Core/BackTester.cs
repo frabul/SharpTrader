@@ -11,7 +11,7 @@ namespace SharpTrader
     public class BackTester
     {
         private MultiMarketSimulator Simulator;
-        private TraderBot Bot { get; set; }
+        private TraderBot[] Bots { get; set; }
 
         public bool Started { get; private set; }
         public DateTime StartTime { get; set; }
@@ -27,7 +27,12 @@ namespace SharpTrader
         public BackTester(MultiMarketSimulator simulator, TraderBot bot)
         {
             Simulator = simulator;
-            Bot = bot;
+            Bots = new[] { bot };
+        }
+        public BackTester(MultiMarketSimulator simulator, TraderBot[] bots)
+        {
+            Simulator = simulator;
+            Bots = bots;
         }
 
         public void Start()
@@ -38,7 +43,8 @@ namespace SharpTrader
                 return;
             Started = true;
 
-            Bot.Start().Wait();
+            foreach (var Bot in Bots)
+                Bot.Start(true).Wait();
 
             bool raiseEvents = false;
             int steps = 1;
@@ -49,7 +55,8 @@ namespace SharpTrader
             while (Simulator.NextTick(raiseEvents) && Simulator.Time < EndTime)
             {
                 if (raiseEvents)
-                    Bot.OnTick().Wait();
+                    foreach (var Bot in Bots)
+                        Bot.OnTick().Wait();
                 raiseEvents = StartTime <= Simulator.Time;
                 if (steps % 240 == 0 && raiseEvents)
                 {

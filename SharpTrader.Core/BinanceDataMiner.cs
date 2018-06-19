@@ -45,7 +45,7 @@ namespace SharpTrader.Utils
             HistoryDB = db;
         }
 
-        public void DownloadSymbols(Func<ExchangeInfoSymbol, bool> filter)
+        public void DownloadSymbols(Func<ExchangeInfoSymbol, bool> filter, TimeSpan redownloadSpan)
         {
             var exchangeInfo = Client.GetExchangeInfo().Result;
             var symbols = exchangeInfo.Symbols;
@@ -62,7 +62,7 @@ namespace SharpTrader.Utils
                 if (tasks.Count < 10)
                 {
                     var symbol = downloadQueue.Dequeue();
-                    var task = DownloadHistoryAsync(symbol, DateTime.UtcNow.Subtract(TimeSpan.FromDays(360)), TimeSpan.FromDays(1));
+                    var task = DownloadHistoryAsync(symbol, DateTime.UtcNow.Subtract(TimeSpan.FromDays(360)), redownloadSpan);
                     tasks.Add(task);
 
                 }

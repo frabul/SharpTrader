@@ -7,12 +7,14 @@ using System.Threading.Tasks;
 namespace SharpTrader
 {
     public abstract class TraderBot
-    { 
-        public bool Active { get; set; } 
-        public PlotHelper Drawer { get; } = new PlotHelper(); 
-        public bool Started { get; private set; } 
-        public async Task Start()
+    {
+        public bool BackTesting { get; private set; }
+        public bool Active { get; set; }
+        public PlotHelper Drawer { get; } = new PlotHelper();
+        public bool Started { get; private set; }
+        public async Task Start(bool backtesting)
         {
+            BackTesting = backtesting;
             await OnStart();
             Started = true;
         }
