@@ -49,6 +49,19 @@ namespace SharpTrader
 
         }
 
+        public void PlotLine(List<(DateTime time, double value)> values, ColorARGB color, bool dedicatedAxis = false)
+        {
+            var chartLine = new Line() { Color = color };
+
+            if (!dedicatedAxis)
+                Lines.Add(chartLine);
+            else
+                LinesOnDedicatedAxis.Add(chartLine);
+
+            foreach (var val in values)
+                chartLine.Points.Add(new Point(val.time, (double)val.value));
+        }
+
         public void PlotLine<T>(TimeSerieNavigator<T> timeSerie,
                                 ColorARGB color,
                                 Func<T, double> valuesSelector, bool dedicatedAxis = false) where T : ITimeRecord
@@ -70,7 +83,6 @@ namespace SharpTrader
 
                 }
             };
-
         }
 
 

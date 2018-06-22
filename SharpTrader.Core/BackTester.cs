@@ -17,7 +17,7 @@ namespace SharpTrader
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
         public string BaseAsset { get; set; }
-        public List<(DateTime time, decimal bal)> EquityHistory { get; set; }
+        public List<(DateTime time, decimal bal)> EquityHistory { get; set; } = new List<(DateTime time, decimal bal)>();
         public decimal FinalBalance { get; set; }
         public decimal MaxDrowDown { get; private set; }
         public decimal MaxDrowDownPrc { get; private set; }
@@ -68,6 +68,7 @@ namespace SharpTrader
                 steps++;
 
                 var balance = Simulator.GetEquity(BaseAsset);
+                EquityHistory.Add((Simulator.Time, balance));
                 BalancePeak = balance > BalancePeak ? balance : BalancePeak;
                 if (BalancePeak - balance > MaxDrowDown)
                 {
