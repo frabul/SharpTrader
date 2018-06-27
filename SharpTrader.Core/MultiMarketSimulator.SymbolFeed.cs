@@ -386,7 +386,7 @@ namespace SharpTrader
                 BaseTimeframe = newCandle.CloseTime - newCandle.OpenTime;
 
                 var previousTime = newCandle.OpenTime;
-                Volume24H += newCandle.Volume;
+                //Volume24H += newCandle.Volume;
                 //let's calculate the volume
                 //if (Ticks.Count > 0)
                 //{

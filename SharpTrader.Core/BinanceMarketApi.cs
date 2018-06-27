@@ -1038,18 +1038,19 @@ namespace SharpTrader
 
                 if (msg.Kline.IsBarFinal && TicksInitialized)
                 {
-
                     var candle = new Candlestick()
                     {
                         Close = (double)msg.Kline.Close,
                         High = (double)msg.Kline.High,
-                        CloseTime = msg.Kline.EndTime.AddMilliseconds(1),
-                        OpenTime = msg.Kline.EndTime,
+                        CloseTime = msg.Kline.StartTime.AddSeconds(60),
+                        OpenTime = msg.Kline.StartTime,
                         Low = (double)msg.Kline.Low,
                         Open = (double)msg.Kline.Open,
-                        Volume = (double)msg.Kline.Volume
+                        Volume = (double)msg.Kline.QuoteVolume
                     };
+
                     BaseTimeframe = candle.CloseTime - candle.OpenTime;
+
                     lock (Locker)
                     {
                         Ticks.AddRecord(candle);
