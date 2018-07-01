@@ -25,17 +25,17 @@ namespace SharpTrader.Utils
 
 
 
-        public BinanceDataDownloader(string dataDir)
+        public BinanceDataDownloader(string dataDir, double rateLimitFactor = 0.6f)
         {
             DataDir = dataDir;
 
-            Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, });
+            Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
 
             HistoryDB = new HistoricalRateDataBase(DataDir);
         }
-        public BinanceDataDownloader(HistoricalRateDataBase db)
+        public BinanceDataDownloader(HistoricalRateDataBase db, double rateLimitFactor = 0.6f)
         {
-            Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, });
+            Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
             HistoryDB = db;
         }
 
