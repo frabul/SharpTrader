@@ -95,9 +95,8 @@ namespace SharpTrader.Utils
                     startTime = epoch;
 
                 //try to get the start time
-                var symbolHistory = HistoryDB.GetSymbolHistory(MarketName, symbol, TimeSpan.FromSeconds(60));
-
-
+                ISymbolHistory symbolHistory = HistoryDB.GetSymbolHistory(MarketName, symbol, TimeSpan.FromSeconds(60));
+                 
                 if (symbolHistory.Ticks.Count > 0)
                 {
                     if (startTime > symbolHistory.Ticks.FirstTickTime) //if startTime is after the first tick we are ready to go

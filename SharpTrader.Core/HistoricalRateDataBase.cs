@@ -78,49 +78,8 @@ namespace SharpTrader
         }
         public ISymbolHistory GetSymbolHistory(string market, string symbol, TimeSpan timeframe, DateTime startOfData)
         {
-            var fileName = GetFileName(market, symbol, timeframe);
-
-            SymbolHistoryRaw sdata = null;
-            lock (SymbolsDataLocker)
-            {
-                sdata = SymbolsData.FirstOrDefault(sd => sd.FileName == fileName);
-            }
-            if (sdata == null)
-            {
-                if (File.Exists(Path.Combine(BaseDirectory, fileName)))
-                {
-                    using (var fs = File.Open(Path.Combine(BaseDirectory, fileName), FileMode.Open))
-                        sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
-
-                }
-                else
-                {
-                    sdata = new SymbolHistoryRaw()
-                    {
-                        FileName = fileName,
-                        Market = market,
-                        Spread = 0,
-                        Symbol = symbol,
-                        Ticks = new List<Candlestick>(),
-                        Timeframe = timeframe,
-                    };
-                    //throw new Exception("History data not found");
-                }
-                lock (SymbolsDataLocker)
-                    SymbolsData.Add(sdata);
-            }
-            else
-            {
-                if (sdata.Ticks.Count > 0)
-                {
-                    var tf = sdata.Ticks.FirstOrDefault()?.Timeframe;
-                    if (tf != timeframe)
-                        throw new InvalidOperationException("Bad timeframe for candle");
-                }
-            }
-
-
-            return new SymbolHistory(sdata, startOfData);
+            var rawHist = GetHistoryRaw(market, symbol, timeframe); 
+            return new SymbolHistory(rawHist, startOfData);
         }
         public ISymbolHistory GetSymbolHistory(string market, string symbol, TimeSpan timeframe)
         {
@@ -141,10 +100,20 @@ namespace SharpTrader
                     //check if we have it on disk
                     if (File.Exists(Path.Combine(BaseDirectory, fileName)))
                     {
-                        using (var fs = File.Open(Path.Combine(BaseDirectory, fileName), FileMode.Open))
-                            sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
+                        try
+                        {
+                            using (var fs = File.Open(Path.Combine(BaseDirectory, fileName), FileMode.Open))
+                                sdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
+                            if (sdata.FileName == null)
+                                sdata = null;
+                        }
+                        catch
+                        {
+                            sdata = null;
+                        }
+
                     }
-                    else
+                    if (sdata == null)
                     {
                         sdata = new SymbolHistoryRaw()
                         {
@@ -156,8 +125,8 @@ namespace SharpTrader
                             Timeframe = timeframe,
                         };
                     }
-
-                    SymbolsData.Add(sdata);
+                    lock (SymbolsDataLocker)
+                        SymbolsData.Add(sdata);
                 }
                 else
                 {
