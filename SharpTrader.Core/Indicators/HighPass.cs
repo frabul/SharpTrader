@@ -14,7 +14,7 @@ namespace SharpTrader.Indicators
         private double a;
         private double alpha1;
         private double b;
-        public double c;
+        private double c;
         private double alpha;
         public override bool IsReady => Filtered.Count > CutoffPeriod + 3;
 
