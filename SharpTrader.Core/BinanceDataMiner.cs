@@ -96,7 +96,7 @@ namespace SharpTrader.Utils
 
                 //try to get the start time
                 ISymbolHistory symbolHistory = HistoryDB.GetSymbolHistory(MarketName, symbol, TimeSpan.FromSeconds(60));
-                 
+
                 if (symbolHistory.Ticks.Count > 0)
                 {
                     if (startTime > symbolHistory.Ticks.FirstTickTime) //if startTime is after the first tick we are ready to go
@@ -110,7 +110,7 @@ namespace SharpTrader.Utils
                                 Symbol = symbol,
                                 StartTime = startTime,
                                 Interval = KlineInterval.OneMinute,
-                                EndTime = DateTime.MaxValue,
+                                EndTime = startTime.AddYears(3),
                                 Limit = 10
                             })).FirstOrDefault();
 
@@ -120,31 +120,53 @@ namespace SharpTrader.Utils
                     }
                 }
 
-                while (AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime)
+                bool noMoreData = false;
+                int zeroCount = 0;
+                while (!noMoreData && ( AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime))
                 {
                     //Console.WriteLine($"Downloading history for {symbol} - {startTime}");
-
-                    var candles = await Client.GetKlinesCandlesticks(new GetKlinesCandlesticksRequest
+                    try
                     {
-                        Symbol = symbol,
-                        StartTime = startTime,
-                        Interval = KlineInterval.OneMinute,
-                        EndTime = DateTime.MaxValue
-                    });
-
-                    var batch = candles.Select(
-                        c => new SharpTrader.Candlestick()
+                        var candles = await Client.GetKlinesCandlesticks(new GetKlinesCandlesticksRequest
                         {
-                            Open = (double)c.Open,
-                            High = (double)c.High,
-                            Low = (double)c.Low,
-                            Close = (double)c.Close,
-                            OpenTime = c.OpenTime,
-                            CloseTime = c.OpenTime.AddSeconds(60), //+ c.CloseTime.AddMilliseconds(1),
-                            Volume = (double)c.QuoteAssetVolume
-                        }).ToList();
+                            Symbol = symbol,
+                            StartTime = startTime,
+                            Interval = KlineInterval.OneMinute,
+                            EndTime = startTime.AddYears(3),
+                        });
 
-                    AllCandles.AddRange(batch);
+                        var batch = candles.Select(
+                            c => new SharpTrader.Candlestick()
+                            {
+                                Open = (double)c.Open,
+                                High = (double)c.High,
+                                Low = (double)c.Low,
+                                Close = (double)c.Close,
+                                OpenTime = c.OpenTime,
+                                CloseTime = c.OpenTime.AddSeconds(60), //+ c.CloseTime.AddMilliseconds(1),
+                                Volume = (double)c.QuoteAssetVolume
+                            }).ToList();
+                         
+                        AllCandles.AddRange(batch);
+
+                        //if we get no data for more than 3 requests then we can assume that there isn't any more data
+                        if (batch.Count < 1)
+                            zeroCount++;
+                        else
+                            zeroCount = 0;
+                        if (zeroCount > 3)
+                            noMoreData = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        var msg = $"Exception during {symbol} history download: ";
+                        if (ex is BinanceException binException)
+                            msg += binException.ErrorDetails;
+                        else
+                            msg += ex.Message;
+                        Console.WriteLine(msg);
+                        await Task.Delay(5000);
+                    }
                     if (AllCandles.Count > 1)
                         startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime - TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
                 }
@@ -156,7 +178,7 @@ namespace SharpTrader.Utils
             }
             catch (Exception ex)
             {
-                var msg = $"Exception during {symbol} history download: ";
+                var msg = $"Fatal Exception during {symbol} history download: ";
                 if (ex is BinanceException binException)
                     msg += binException.ErrorDetails;
                 else
