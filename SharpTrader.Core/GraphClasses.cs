@@ -44,9 +44,7 @@ namespace SharpTrader
                 }
             }
 
-            //if it is sell trade add lines from the last not signaled trades to this 
-
-
+            //if it is sell trade add lines from the last not signaled trades to this  
         }
 
         public void PlotLine(List<(DateTime time, double value)> values, ColorARGB color, bool dedicatedAxis = false)
@@ -118,11 +116,11 @@ namespace SharpTrader
 
         public void PlotOperation(ITrade buy, ITrade sell)
         {
-            var start = new Point(buy.Time, (double)buy.Price);
-            var arrival = new Point(sell.Time, (double)sell.Price);
-            var color = arrival.Y * (1 - 0.002) > start.Y ?
-                new ColorARGB(255, 10, 10, 255) : new ColorARGB(255, 255, 10, 10);
-            this.Lines.Add(new Line() { Color = color, Points = new List<Point>() { start, arrival } });
+            var p1 = new Point(buy.Time, (double)buy.Price);
+            var p2 = new Point(sell.Time, (double)sell.Price);
+            var color = buy.Price < sell.Price ?
+                new ColorARGB(255, 10, 255, 10) : new ColorARGB(255, 255, 10, 90);
+            this.Lines.Add(new Line() { Color = color, Points = new List<Point>() { p1, p2 } });
         }
     }
 

@@ -206,18 +206,18 @@ namespace SharpTrader
                     var aBal = _Balances[feed.Asset];
                     if (trade.Type == TradeType.Buy)
                     {
-                        aBal.Free += Convert.ToDecimal(trade.Amount);
-                        qBal.Locked -= Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
+                        aBal.Free += trade.Amount - trade.Fee / trade.Price;
+                        qBal.Locked -= (trade.Amount * trade.Price);
                         Debug.Assert(qBal.Locked >= 0, "incoerent trade");
                     }
+
                     if (trade.Type == TradeType.Sell)
                     {
-                        qBal.Free += Convert.ToDecimal(trade.Amount * (decimal)trade.Price);
+                        qBal.Free += trade.Amount * trade.Price - trade.Fee;
                         aBal.Locked -= Convert.ToDecimal(trade.Amount);
                         Debug.Assert(_Balances[feed.Asset].Locked >= -0.0000000001m, "incoerent trade");
                     }
-                    qBal.Free -= Convert.ToDecimal(trade.Fee);
-
+                     
                     trade.Order.Status = OrderStatus.Filled;
                     trade.Order.Filled = trade.Amount;
                     this._Trades.Add(trade);
@@ -475,6 +475,9 @@ namespace SharpTrader
 
             public DateTime Time { get; private set; }
 
+            /// <summary>
+            /// Fee in quote asset
+            /// </summary>
             public decimal Fee { get; private set; }
 
             public string Market { get; private set; }

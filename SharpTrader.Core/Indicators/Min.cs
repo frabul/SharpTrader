@@ -9,32 +9,39 @@ namespace SharpTrader.Indicators
     public class Min<T> : Filter<T> where T : ITimeRecord
     {
         public int Period { get; }
-        //todo
-        public Min(TimeSerieNavigator<T> signal, Func<T, double> valueSelector)
+
+        public Min(TimeSerieNavigator<T> signal, Func<T, double> valueSelector, int period)
             : base("Min(serie)", signal, valueSelector)
         {
-
+            Period = period;
             CalculateAll();
         }
 
-        public override bool IsReady => throw new NotImplementedException();
+        public override bool IsReady => Filtered.Count >= Period;
 
         protected override double Calculate()
         {
-            var signalOut = GetSignalCursor() >= Period ? GetSignal(Period) : double.MaxValue;
-            var signalIn = GetSignal(0);
-            if (signalOut > Filtered.LastTick.Value) //we are losing a value 
-                return signalIn < Filtered.LastTick.Value ? signalIn : Filtered.LastTick.Value;
-            else if (signalIn < signalOut) //the minimum is going out of range, but signalIn is lower than min then signalIn IS the min
-                return signalIn;
+            var sout = GetSignalCursor() >= Period ? GetSignal(Period) : double.MaxValue;
+            var sin = GetSignal(0);
+
+            if (Filtered.Count < 1)
+                return sin;
+            else if (sout > Filtered.LastTick.Value)
+                //if the sample that's going out of range is NOT the current min then we only need to check if the new sample is lower than current min
+                return sin < Filtered.LastTick.Value ? sin : Filtered.LastTick.Value;
+            else if (sin < sout)
+                //the current minimum is going out of range, but signalIn is lower than min then signalIn IS the new min
+                return sin;
             else
             {
                 //min is going out of range so we need to search again
                 double min = double.MaxValue;
-                for (int i = 0; i < Period; i++)
+                var steps = Math.Min(GetSignalCursor() + 1, Period);
+                for (int i = 0; i < steps; i++)
                 {
-                    if (GetSignal(i) < min)
-                        min = GetSignal(i);
+                    var s = GetSignal(i);
+                    if (s < min)
+                        min = s;
                 }
                 return min;
             }
@@ -47,5 +54,5 @@ namespace SharpTrader.Indicators
         }
     }
 
-   
+
 }

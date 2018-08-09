@@ -15,11 +15,11 @@ namespace SharpTrader
         public async Task Start(bool backtesting)
         {
             BackTesting = backtesting;
-            await OnStart();
+            await OnStartAsync();
             Started = true;
         }
 
-        public abstract Task OnStart();
+        public abstract Task OnStartAsync();
         public abstract Task OnTick();
     }
 
