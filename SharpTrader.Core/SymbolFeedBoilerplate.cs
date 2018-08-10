@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-    abstract class SymbolFeedBoilerplate
+    public abstract class SymbolFeedBoilerplate
     {
         public event Action<ISymbolFeed> OnTick;
         private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);

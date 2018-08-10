@@ -13,7 +13,7 @@ namespace SharpTrader
     {
         public IEnumerable<ITrade> Trades => Markets.SelectMany(m => m.Trades);
 
-        class Market : IMarketApi
+        public class Market : IMarketApi
         {
             object LockObject = new object();
             //private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
@@ -27,8 +27,8 @@ namespace SharpTrader
             private Logger Logger;
 
             public string MarketName { get; private set; }
-            public double MakerFee { get; private set; } = 0.0015;
-            public double TakerFee { get; private set; } = 0.0025;
+            public double MakerFee { get; set; } = 0.0015;
+            public double TakerFee { get; set; } = 0.0025;
             public DateTime Time { get; internal set; }
             public event Action<IMarketApi, ITrade> OnNewTrade;
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
@@ -217,7 +217,7 @@ namespace SharpTrader
                         aBal.Locked -= Convert.ToDecimal(trade.Amount);
                         Debug.Assert(_Balances[feed.Asset].Locked >= -0.0000000001m, "incoerent trade");
                     }
-                     
+
                     trade.Order.Status = OrderStatus.Filled;
                     trade.Order.Filled = trade.Amount;
                     this._Trades.Add(trade);
@@ -225,7 +225,7 @@ namespace SharpTrader
                 }
             }
 
-            internal void AddNewCandle(SymbolFeed feed, Candlestick tick)
+            public void AddNewCandle(SymbolFeed feed, Candlestick tick)
             {
                 Time = tick.CloseTime;
                 feed.AddNewCandle(tick);
@@ -355,7 +355,7 @@ namespace SharpTrader
             return Markets.Sum(m => m.GetEquity(baseAsset).Result.Result);
         }
 
-        class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
+        public class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
         {
 
             private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
