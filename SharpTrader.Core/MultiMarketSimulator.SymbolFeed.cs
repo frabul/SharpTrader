@@ -74,9 +74,17 @@ namespace SharpTrader
                 var order = new Order(this.MarketName, symbol, Time, type, OrderType.Limit, amount, (double)rate, clientOrderId);
 
                 var res = RegisterOrder(order);
-                lock (LockObject)
-                    this.PendingOrders.Add(order);
-                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
+                if (res.result)
+                {
+                    lock (LockObject)
+                        this.PendingOrders.Add(order);
+                    return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
+                }
+                else
+                {
+                    return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null) { ErrorInfo = res.error };
+                }
+
 
             }
 
