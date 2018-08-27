@@ -79,12 +79,12 @@ namespace SharpTrader
 
             var totalBal = Simulator.GetEquity(BaseAsset);
             var lostInFee = Simulator.Trades.Select(tr => tr.Fee).Sum();
-
+            var profit = totalBal - startingBal;
             var totalBuys = Simulator.Trades.Where(tr => tr.Type == TradeType.Buy).Count();
 
             Logger.Info($"Balance: {totalBal} - Trades:{Simulator.Trades.Count()} - Lost in fee:{lostInFee}");
             if (totalBuys > 0)
-                Logger.Info($"Profit/buy: {(totalBal - startingBal) / totalBuys:F8} - MaxDrawDown:{MaxDrowDown} - Max DD %:{MaxDrowDownPrc * 100}");
+                Logger.Info($"Profit/buy: {(totalBal - startingBal) / totalBuys:F8} - MaxDrawDown:{MaxDrowDown} - Profit/MDD:{profit / MaxDrowDown}");
 
             //foreach (var bot in theBots)
             //{

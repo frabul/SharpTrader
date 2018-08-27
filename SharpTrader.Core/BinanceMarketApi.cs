@@ -45,7 +45,7 @@ namespace SharpTrader
         private Stopwatch UserDataPingStopwatch = new Stopwatch();
 
         private HistoricalRateDataBase HistoryDb;
-        private BinanceClient Client;
+       
         private DisposableBinanceWebSocketClient WSClient;
         private ExchangeInfoResponse ExchangeInfo;
         private NLog.Logger Logger;
@@ -62,6 +62,7 @@ namespace SharpTrader
         private System.Timers.Timer TimerFastUpdates;
         private System.Timers.Timer TimerOrdersTradesSynch;
 
+        public BinanceClient Client { get; private set; }
         public string MarketName => "Binance";
 
         public DateTime Time => DateTime.UtcNow.Add(Client.TimestampOffset);
