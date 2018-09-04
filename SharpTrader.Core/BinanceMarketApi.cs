@@ -81,17 +81,7 @@ namespace SharpTrader
         }
 
         public IEnumerable<string> Symbols => ExchangeInfo.Symbols.Select(sym => sym.Symbol);
-
-        public IEnumerable<SymbolInfo> GetSymbols()
-        {
-            return ExchangeInfo.Symbols.Select(sym => new SymbolInfo
-            {
-                Asset = sym.BaseAsset,
-                QuoteAsset = sym.QuoteAsset,
-                Symbol = sym.Symbol,
-            });
-        }
-
+         
         public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb, bool resynchTradesAndOrders = false)
         {
             Logger = LogManager.GetLogger("BinanceMarketApi");
@@ -165,14 +155,7 @@ namespace SharpTrader
                 };
             Logger.Info("initialization complete");
         }
-
-        public void Dispose()
-        {
-            Trades = null;
-            Orders = null;
-            TradesAndOrdersDb.Dispose();
-        }
-
+         
         private async Task SynchAllOperations()
         {
             var symbols = ExchangeInfo.Symbols.Select(s => s.Symbol).ToArray();
@@ -291,6 +274,9 @@ namespace SharpTrader
 
         }
 
+        /// <summary>
+        /// Synchronizes all open orders
+        /// </summary> 
         private async Task SynchOpenOrders()
         {
             MarketOperation<object> oper = new MarketOperation<object>(MarketOperationStatus.Completed);
@@ -540,9 +526,41 @@ namespace SharpTrader
             }
         }
 
+        private (string symbol, long id) DeconstructId(string idString)
+        {
+            var match = IdRegex.Match(idString);
+            if (!match.Success)
+                throw new ArgumentException("Bad id");
+            var symbol = match.Groups[1].Value;
+            var id = int.Parse(match.Groups[2].Value);
+            return (symbol, id);
+        }
+
+        private static string GetExceptionErrorInfo(Exception ex)
+        {
+            if (ex is AggregateException ae)
+            {
+                string msg = "One or more errors: ";
+                foreach (var innerExc in ae.InnerExceptions)
+                {
+                    msg += "\n\t" + GetExceptionErrorInfo(innerExc).Replace("\n", "\n\t");
+                    //if (ex is BinanceException binanceExc)
+                    //    msg += binanceExc.ErrorDetails.ToString();
+                    //else
+                    //    msg += "\n\t" + e.Message;
+                }
+                return msg;
+            }
+            else if (ex is BinanceException binanceExc)
+            {
+                return binanceExc.ErrorDetails.ToString();
+            }
+            else
+                return ex.Message;
+        }
+
         public Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
         {
-
             try
             {
                 int tradeId = 0;
@@ -568,8 +586,7 @@ namespace SharpTrader
         }
 
         public Task<IMarketOperation<IEnumerable<ITrade>>> GetAllTradesAsync(string symbol)
-        {
-
+        { 
             var result = Trades.Find(tr => tr.Symbol == symbol).ToArray<ITrade>();
             return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(
                 new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result));
@@ -631,17 +648,7 @@ namespace SharpTrader
                     new MarketOperation<ITrade>(GetExceptionErrorInfo(ex)));
             }
         }
-
-        private (string symbol, long id) DeconstructId(string idString)
-        {
-            var match = IdRegex.Match(idString);
-            if (!match.Success)
-                throw new ArgumentException("Bad id");
-            var symbol = match.Groups[1].Value;
-            var id = int.Parse(match.Groups[2].Value);
-            return (symbol, id);
-        }
-
+         
         public decimal GetFreeBalance(string asset)
         {
             lock (LockBalances)
@@ -849,6 +856,16 @@ namespace SharpTrader
             throw new Exception($"Precision info not found for symbol {symbol}");
         }
 
+        public IEnumerable<SymbolInfo> GetSymbols()
+        {
+            return ExchangeInfo.Symbols.Select(sym => new SymbolInfo
+            {
+                Asset = sym.BaseAsset,
+                QuoteAsset = sym.QuoteAsset,
+                Symbol = sym.Symbol,
+            });
+        }
+
         public decimal GetMinNotional(string symbol)
         {
             var info = ExchangeInfo.Symbols.Where(s => s.Symbol == symbol).FirstOrDefault();
@@ -861,27 +878,11 @@ namespace SharpTrader
             return 0;
         }
 
-        private static string GetExceptionErrorInfo(Exception ex)
+        public void Dispose()
         {
-            if (ex is AggregateException ae)
-            {
-                string msg = "One or more errors: ";
-                foreach (var innerExc in ae.InnerExceptions)
-                {
-                    msg += "\n\t" + GetExceptionErrorInfo(innerExc).Replace("\n", "\n\t");
-                    //if (ex is BinanceException binanceExc)
-                    //    msg += binanceExc.ErrorDetails.ToString();
-                    //else
-                    //    msg += "\n\t" + e.Message;
-                }
-                return msg;
-            }
-            else if (ex is BinanceException binanceExc)
-            {
-                return binanceExc.ErrorDetails.ToString();
-            }
-            else
-                return ex.Message;
+            Trades = null;
+            Orders = null;
+            TradesAndOrdersDb.Dispose();
         }
 
         class MarketOperation<T> : IMarketOperation<T>
@@ -1072,7 +1073,7 @@ namespace SharpTrader
 
                     var historyToLoad = DateTime.UtcNow - historyStartTime;
                     //--- download latest data
-                    var refreshTime = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(6) : historyToLoad;
+                    var refreshTime = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(4) : historyToLoad;
                     var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
                     await downloader.DownloadHistoryAsync(Symbol, historyStartTime, refreshTime); //todo make async
 
