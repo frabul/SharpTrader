@@ -20,18 +20,15 @@ namespace SharpTrader
 
 
         public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>();
-
-
-
+        public bool Disposed { get; protected set; }
+         
         public class DerivedChart
         {
             public TimeSpan Timeframe;
             public TimeSerie<ICandlestick> Ticks;
             public Candlestick FormingCandle;
         }
-
-
-
+         
         public virtual Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
         {
 
@@ -101,7 +98,6 @@ namespace SharpTrader
             }
         }
 
-
         private DateTime GetOpenTime(DateTime mid, TimeSpan timeFrame)
         {
             long tfMs = (long)Math.Floor(timeFrame.TotalMilliseconds);
@@ -132,6 +128,11 @@ namespace SharpTrader
         protected void SignalTick()
         {
             onTickPending = true;
+        }
+
+        public virtual void Dispose()
+        {
+            Disposed = true;
         }
     }
 }

@@ -59,7 +59,7 @@ namespace SharpTrader
         decimal GetSymbolPrecision(string symbol);
 
         decimal GetMinNotional(string asset);
-
+        void DisposeFeed(ISymbolFeed feed);
     }
 
     public class SymbolInfo
@@ -81,6 +81,8 @@ namespace SharpTrader
         double Ask { get; }
         string Asset { get; }
         string QuoteAsset { get; }
+
+        bool Disposed { get; }
         /// <summary>
         /// Returns maker data history ( candlesticks ) with provided timeframe 
         /// </summary>  

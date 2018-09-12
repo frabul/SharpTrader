@@ -755,9 +755,23 @@ namespace SharpTrader
                 feed = new SymbolFeed(Client, HistoryDb, MarketName, symbol, symInfo.BaseAsset, symInfo.QuoteAsset);
                 await feed.Initialize();
                 lock (LockBalances)
-                    Feeds.Add(feed);
+                {
+                    Feeds.Add(feed); 
+                }
             }
             return feed;
+        }
+         
+        public void DisposeFeed(ISymbolFeed f)
+        {
+            lock (LockBalances)
+            {
+                if (f is SymbolFeed feed && Feeds.Contains(feed))
+                { 
+                    Feeds.Remove(feed);
+                    feed.Dispose();
+                }
+            }
         }
 
         public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
@@ -978,6 +992,7 @@ namespace SharpTrader
             public string Market { get; private set; }
             public double Spread { get; set; }
             public double Volume24H { get; private set; }
+
             TimeSpan HistoryDepth { get; set; }
 
             public SymbolFeed(BinanceClient client, HistoricalRateDataBase hist, string market, string symbol, string asset, string quoteAsset)
@@ -1059,7 +1074,6 @@ namespace SharpTrader
                 }
 
             }
-
             private void HandlePartialDepthUpdate(BinancePartialData messageData)
             {
                 PartialDepthWatchDog.Restart();
@@ -1074,12 +1088,6 @@ namespace SharpTrader
                 }
 
             }
-
-            public override async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
-            {
-                return await GetNavigatorAsync(timeframe, new DateTime(2016, 1, 1));
-            }
-
             private void HandleKlineEvent(BinanceKlineData msg)
             {
                 KlineWatchdog.Restart();
@@ -1109,6 +1117,10 @@ namespace SharpTrader
                 }
                 RaisePendingEvents(this);
             }
+            public override async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
+            {
+                return await GetNavigatorAsync(timeframe, new DateTime(2016, 1, 1));
+            }
 
             public override async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
             {
@@ -1134,6 +1146,20 @@ namespace SharpTrader
                     TicksInitialized = true;
                 }
                 return await base.GetNavigatorAsync(timeframe);
+            }
+
+            internal void Dispose()
+            {
+                HearthBeatTimer.Stop();
+                try
+                {
+                    WebSocketClient.CloseWebSocketInstance(KlineSocket);
+                    WebSocketClient.CloseWebSocketInstance(PartialDepthSocket);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Exeption during SymbolFeed.Dispose: " + ex.Message);
+                }
             }
         }
 
