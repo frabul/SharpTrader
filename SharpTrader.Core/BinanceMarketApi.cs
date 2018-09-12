@@ -39,13 +39,15 @@ namespace SharpTrader
         private Dictionary<string, ApiTrade> TradesPerSymbol = new Dictionary<string, ApiTrade>();
         private LiteCollection<ApiOrder> Orders;
         private LiteCollection<ApiTrade> Trades;
+        private LiteCollection<ApiOrder> OrdersArchive;
+        private LiteCollection<ApiTrade> TradesArchive;
         private List<ApiOrder> OrdersActive = new List<ApiOrder>();
 
         private Stopwatch StopwatchSocketClose = new Stopwatch();
         private Stopwatch UserDataPingStopwatch = new Stopwatch();
 
         private HistoricalRateDataBase HistoryDb;
-       
+
         private DisposableBinanceWebSocketClient WSClient;
         private ExchangeInfoResponse ExchangeInfo;
         private NLog.Logger Logger;
@@ -53,7 +55,7 @@ namespace SharpTrader
 
         private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
         private System.Timers.Timer TimerListenUserData;
-
+        private LiteDatabase TradesAndOrdersArch;
         private LiteDatabase TradesAndOrdersDb;
         private List<SymbolFeed> Feeds = new List<SymbolFeed>();
 
@@ -61,6 +63,7 @@ namespace SharpTrader
         private Regex IdRegex = new Regex("([A-Z]+)([0-9]+)", RegexOptions.Compiled);
         private System.Timers.Timer TimerFastUpdates;
         private System.Timers.Timer TimerOrdersTradesSynch;
+        private DateTime LastOperationsArchivingTime = DateTime.MinValue;
 
         public BinanceClient Client { get; private set; }
         public string MarketName => "Binance";
@@ -81,36 +84,20 @@ namespace SharpTrader
         }
 
         public IEnumerable<string> Symbols => ExchangeInfo.Symbols.Select(sym => sym.Symbol);
-         
+
         public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb, bool resynchTradesAndOrders = false)
         {
             Logger = LogManager.GetLogger("BinanceMarketApi");
             Logger.Info("starting initialization...");
             this.HistoryDb = historyDb;
 
-            var dbPath = Path.Combine("Data", "BinanceAccountsData", $"{ apiKey}_tnd.db");
-            if (!Directory.Exists(Path.GetDirectoryName(dbPath)))
-                Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
-            TradesAndOrdersDb = new LiteDatabase(dbPath);
-
-            Orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
-            Orders.EnsureIndex(o => o.Id, true);
-            Orders.EnsureIndex(o => o.Symbol);
-            Orders.EnsureIndex(o => o.Filled);
-            Orders.EnsureIndex(o => o.Status);
-
-            Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
-            Trades.EnsureIndex(o => o.Id, true);
-            Trades.EnsureIndex(o => o.Symbol);
-            Trades.EnsureIndex(o => o.OrderId);
-            Trades.EnsureIndex(o => o.TradeId);
+            InitializeOperationsDb(apiKey);
 
             Client = new BinanceClient(new ClientConfiguration()
             {
                 ApiKey = apiKey,
                 SecretKey = apiSecret,
             });
-
 
             ExchangeInfo = Client.GetExchangeInfo().Result;
             WSClient = new DisposableBinanceWebSocketClient(Client);
@@ -152,10 +139,67 @@ namespace SharpTrader
                 {
                     Thread.MemoryBarrier();
                     SynchOpenOrders().ContinueWith((t) => SynchLastTrades()).ContinueWith(t => TimerOrdersTradesSynch.Start());
+
+                    //we also want to move old trades and orders in the archive
+                    if (LastOperationsArchivingTime + TimeSpan.FromHours(24) > DateTime.Now)
+                    {
+                        List<ApiOrder> ordersToMove = Orders.Find(o => o.Time < Time - TimeSpan.FromDays(30)).ToList();
+                        List<ApiTrade> tradesToMove = new List<ApiTrade>();
+                        foreach (var order in ordersToMove)
+                        {
+                            tradesToMove.AddRange(Trades.Find(t => t.OrderId == order.OrderId && t.Symbol == order.Symbol));
+                        }
+                        foreach (var trade in tradesToMove)
+                        {
+                            Trades.Delete(trade.Id);
+                            TradesArchive.Upsert(trade);
+                        }
+                        foreach (var ord in ordersToMove)
+                        {
+                            Orders.Delete(ord.Id);
+                            OrdersArchive.Upsert(ord);
+                        }
+                        TradesAndOrdersDb.Shrink();
+                        LastOperationsArchivingTime = DateTime.Now;
+                    }
+
                 };
             Logger.Info("initialization complete");
         }
-         
+
+        private void InitializeOperationsDb(string apiKey)
+        {
+            var dbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
+            var archivePath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd_archive.db");
+            if (!Directory.Exists(Path.GetDirectoryName(dbPath)))
+                Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
+
+            //----
+            TradesAndOrdersArch = new LiteDatabase(archivePath);
+            TradesAndOrdersDb = new LiteDatabase(dbPath);
+            var dbs = new[] { TradesAndOrdersDb, TradesAndOrdersArch };
+            foreach (var db in dbs)
+            {
+                var orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
+                orders.EnsureIndex(o => o.Id, true);
+                orders.EnsureIndex(o => o.Symbol);
+                orders.EnsureIndex(o => o.Filled);
+                orders.EnsureIndex(o => o.Status);
+
+                var trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
+                trades.EnsureIndex(o => o.Id, true);
+                trades.EnsureIndex(o => o.Symbol);
+                trades.EnsureIndex(o => o.OrderId);
+                trades.EnsureIndex(o => o.TradeId);
+            }
+            //----
+            Orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
+            Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
+
+            OrdersArchive = TradesAndOrdersArch.GetCollection<ApiOrder>("Orders");
+            TradesArchive = TradesAndOrdersArch.GetCollection<ApiTrade>("Trades");
+        }
+
         private async Task SynchAllOperations()
         {
             var symbols = ExchangeInfo.Symbols.Select(s => s.Symbol).ToArray();
@@ -586,7 +630,7 @@ namespace SharpTrader
         }
 
         public Task<IMarketOperation<IEnumerable<ITrade>>> GetAllTradesAsync(string symbol)
-        { 
+        {
             var result = Trades.Find(tr => tr.Symbol == symbol).ToArray<ITrade>();
             return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(
                 new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result));
@@ -648,7 +692,7 @@ namespace SharpTrader
                     new MarketOperation<ITrade>(GetExceptionErrorInfo(ex)));
             }
         }
-         
+
         public decimal GetFreeBalance(string asset)
         {
             lock (LockBalances)
@@ -924,6 +968,7 @@ namespace SharpTrader
             private Stopwatch PartialDepthWatchDog = new Stopwatch();
             private System.Timers.Timer HearthBeatTimer;
             private bool TicksInitialized;
+            private DateTime LastHistoryShrink;
 
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
@@ -933,6 +978,7 @@ namespace SharpTrader
             public string Market { get; private set; }
             public double Spread { get; set; }
             public double Volume24H { get; private set; }
+            TimeSpan HistoryDepth { get; set; }
 
             public SymbolFeed(BinanceClient client, HistoricalRateDataBase hist, string market, string symbol, string asset, string quoteAsset)
             {
@@ -971,6 +1017,7 @@ namespace SharpTrader
                 {
                     KlineListen();
                 }
+
                 if (!PartialDepthWatchDog.IsRunning || PartialDepthWatchDog.ElapsedMilliseconds > 75000)
                 {
                     PartialDepthListen();
@@ -1063,8 +1110,7 @@ namespace SharpTrader
                 RaisePendingEvents(this);
             }
 
-
-            public async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
+            public override async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
             {
                 if (!TicksInitialized)
                 {

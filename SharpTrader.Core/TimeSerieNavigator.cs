@@ -199,7 +199,7 @@ namespace SharpTrader
 
     public class TimeRecordCollection<T> where T : ITimeRecord
     {
-        public event Action<TimeRecordCollection<T>, T> NewRecord;
+        public event Action<TimeRecordCollection<T>, T> NewRecord; 
         private List<T> Items;
         ReaderWriterLock Lock = new ReaderWriterLock();
 

@@ -65,7 +65,7 @@ namespace SharpTrader
             }
         }
 
-        public async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
+        public virtual async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
         {
             return await GetNavigatorAsync(timeframe);
         }
