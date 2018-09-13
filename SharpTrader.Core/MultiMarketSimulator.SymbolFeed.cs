@@ -356,6 +356,11 @@ namespace SharpTrader
             {
                 return SymbolsTable.Values;
             }
+
+            public void DisposeFeed(ISymbolFeed feed)
+            {
+                 
+            }
         }
 
         public decimal GetEquity(string baseAsset)

@@ -39,6 +39,7 @@ namespace SharpTrader
         private Dictionary<string, ApiTrade> TradesPerSymbol = new Dictionary<string, ApiTrade>();
         private LiteCollection<ApiOrder> Orders;
         private LiteCollection<ApiTrade> Trades;
+        private LiteCollection<BsonDocument> TradesRaw;
         private LiteCollection<ApiOrder> OrdersArchive;
         private LiteCollection<ApiTrade> TradesArchive;
         private List<ApiOrder> OrdersActive = new List<ApiOrder>();
@@ -64,6 +65,8 @@ namespace SharpTrader
         private System.Timers.Timer TimerFastUpdates;
         private System.Timers.Timer TimerOrdersTradesSynch;
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
+        private string OperationsDbPath;
+        private string OperationsArchivePath;
 
         public BinanceClient Client { get; private set; }
         public string MarketName => "Binance";
@@ -90,8 +93,9 @@ namespace SharpTrader
             Logger = LogManager.GetLogger("BinanceMarketApi");
             Logger.Info("starting initialization...");
             this.HistoryDb = historyDb;
-
-            InitializeOperationsDb(apiKey);
+            OperationsDbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
+            OperationsArchivePath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd_archive.db");
+            InitializeOperationsDb();
 
             Client = new BinanceClient(new ClientConfiguration()
             {
@@ -103,11 +107,16 @@ namespace SharpTrader
             WSClient = new DisposableBinanceWebSocketClient(Client);
             this.ServerTimeSynch().Wait();
             Logger.Info("synch all operations");
+
+            ArchiveOldOperations();
+
             if (resynchTradesAndOrders)
                 SynchAllOperations().Wait();
             else
-                SynchOpenOrders().ContinueWith((t) => SynchLastTrades()).Wait();
-
+            {
+                SynchOpenOrders().Wait();
+                SynchLastTrades().Wait();
+            }
             Task.WaitAll(ListenUserData(), SynchBalance());
             TimerListenUserData = new System.Timers.Timer(30000)
             {
@@ -141,53 +150,75 @@ namespace SharpTrader
                     SynchOpenOrders().ContinueWith((t) => SynchLastTrades()).ContinueWith(t => TimerOrdersTradesSynch.Start());
 
                     //we also want to move old trades and orders in the archive
-                    if (LastOperationsArchivingTime + TimeSpan.FromHours(24) > DateTime.Now)
-                    {
-                        List<ApiOrder> ordersToMove = Orders.Find(o => o.Time < Time - TimeSpan.FromDays(30)).ToList();
-                        List<ApiTrade> tradesToMove = new List<ApiTrade>();
-                        foreach (var order in ordersToMove)
-                        {
-                            tradesToMove.AddRange(Trades.Find(t => t.OrderId == order.OrderId && t.Symbol == order.Symbol));
-                        }
-                        foreach (var trade in tradesToMove)
-                        {
-                            Trades.Delete(trade.Id);
-                            TradesArchive.Upsert(trade);
-                        }
-                        foreach (var ord in ordersToMove)
-                        {
-                            Orders.Delete(ord.Id);
-                            OrdersArchive.Upsert(ord);
-                        }
-                        TradesAndOrdersDb.Shrink();
-                        LastOperationsArchivingTime = DateTime.Now;
-                    }
+                    ArchiveOldOperations();
 
                 };
             Logger.Info("initialization complete");
         }
 
-        private void InitializeOperationsDb(string apiKey)
+        private void ArchiveOldOperations()
         {
-            var dbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
-            var archivePath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd_archive.db");
-            if (!Directory.Exists(Path.GetDirectoryName(dbPath)))
-                Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
+
+            if (LastOperationsArchivingTime + TimeSpan.FromHours(24) < DateTime.Now)
+                lock (LockOrdersTrades)
+                {
+
+                    List<ApiOrder> ordersToMove = Orders.Find(o => o.Time < Time - TimeSpan.FromDays(30)).ToList();
+                    List<ApiTrade> tradesToMove = new List<ApiTrade>();
+                    foreach (var order in ordersToMove)
+                    {
+                        tradesToMove.AddRange(Trades.Find(t => t.OrderId == order.OrderId && t.Symbol == order.Symbol).ToArray());
+                    }
+                    foreach (var trade in tradesToMove.ToArray())
+                    {
+                        Trades.Delete(tr => tr.Id == trade.Id);
+                        if (TradesArchive.FindById(trade.Id) != null)
+                            tradesToMove.Remove(trade);
+
+                    }
+
+                    foreach (var ord in ordersToMove.ToArray())
+                    {
+                        Orders.Delete(o => o.Id == ord.Id);
+                        if (OrdersArchive.FindById(ord.Id) != null)
+                            ordersToMove.Remove(ord);
+                    }
+
+
+                    TradesArchive.InsertBulk(tradesToMove);
+                    OrdersArchive.InsertBulk(ordersToMove);
+
+                    TradesAndOrdersDb.Shrink();
+                    LastOperationsArchivingTime = DateTime.Now;
+                    TradesAndOrdersDb.Dispose();
+                    TradesAndOrdersArch.Dispose();
+                    InitializeOperationsDb();
+                }
+        }
+
+        private void InitializeOperationsDb()
+        {
+
+            if (!Directory.Exists(Path.GetDirectoryName(OperationsDbPath)))
+                Directory.CreateDirectory(Path.GetDirectoryName(OperationsDbPath));
 
             //----
-            TradesAndOrdersArch = new LiteDatabase(archivePath);
-            TradesAndOrdersDb = new LiteDatabase(dbPath);
+            TradesAndOrdersArch = new LiteDatabase(OperationsArchivePath);
+            TradesAndOrdersDb = new LiteDatabase(OperationsDbPath);
+
             var dbs = new[] { TradesAndOrdersDb, TradesAndOrdersArch };
             foreach (var db in dbs)
             {
-                var orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
+                var orders = db.GetCollection<ApiOrder>("Orders");
                 orders.EnsureIndex(o => o.Id, true);
+                orders.EnsureIndex(o => o.OrderId);
                 orders.EnsureIndex(o => o.Symbol);
                 orders.EnsureIndex(o => o.Filled);
                 orders.EnsureIndex(o => o.Status);
 
-                var trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
+                var trades = db.GetCollection<ApiTrade>("Trades");
                 trades.EnsureIndex(o => o.Id, true);
+                trades.EnsureIndex(o => o.TradeId);
                 trades.EnsureIndex(o => o.Symbol);
                 trades.EnsureIndex(o => o.OrderId);
                 trades.EnsureIndex(o => o.TradeId);
@@ -195,6 +226,7 @@ namespace SharpTrader
             //----
             Orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
             Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
+            TradesRaw = TradesAndOrdersDb.GetCollection("Trades");
 
             OrdersArchive = TradesAndOrdersArch.GetCollection<ApiOrder>("Orders");
             TradesArchive = TradesAndOrdersArch.GetCollection<ApiTrade>("Trades");
@@ -395,11 +427,16 @@ namespace SharpTrader
                         var trades = resp.Select(tr => new ApiTrade(sym, tr));
                         foreach (var tr in trades)
                         {
-                            var order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
-                            if (order == null)
-                                order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder;
-                            tr.ClientOrderId = order.ClientId;
-                            TradesUpdateOrInsert(tr);
+                            lock (LockOrdersTrades)
+                            {
+                                var order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
+                                if (order == null)
+                                    order = OrdersArchive.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
+                                if (order == null)
+                                    order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder;
+                                tr.ClientOrderId = order.ClientId;
+                                TradesUpdateOrInsert(tr);
+                            }
                         }
                         //if has active orders we want it to continue updating when the active order becomes inactive
                         if (!hasActiveOrders)
@@ -554,20 +591,31 @@ namespace SharpTrader
 
         private void TradesUpdateOrInsert(ApiTrade newTrade)
         {
-            var tradeInDb = Trades.FindOne(t => t.Id == newTrade.Id);
-            if (newTrade.ClientOrderId == null || newTrade.ClientOrderId == "null")
+            lock (LockOrdersTrades)
             {
-                var order = Orders.FindOne(o => o.OrderId == newTrade.OrderId && o.Symbol == newTrade.Symbol);
-                newTrade.ClientOrderId = order?.ClientId;
-            }
+                var tradeInDb = Trades.FindOne(t => t.Id == newTrade.Id);
+                var tradeRaw = Trades.FindById(newTrade.Id);
+            
+                if (newTrade.ClientOrderId == null || newTrade.ClientOrderId == "null")
+                {
+                    var order = Orders.FindOne(o => o.OrderId == newTrade.OrderId && o.Symbol == newTrade.Symbol);
+                    newTrade.ClientOrderId = order?.ClientId;
+                }
 
-            if (tradeInDb != null)
-                Trades.Update(newTrade);
-            else
-            {
-                Trades.Insert(newTrade);
-                OnNewTrade?.Invoke(this, newTrade);
+                if (tradeInDb != null)
+                    Trades.Update(newTrade);
+                else if (TradesArchive.FindOne(tr => tr.Id == newTrade.Id) != null)
+                {
+
+                }
+                else
+                {
+                    Trades.Insert(newTrade);
+                    OnNewTrade?.Invoke(this, newTrade);
+                    Logger.Trace($"New trade {newTrade.Id}");
+                }
             }
+         
         }
 
         private (string symbol, long id) DeconstructId(string idString)
@@ -756,18 +804,18 @@ namespace SharpTrader
                 await feed.Initialize();
                 lock (LockBalances)
                 {
-                    Feeds.Add(feed); 
+                    Feeds.Add(feed);
                 }
             }
             return feed;
         }
-         
+
         public void DisposeFeed(ISymbolFeed f)
         {
             lock (LockBalances)
             {
                 if (f is SymbolFeed feed && Feeds.Contains(feed))
-                { 
+                {
                     Feeds.Remove(feed);
                     feed.Dispose();
                 }
@@ -941,6 +989,7 @@ namespace SharpTrader
             Trades = null;
             Orders = null;
             TradesAndOrdersDb.Dispose();
+            TradesAndOrdersArch.Dispose();
         }
 
         class MarketOperation<T> : IMarketOperation<T>
