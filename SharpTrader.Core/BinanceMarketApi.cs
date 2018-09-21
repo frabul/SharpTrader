@@ -88,7 +88,7 @@ namespace SharpTrader
 
         public IEnumerable<string> Symbols => ExchangeInfo.Symbols.Select(sym => sym.Symbol);
 
-        public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb, bool resynchTradesAndOrders = false)
+        public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb, bool resynchTradesAndOrders = false, double rateLimitFactor = 1)
         {
             Logger = LogManager.GetLogger("BinanceMarketApi");
             Logger.Info("starting initialization...");
@@ -101,6 +101,7 @@ namespace SharpTrader
             {
                 ApiKey = apiKey,
                 SecretKey = apiSecret,
+                RateLimitFactor = rateLimitFactor
             });
 
             ExchangeInfo = Client.GetExchangeInfo().Result;
@@ -595,7 +596,7 @@ namespace SharpTrader
             {
                 var tradeInDb = Trades.FindOne(t => t.Id == newTrade.Id);
                 var tradeRaw = Trades.FindById(newTrade.Id);
-            
+
                 if (newTrade.ClientOrderId == null || newTrade.ClientOrderId == "null")
                 {
                     var order = Orders.FindOne(o => o.OrderId == newTrade.OrderId && o.Symbol == newTrade.Symbol);
@@ -615,7 +616,7 @@ namespace SharpTrader
                     Logger.Trace($"New trade {newTrade.Id}");
                 }
             }
-         
+
         }
 
         private (string symbol, long id) DeconstructId(string idString)
