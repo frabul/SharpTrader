@@ -25,6 +25,7 @@ using System.Text.RegularExpressions;
 using NLog;
 
 using System.Timers;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace SharpTrader
 {
@@ -86,7 +87,6 @@ namespace SharpTrader
             }
         }
 
-        public IEnumerable<string> Symbols => ExchangeInfo.Symbols.Select(sym => sym.Symbol);
 
         public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb, bool resynchTradesAndOrders = false, double rateLimitFactor = 1)
         {
@@ -163,8 +163,8 @@ namespace SharpTrader
             if (LastOperationsArchivingTime + TimeSpan.FromHours(24) < DateTime.Now)
                 lock (LockOrdersTrades)
                 {
-
-                    List<ApiOrder> ordersToMove = Orders.Find(o => o.Time < Time - TimeSpan.FromDays(30)).ToList();
+                    TimeToArchive = Time - TimeSpan.FromDays(30);
+                    List<ApiOrder> ordersToMove = Orders.Find(o => o.Time < TimeToArchive).ToList();
                     List<ApiTrade> tradesToMove = new List<ApiTrade>();
                     foreach (var order in ordersToMove)
                     {
@@ -196,6 +196,9 @@ namespace SharpTrader
                     InitializeOperationsDb();
                 }
         }
+
+        private DateTime TimeToArchive;
+
 
         private void InitializeOperationsDb()
         {
@@ -558,15 +561,23 @@ namespace SharpTrader
         {
             lock (LockOrdersTrades)
             {
-                var ord = Orders.FindOne(o => o.Id == newOrder.Id);
-                if (ord != null)
+                if (newOrder.Time < TimeToArchive)
                 {
-                    ord.Update(newOrder);
-                    Orders.Update(newOrder);
+                    //the order is archived or we should archive it
+                    OrdersArchive.Upsert(newOrder);
                 }
                 else
                 {
-                    Orders.Insert(newOrder);
+                    var ord = Orders.FindOne(o => o.Id == newOrder.Id);
+                    if (ord != null)
+                    {
+                        ord.Update(newOrder);
+                        Orders.Update(newOrder);
+                    }
+                    else
+                    {
+                        Orders.Insert(newOrder);
+                    }
                 }
             }
         }
@@ -595,8 +606,6 @@ namespace SharpTrader
             lock (LockOrdersTrades)
             {
                 var tradeInDb = Trades.FindOne(t => t.Id == newTrade.Id);
-                var tradeRaw = Trades.FindById(newTrade.Id);
-
                 if (newTrade.ClientOrderId == null || newTrade.ClientOrderId == "null")
                 {
                     var order = Orders.FindOne(o => o.OrderId == newTrade.OrderId && o.Symbol == newTrade.Symbol);
@@ -752,11 +761,21 @@ namespace SharpTrader
             return 0;
         }
 
+
+
+        MemoryCache Cache = new MemoryCache(new MemoryCacheOptions());
         public async Task<IMarketOperation<decimal>> GetEquity(string asset)
         {
             try
             {
-                var allPrices = await Client.GetSymbolsPriceTicker();
+                List<SymbolPriceResponse> allPrices;
+                if (Cache.TryGetValue("allPrices", out object result))
+                    allPrices = result as List<SymbolPriceResponse>;
+                else
+                {
+                    allPrices = await Client.GetSymbolsPriceTicker();
+                    Cache.Set("allPrices", allPrices, DateTime.Now.AddSeconds(30));
+                }
                 lock (LockBalances)
                 {
                     decimal val = 0;
@@ -965,7 +984,7 @@ namespace SharpTrader
 
         public IEnumerable<SymbolInfo> GetSymbols()
         {
-            return ExchangeInfo.Symbols.Select(sym => new SymbolInfo
+            return ExchangeInfo.Symbols.Where(sym => sym.Status == "TRADING").Select(sym => new SymbolInfo
             {
                 Asset = sym.BaseAsset,
                 QuoteAsset = sym.QuoteAsset,
