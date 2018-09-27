@@ -99,8 +99,8 @@ namespace SharpTrader
 
             Client = new BinanceClient(new ClientConfiguration()
             {
-                ApiKey = apiKey,
-                SecretKey = apiSecret,
+                ApiKey = apiKey ?? "null",
+                SecretKey = apiSecret ?? "null",
                 RateLimitFactor = rateLimitFactor
             });
 
@@ -115,16 +115,37 @@ namespace SharpTrader
                 SynchAllOperations().Wait();
             else
             {
-                SynchOpenOrders().Wait();
-                SynchLastTrades().Wait();
+                if (apiKey != null)
+                {
+                    SynchOpenOrders().Wait();
+                    SynchLastTrades().Wait();
+                }
             }
-            Task.WaitAll(ListenUserData(), SynchBalance());
-            TimerListenUserData = new System.Timers.Timer(30000)
+            if (apiKey != null)
             {
-                AutoReset = false,
-                Enabled = true,
-            };
-            TimerListenUserData.Elapsed += (s, ea) => ListenUserData().ContinueWith(t => TimerListenUserData.Start());
+                Task.WaitAll(ListenUserData(), SynchBalance());
+                TimerListenUserData = new System.Timers.Timer(30000)
+                {
+                    AutoReset = false,
+                    Enabled = true,
+                };
+                TimerListenUserData.Elapsed += (s, ea) => ListenUserData().ContinueWith(t => TimerListenUserData.Start());
+                TimerOrdersTradesSynch = new System.Timers.Timer(60000)
+                {
+                    AutoReset = false,
+                    Enabled = true,
+                };
+                TimerOrdersTradesSynch.Elapsed +=
+                    (s, e) =>
+                    {
+                        Thread.MemoryBarrier();
+                        SynchOpenOrders().ContinueWith((t) => SynchLastTrades()).ContinueWith(t => TimerOrdersTradesSynch.Start());
+
+                        //we also want to move old trades and orders in the archive
+                        ArchiveOldOperations();
+
+                    };
+            }
 
             TimerFastUpdates = new System.Timers.Timer(10000)
             {
@@ -139,21 +160,7 @@ namespace SharpTrader
                         .ContinueWith(t => TimerFastUpdates.Start());
                 };
 
-            TimerOrdersTradesSynch = new System.Timers.Timer(60000)
-            {
-                AutoReset = false,
-                Enabled = true,
-            };
-            TimerOrdersTradesSynch.Elapsed +=
-                (s, e) =>
-                {
-                    Thread.MemoryBarrier();
-                    SynchOpenOrders().ContinueWith((t) => SynchLastTrades()).ContinueWith(t => TimerOrdersTradesSynch.Start());
 
-                    //we also want to move old trades and orders in the archive
-                    ArchiveOldOperations();
-
-                };
             Logger.Info("initialization complete");
         }
 
@@ -766,6 +773,7 @@ namespace SharpTrader
         MemoryCache Cache = new MemoryCache(new MemoryCacheOptions());
         public async Task<IMarketOperation<decimal>> GetEquity(string asset)
         {
+
             try
             {
                 List<SymbolPriceResponse> allPrices;
@@ -776,33 +784,48 @@ namespace SharpTrader
                     allPrices = await Client.GetSymbolsPriceTicker();
                     Cache.Set("allPrices", allPrices, DateTime.Now.AddSeconds(30));
                 }
-                lock (LockBalances)
+                if (asset == "ETH" || asset == "BNB" || asset == "BTC")
                 {
-                    decimal val = 0;
-                    foreach (var kv in _Balances)
+                    lock (LockBalances)
                     {
-                        if (kv.Key == asset)
-                            val += kv.Value.Total;
-                        else if (kv.Value.Total != 0)
+                        decimal val = 0;
+                        foreach (var kv in _Balances)
                         {
-                            var sym1 = (kv.Key + asset);
-                            var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == sym1);
-                            if (price1 != null)
+                            if (kv.Key == asset)
+                                val += kv.Value.Total;
+                            else if (kv.Value.Total != 0)
                             {
-                                val += ((decimal)price1.Price * kv.Value.Total);
-                            }
-                            else
-                            {
-                                var sym2 = asset + kv.Key;
-                                var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == sym2);
-                                if (price2 != null)
+                                var sym1 = (kv.Key + asset);
+                                var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == sym1);
+                                if (price1 != null)
                                 {
-                                    val += (kv.Value.Total / price2.Price);
+                                    val += ((decimal)price1.Price * kv.Value.Total);
+                                }
+                                else
+                                {
+                                    var sym2 = asset + kv.Key;
+                                    var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == sym2);
+                                    if (price2 != null)
+                                    {
+                                        val += (kv.Value.Total / price2.Price);
+                                    }
                                 }
                             }
                         }
+                        return new MarketOperation<decimal>(MarketOperationStatus.Completed, val);
                     }
-                    return new MarketOperation<decimal>(MarketOperationStatus.Completed, val);
+                }
+                else
+                {
+                    var btceq = await GetEquity("BTC");
+                    var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == asset);
+                    if (price1 != null && btceq.Status == MarketOperationStatus.Completed)
+                    {
+                        return new MarketOperation<decimal>(MarketOperationStatus.Completed, (decimal)price1.Price * btceq.Result);
+
+                    }
+                    else
+                        return new MarketOperation<decimal>("Unable to get the price of the symbol"); 
                 }
             }
             catch (Exception ex)
