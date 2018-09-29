@@ -130,6 +130,7 @@ namespace SharpTrader
                     Enabled = true,
                 };
                 TimerListenUserData.Elapsed += (s, ea) => ListenUserData().ContinueWith(t => TimerListenUserData.Start());
+                //----------
                 TimerOrdersTradesSynch = new System.Timers.Timer(60000)
                 {
                     AutoReset = false,
@@ -138,16 +139,17 @@ namespace SharpTrader
                 TimerOrdersTradesSynch.Elapsed +=
                     (s, e) =>
                     {
-                        Thread.MemoryBarrier();
-                        SynchOpenOrders().ContinueWith((t) => SynchLastTrades()).ContinueWith(t => TimerOrdersTradesSynch.Start());
-
-                        //we also want to move old trades and orders in the archive
-                        ArchiveOldOperations();
-
+                        //we first synch open orders
+                        //then last trades
+                        //then finally we restart the timer and archive operations
+                        SynchOpenOrders()
+                            .ContinueWith(
+                                t => SynchLastTrades()
+                                    .ContinueWith(t2 => { TimerOrdersTradesSynch.Start(); ArchiveOldOperations(); }));
                     };
             }
 
-            TimerFastUpdates = new System.Timers.Timer(10000)
+            TimerFastUpdates = new System.Timers.Timer(15000)
             {
                 AutoReset = false,
                 Enabled = true,
@@ -155,9 +157,9 @@ namespace SharpTrader
             TimerFastUpdates.Elapsed +=
                 (s, e) =>
                 {
+                    //first synch server time then balance then restart timer
                     ServerTimeSynch()
-                        .ContinueWith(t => SynchBalance())
-                        .ContinueWith(t => TimerFastUpdates.Start());
+                        .ContinueWith(t => SynchBalance().ContinueWith(t2 => TimerFastUpdates.Start())); 
                 };
 
 
@@ -818,14 +820,14 @@ namespace SharpTrader
                 else
                 {
                     var btceq = await GetEquity("BTC");
-                    var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == asset);
+                    var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == asset + "BTC");
+                    var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == "BTC" + asset);
                     if (price1 != null && btceq.Status == MarketOperationStatus.Completed)
-                    {
-                        return new MarketOperation<decimal>(MarketOperationStatus.Completed, (decimal)price1.Price * btceq.Result);
-
-                    }
+                        return new MarketOperation<decimal>(MarketOperationStatus.Completed, (decimal)price1.Price / btceq.Result);
+                    else if (price2 != null && btceq.Status == MarketOperationStatus.Completed)
+                        return new MarketOperation<decimal>(MarketOperationStatus.Completed, (decimal)price2.Price * btceq.Result);
                     else
-                        return new MarketOperation<decimal>("Unable to get the price of the symbol"); 
+                        return new MarketOperation<decimal>("Unable to get the price of the symbol");
                 }
             }
             catch (Exception ex)
