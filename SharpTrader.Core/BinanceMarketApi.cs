@@ -68,8 +68,10 @@ namespace SharpTrader
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
         private string OperationsDbPath;
         private string OperationsArchivePath;
+        private MemoryCache Cache = new MemoryCache(new MemoryCacheOptions());
 
         public BinanceClient Client { get; private set; }
+
         public string MarketName => "Binance";
 
         public DateTime Time => DateTime.UtcNow.Add(Client.TimestampOffset);
@@ -121,6 +123,7 @@ namespace SharpTrader
                     SynchLastTrades().Wait();
                 }
             }
+
             if (apiKey != null)
             {
                 Task.WaitAll(ListenUserData(), SynchBalance());
@@ -207,8 +210,7 @@ namespace SharpTrader
         }
 
         private DateTime TimeToArchive;
-
-
+         
         private void InitializeOperationsDb()
         {
 
@@ -769,10 +771,7 @@ namespace SharpTrader
             }
             return 0;
         }
-
-
-
-        MemoryCache Cache = new MemoryCache(new MemoryCacheOptions());
+          
         public async Task<IMarketOperation<decimal>> GetEquity(string asset)
         {
 
