@@ -159,7 +159,7 @@ namespace SharpTrader
                 {
                     //first synch server time then balance then restart timer
                     ServerTimeSynch()
-                        .ContinueWith(t => SynchBalance().ContinueWith(t2 => TimerFastUpdates.Start())); 
+                        .ContinueWith(t => SynchBalance().ContinueWith(t2 => TimerFastUpdates.Start()));
                 };
 
 
@@ -1071,13 +1071,13 @@ namespace SharpTrader
             private object Locker = new object();
             private Guid KlineSocket;
             private Guid PartialDepthSocket;
-
+            private DateTime LastSocketsPing = DateTime.MinValue;
             private Stopwatch KlineWatchdog = new Stopwatch();
             private Stopwatch PartialDepthWatchDog = new Stopwatch();
             private System.Timers.Timer HearthBeatTimer;
             private bool TicksInitialized;
             private DateTime LastHistoryShrink;
-
+            private DateTime LastPartialSocketWarning = DateTime.MinValue;
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
             public string QuoteAsset { get; private set; }
@@ -1124,12 +1124,43 @@ namespace SharpTrader
             {
                 if (!KlineWatchdog.IsRunning || KlineWatchdog.ElapsedMilliseconds > 75000)
                 {
+                    if (KlineWatchdog.ElapsedMilliseconds > 75000)
+                        Logger.Warn("Kline websock looked like frozen");
                     KlineListen();
                 }
 
-                if (!PartialDepthWatchDog.IsRunning || PartialDepthWatchDog.ElapsedMilliseconds > 75000)
+                //if (PartialDepthWatchDog.ElapsedMilliseconds > 20000 && (DateTime.Now - LastPartialSocketWarning).TotalSeconds > 20)
+                //{
+                //    LastPartialSocketWarning = DateTime.Now;
+                //    var book = Client.GetOrderBook(Symbol, false, 10).Result;
+                //    if (book.Asks.Any() && book.Bids.Any())
+                //    {
+                //        if (!book.Asks.First().Price.EpsilonEqual((decimal)Ask, 0.002) || !book.Bids.First().Price.EpsilonEqual((decimal)Bid, 0.002))
+                //            Logger.Warn("PartialDepthWatchDog websock looked like frozen");
+                //    }
+                //}
+
+                if (!PartialDepthWatchDog.IsRunning || PartialDepthWatchDog.ElapsedMilliseconds > 60000)
                 {
                     PartialDepthListen();
+                }
+                if (LastSocketsPing.AddMinutes(20) < DateTime.Now)
+                {
+
+                    if (!WebSocketClient.PingWebSocketInstance(KlineSocket))
+                    {
+                        KlineSocket = Guid.Empty;
+                        KlineListen();
+                    }
+
+
+                    if (!WebSocketClient.PingWebSocketInstance(PartialDepthSocket))
+                    {
+                        PartialDepthSocket = Guid.Empty;
+                        PartialDepthListen();
+                    }
+
+                    LastSocketsPing = DateTime.Now;
                 }
                 HearthBeatTimer.Start();
             }
@@ -1171,8 +1202,8 @@ namespace SharpTrader
             private void HandlePartialDepthUpdate(BinancePartialData messageData)
             {
                 PartialDepthWatchDog.Restart();
-                var bid = (double)messageData.Bids.FirstOrDefault().Price;
-                var ask = (double)messageData.Asks.FirstOrDefault().Price;
+                var bid = (double)messageData.Bids.FirstOrDefault(b => b.Quantity > 0).Price;
+                var ask = (double)messageData.Asks.FirstOrDefault(a => a.Quantity > 0).Price;
                 if (bid != 0 && ask != 0)
                 {
                     this.Bid = bid;

@@ -29,8 +29,8 @@ namespace SharpTrader
         {
             return Extensions.BaseUnixTime.AddSeconds(epoch);
         }
-
-
+        public static bool EpsilonEqual(this double x1, double x2, double epsilon) => Math.Abs((x1 - x2) / x1) < epsilon;
+        public static bool EpsilonEqual(this decimal x1, decimal x2, double epsilon) => Math.Abs((x1 - x2) / x1) < (decimal)epsilon;
     }
     public class CandlestickTimeComparer<Tc> : IComparer<Tc> where Tc : ICandlestick
     {
