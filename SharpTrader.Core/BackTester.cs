@@ -56,7 +56,7 @@ namespace SharpTrader
             {
                 if (raiseEvents)
                     foreach (var Bot in Bots)
-                        Bot.OnTick().Wait();
+                        Bot.OnTickAsync().Wait();
                 raiseEvents = StartTime <= Simulator.Time;
                 if (steps % 240 == 0 && raiseEvents)
                 {

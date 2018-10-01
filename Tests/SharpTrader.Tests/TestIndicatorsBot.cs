@@ -18,7 +18,8 @@ namespace SharpTrader
             Market = marketsManager.GetMarketApi("Binance");
         }
 
-        public override Task OnStart()
+    
+        public override Task OnStartAsync()
         {
             Feed = Market.GetSymbolFeedAsync("BCPTETH").Result;
             var feedNav = Feed.GetNavigatorAsync(TimeSpan.FromMinutes(15)).Result;
@@ -29,15 +30,11 @@ namespace SharpTrader
             return Task.CompletedTask;
         }
 
-        public override async Task OnTick()
+     
+
+        public override async Task OnTickAsync()
         {
-
-
-
-        
-  
-
-           
+         
         }
     }
 }

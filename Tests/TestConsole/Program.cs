@@ -13,12 +13,7 @@ namespace TestConsole
     {
         static void Main(string[] args)
         {
-            var histDb = new HistoricalRateDataBase(".\\Data\\");
-
-          
-
-            TestMarketSimulator tms = new TestMarketSimulator();
-            tms.Test();
+            TestCombinedWebSocketClient.Test();
         }
 
         public class test

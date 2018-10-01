@@ -16,7 +16,7 @@ namespace ChartDataMiner
             BinanceDataDownloader dm = new BinanceDataDownloader(".\\Data\\");
             dm.SynchSymbolsTable(".\\Data\\");
 
-            dm.DownloadSymbols(s => s.QuoteAsset == "ETH");
+            dm.DownloadSymbols(s => s.QuoteAsset == "ETH", TimeSpan.FromHours(6));
 
         }
 

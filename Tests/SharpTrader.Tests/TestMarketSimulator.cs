@@ -30,8 +30,8 @@ namespace SharpTrader
                 new TestIndicatorsBot(simulator)
             };
 
-            foreach (var bot in bots)
-                bot.Start();
+
+            Task.WaitAll(bots.Select(bot => bot.Start(true)).ToArray());
 
             var simStart = new DateTime(2017, 09, 10);
             var simEnd = new DateTime(2018, 06, 28);
@@ -69,7 +69,7 @@ namespace SharpTrader
 
             foreach (var bot in bots)
             {
-                var vm = TraderBotResultsPlotViewModel.RunWindow(bot);
+                var vm = TraderBotResultsPlotViewModel.RunWindow(bot.Drawer);
                 vm.UpdateChart();
             }
             Console.ReadLine();
