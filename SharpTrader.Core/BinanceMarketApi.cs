@@ -1084,7 +1084,7 @@ namespace SharpTrader
             private bool TicksInitialized;
             private DateTime LastHistoryShrink;
             private DateTime LastPartialSocketWarning = DateTime.MinValue;
-            private BinanceKline LastKnownCandle;
+            private BinanceKline LastKnownCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
 
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
@@ -1177,54 +1177,57 @@ namespace SharpTrader
             private void HandleKlineEvent(BinanceKlineData msg)
             {
                 //if we skipped last candle final tick we need to recover
-                lock (Locker)
+                if (TicksInitialized)
                 {
-                    if (msg.Kline.StartTime > LastKnownCandle.StartTime && Ticks.LastTick.OpenTime < LastKnownCandle.StartTime)
-                    {
-                        //if this tick is a new candle and the last candle was not added to ticks
-                        //then let's add it
-                        var candle = new Candlestick()
-                        {
-                            Close = (double)LastKnownCandle.Close,
-                            High = (double)LastKnownCandle.High,
-                            CloseTime = LastKnownCandle.StartTime.AddSeconds(60),
-                            OpenTime = LastKnownCandle.StartTime,
-                            Low = (double)LastKnownCandle.Low,
-                            Open = (double)LastKnownCandle.Open,
-                            Volume = (double)LastKnownCandle.QuoteVolume
-                        };
-
-                        Ticks.AddRecord(candle);
-                        UpdateDerivedCharts(candle);
-                        SignalTick();
-                    }
-                }
-
-                if (msg.Kline.IsBarFinal && TicksInitialized)
-                {
-                    var candle = new Candlestick()
-                    {
-                        Close = (double)msg.Kline.Close,
-                        High = (double)msg.Kline.High,
-                        CloseTime = msg.Kline.StartTime.AddSeconds(60),
-                        OpenTime = msg.Kline.StartTime,
-                        Low = (double)msg.Kline.Low,
-                        Open = (double)msg.Kline.Open,
-                        Volume = (double)msg.Kline.QuoteVolume
-                    };
                     lock (Locker)
                     {
-                        if (Ticks.LastTick.OpenTime < candle.OpenTime)
+                        if (msg.Kline.StartTime > LastKnownCandle.StartTime && Ticks.LastTick.OpenTime < LastKnownCandle.StartTime)
                         {
+                            //if this tick is a new candle and the last candle was not added to ticks
+                            //then let's add it
+                            var candle = new Candlestick()
+                            {
+                                Close = (double)LastKnownCandle.Close,
+                                High = (double)LastKnownCandle.High,
+                                CloseTime = LastKnownCandle.StartTime.AddSeconds(60),
+                                OpenTime = LastKnownCandle.StartTime,
+                                Low = (double)LastKnownCandle.Low,
+                                Open = (double)LastKnownCandle.Open,
+                                Volume = (double)LastKnownCandle.QuoteVolume
+                            };
 
                             Ticks.AddRecord(candle);
                             UpdateDerivedCharts(candle);
                             SignalTick();
                         }
                     }
+
+                    if (msg.Kline.IsBarFinal && TicksInitialized)
+                    {
+                        var candle = new Candlestick()
+                        {
+                            Close = (double)msg.Kline.Close,
+                            High = (double)msg.Kline.High,
+                            CloseTime = msg.Kline.StartTime.AddSeconds(60),
+                            OpenTime = msg.Kline.StartTime,
+                            Low = (double)msg.Kline.Low,
+                            Open = (double)msg.Kline.Open,
+                            Volume = (double)msg.Kline.QuoteVolume
+                        };
+                        lock (Locker)
+                        {
+                            if (Ticks.LastTick.OpenTime < candle.OpenTime)
+                            {
+
+                                Ticks.AddRecord(candle);
+                                UpdateDerivedCharts(candle);
+                                SignalTick();
+                            }
+                        }
+                    }
+                    LastKnownCandle = msg.Kline;
+                    RaisePendingEvents(this);
                 }
-                LastKnownCandle = msg.Kline;
-                RaisePendingEvents(this);
             }
 
             public override async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
