@@ -133,6 +133,7 @@ namespace SharpTrader
         public virtual void Dispose()
         {
             Disposed = true;
+            DerivedTicks = null;
         }
     }
 }

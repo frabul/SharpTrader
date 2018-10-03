@@ -44,6 +44,8 @@ namespace SharpTrader
         private LiteCollection<ApiTrade> TradesArchive;
         private List<ApiOrder> OrdersActive = new List<ApiOrder>();
 
+
+
         private Stopwatch StopwatchSocketClose = new Stopwatch();
         private Stopwatch UserDataPingStopwatch = new Stopwatch();
 
@@ -1076,16 +1078,15 @@ namespace SharpTrader
             private HistoricalRateDataBase HistoryDb;
             private object Locker = new object();
 
-
-            private DateTime LastSocketsPing = DateTime.MinValue;
-
-
-            private System.Timers.Timer HearthBeatTimer;
             private bool TicksInitialized;
-            private DateTime LastHistoryShrink;
-            private DateTime LastPartialSocketWarning = DateTime.MinValue;
+            private System.Timers.Timer HearthBeatTimer;
+            private Stopwatch KlineWatchdog = new Stopwatch();
+            private Stopwatch DepthWatchdog = new Stopwatch();
+            private DateTime LastKlineWarn = DateTime.Now;
+            private DateTime LastDepthWarn = DateTime.Now;
             private BinanceKline LastKnownCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
 
+            private TimeSpan HistoryDepth { get; set; }
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
             public string QuoteAsset { get; private set; }
@@ -1094,8 +1095,6 @@ namespace SharpTrader
             public string Market { get; private set; }
             public double Spread { get; set; }
             public double Volume24H { get; private set; }
-
-            TimeSpan HistoryDepth { get; set; }
 
             public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, HistoricalRateDataBase hist, string market, string symbol, string asset, string quoteAsset)
             {
@@ -1128,11 +1127,31 @@ namespace SharpTrader
                     Interval = 2500,
                 };
                 HearthBeatTimer.Elapsed += HearthBeat;
-
+                HearthBeatTimer.Start();
+                DepthWatchdog.Restart();
+                KlineWatchdog.Restart();
             }
 
             private void HearthBeat(object state, ElapsedEventArgs args)
             {
+                if (KlineWatchdog.ElapsedMilliseconds > 75000)
+                {
+                    if (DateTime.Now > LastKlineWarn.AddSeconds(60))
+                    {
+                        Logger.Warn("Kline websock looked like frozen");
+                        LastKlineWarn = DateTime.Now;
+                    }
+                    KlineListen();
+                }
+                if (DepthWatchdog.ElapsedMilliseconds > 75000)
+                {
+                    if (DateTime.Now > LastDepthWarn.AddSeconds(60))
+                    {
+                        Logger.Warn("Depth websock looked like frozen");
+                        LastDepthWarn = DateTime.Now;
+                    }
+                    PartialDepthListen();
+                }
                 HearthBeatTimer.Start();
             }
 
@@ -1161,8 +1180,10 @@ namespace SharpTrader
                 }
 
             }
+
             private void HandlePartialDepthUpdate(BinancePartialData messageData)
             {
+                DepthWatchdog.Restart();
                 var bid = (double)messageData.Bids.FirstOrDefault(b => b.Quantity > 0).Price;
                 var ask = (double)messageData.Asks.FirstOrDefault(a => a.Quantity > 0).Price;
                 if (bid != 0 && ask != 0)
@@ -1204,6 +1225,7 @@ namespace SharpTrader
 
                     if (msg.Kline.IsBarFinal && TicksInitialized)
                     {
+                        KlineWatchdog.Restart();
                         var candle = new Candlestick()
                         {
                             Close = (double)msg.Kline.Close,
@@ -1264,6 +1286,7 @@ namespace SharpTrader
             public override void Dispose()
             {
                 HearthBeatTimer.Stop();
+                HearthBeatTimer.Dispose();
                 try
                 {
                     WebSocketClient.Unsubscribe<BinanceKlineData>(HandleKlineEvent);
@@ -1273,8 +1296,11 @@ namespace SharpTrader
                 {
                     Logger.Error("Exeption during SymbolFeed.Dispose: " + ex.Message);
                 }
+                Ticks = null;
+                
                 base.Dispose();
             }
+
         }
 
         class ApiOrder : IOrder
