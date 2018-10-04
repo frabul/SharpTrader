@@ -76,11 +76,13 @@ namespace SharpTrader
                 }
             }
         }
+
         public ISymbolHistory GetSymbolHistory(string market, string symbol, TimeSpan timeframe, DateTime startOfData)
         {
-            var rawHist = GetHistoryRaw(market, symbol, timeframe); 
+            var rawHist = GetHistoryRaw(market, symbol, timeframe);
             return new SymbolHistory(rawHist, startOfData);
         }
+
         public ISymbolHistory GetSymbolHistory(string market, string symbol, TimeSpan timeframe)
         {
             SymbolHistoryRaw sdata = GetHistoryRaw(market, symbol, timeframe);
@@ -141,6 +143,8 @@ namespace SharpTrader
             }
             return sdata;
         }
+
+
 
         public void AddCandlesticks(string market, string symbol, IEnumerable<ICandlestick> candles)
         {
@@ -217,6 +221,31 @@ namespace SharpTrader
             }
         }
 
+        public void CloseFile(string market, string symbol, TimeSpan timeframe)
+        {
+            lock (SymbolsDataLocker)
+            {
+                var fileName = GetFileName(market, symbol, timeframe);
+                var sdata = SymbolsData.FirstOrDefault(sd => sd.FileName == fileName);
+                lock (sdata.Locker)
+                    this.SymbolsData.Remove(sdata);
+            }
+        }
+
+        public void CloseAllFiles()
+        {
+            lock (SymbolsDataLocker)
+            {
+                foreach (var fi in SymbolsData.ToArray())
+                {
+                    lock (fi.Locker)
+                    {
+                        this.SymbolsData.Remove(fi);
+                    }
+                }
+            }
+        }
+
         private void Save(SymbolHistoryRaw sdata) => SaveProtobuf(sdata);
 
         private void SaveProtobuf(SymbolHistoryRaw data)
@@ -237,7 +266,6 @@ namespace SharpTrader
                     Serializer.Serialize<SymbolHistoryRaw>(fs, sdata);
             }
         }
-
 
         [ProtoContract]
         class SymbolHistoryRaw

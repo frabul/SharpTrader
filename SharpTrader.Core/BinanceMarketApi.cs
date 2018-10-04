@@ -1272,6 +1272,7 @@ namespace SharpTrader
 
                     //--- load the history into this 
                     ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
+                    HistoryDb.CloseFile(this.Market, Symbol, TimeSpan.FromSeconds(60));
                     symbolHistory.Ticks.SeekNearestAfter(DateTime.UtcNow - historyToLoad);
                     lock (Locker)
                     {
