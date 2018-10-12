@@ -111,14 +111,15 @@ namespace SharpTrader
             WSClient = new DisposableBinanceWebSocketClient(Client);
             CombinedWebSocketClient = new CombinedWebSocketClient();
             this.ServerTimeSynch().Wait();
-            Logger.Info("synch all operations");
-
+            Logger.Info("Archiving old oders...");
             ArchiveOldOperations();
+
 
             if (resynchTradesAndOrders)
                 SynchAllOperations().Wait();
             else
             {
+                Logger.Info("Synching oders and trades....");
                 if (apiKey != null)
                 {
                     SynchOpenOrders().Wait();
@@ -450,16 +451,19 @@ namespace SharpTrader
                         var trades = resp.Select(tr => new ApiTrade(sym, tr));
                         foreach (var tr in trades)
                         {
+                            ApiOrder order;
                             lock (LockOrdersTrades)
                             {
-                                var order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
+                                order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
                                 if (order == null)
-                                    order = OrdersArchive.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
-                                if (order == null)
-                                    order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder;
-                                tr.ClientOrderId = order.ClientId;
-                                TradesUpdateOrInsert(tr);
+                                    order = OrdersArchive.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol); 
                             }
+                            // put out of lokc to prevent deadlock
+                            if (order == null)
+                                order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder;
+                            tr.ClientOrderId = order.ClientId;
+                            lock (LockOrdersTrades)
+                                TradesUpdateOrInsert(tr);
                         }
                         //if has active orders we want it to continue updating when the active order becomes inactive
                         if (!hasActiveOrders)
@@ -1082,6 +1086,7 @@ namespace SharpTrader
             private System.Timers.Timer HearthBeatTimer;
             private Stopwatch KlineWatchdog = new Stopwatch();
             private Stopwatch DepthWatchdog = new Stopwatch();
+
             private DateTime LastKlineWarn = DateTime.Now;
             private DateTime LastDepthWarn = DateTime.Now;
             private BinanceKline LastKnownCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
@@ -1134,25 +1139,28 @@ namespace SharpTrader
 
             private void HearthBeat(object state, ElapsedEventArgs args)
             {
-                if (KlineWatchdog.ElapsedMilliseconds > 75000)
+                if (KlineWatchdog.ElapsedMilliseconds > 90000)
                 {
-                    if (DateTime.Now > LastKlineWarn.AddSeconds(60))
+                    if (DateTime.Now > LastKlineWarn.AddSeconds(90000))
                     {
                         Logger.Warn("Kline websock looked like frozen");
                         LastKlineWarn = DateTime.Now;
                     }
                     KlineListen();
                 }
-                if (DepthWatchdog.ElapsedMilliseconds > 75000)
+                if (DepthWatchdog.ElapsedMilliseconds > 90000)
                 {
-                    if (DateTime.Now > LastDepthWarn.AddSeconds(60))
+                    if (DateTime.Now > LastDepthWarn.AddSeconds(90000))
                     {
                         Logger.Warn("Depth websock looked like frozen");
                         LastDepthWarn = DateTime.Now;
                     }
                     PartialDepthListen();
                 }
+
                 HearthBeatTimer.Start();
+
+
             }
 
             private void KlineListen()
@@ -1160,6 +1168,7 @@ namespace SharpTrader
                 try
                 {
                     WebSocketClient.SubscribeKlineStream(this.Symbol.ToLower(), KlineInterval.OneMinute, HandleKlineEvent);
+
                 }
                 catch (Exception ex)
                 {
@@ -1298,7 +1307,7 @@ namespace SharpTrader
                     Logger.Error("Exeption during SymbolFeed.Dispose: " + ex.Message);
                 }
                 Ticks = null;
-                
+
                 base.Dispose();
             }
 
