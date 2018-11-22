@@ -783,6 +783,15 @@ namespace SharpTrader
             }
             return 0;
         }
+        public decimal GetTotalBalance(string asset)
+        {
+            lock (LockBalances)
+            {
+                if (_Balances.ContainsKey(asset))
+                    return _Balances[asset].Free + _Balances[asset].Locked;
+            }
+            return 0;
+        }
 
         public async Task<IMarketOperation<decimal>> GetEquity(string asset)
         {
