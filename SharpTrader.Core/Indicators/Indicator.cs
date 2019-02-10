@@ -62,6 +62,13 @@ namespace SharpTrader.Indicators
 
         protected double GetSignal(int ind) => Selector(Signal.GetFromCursor(ind));
 
+        protected FRecord GetSignalAndTime(int ind)
+        {
+            var rec = Signal.GetFromCursor(ind);
+            return new FRecord(rec.Time, Selector(rec));
+
+        }
+
         protected int GetSignalCursor()
         {
             return Signal.Position;

@@ -18,32 +18,38 @@ namespace SharpTrader.Indicators
 
         public override bool IsReady => Filtered.Count > Period;
 
+        /// <summary>
+        /// The record that generated the min 
+        /// </summary>
+        public FRecord Current { get; private set; }
+
         protected override double Calculate()
         {
-            var sin = GetSignal(0);
-            var sout = GetSignalCursor() >= Period ? GetSignal(Period) : double.MinValue;
+            var sout = GetSignalCursor() >= Period ? GetSignal(Period) : double.MaxValue;
+            var sin = GetSignalAndTime(0);
+
             if (Filtered.Count < 1)
-                return sin;
+                Current = sin;
             else if (sout < Filtered.LastTick.Value)
                 //if the sample that's going out of range is NOT the current max then we only need to check if the new sample is higher than current max
-                return sin > Filtered.LastTick.Value ? sin : Filtered.LastTick.Value;
-            else if (sin > sout)
+                Current = sin.Value > Filtered.LastTick.Value ? sin : Current;
+            else if (sin.Value > sout)
                 //the MAX is going out of range, but signalIn is higher than old max then signalIn IS the new MAX
-                return sin;
+                Current = sin;
             else
             {
                 //sample that was the old max is going out of range so we need to search again
-                double max = double.MinValue;
+                Current = new FRecord(default(DateTime), double.MinValue);
                 var steps = Math.Min(GetSignalCursor() + 1, Period);
                 for (int i = 0; i < steps; i++)
                 {
-                    var s = GetSignal(i);
-                    if (s > max)
-                        max = s;
+                    var rec = GetSignalAndTime(i);
+                    if (rec.Value > Current.Value)
+                        Current = rec;
                 }
-                return max;
-            }
 
+            }
+            return Current.Value;
         }
 
         protected override double CalculatePeek(double sample)
