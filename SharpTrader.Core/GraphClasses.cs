@@ -114,12 +114,17 @@ namespace SharpTrader
             };
         }
 
-        public void PlotOperation(ITrade buy, ITrade sell)
+        public void PlotOperation(ITrade buy, ITrade sell, bool isLong = true)
         {
             var p1 = new Point(buy.Time, (double)buy.Price);
             var p2 = new Point(sell.Time, (double)sell.Price);
-            var color = buy.Price < sell.Price ?
-                new ColorARGB(255, 10, 255, 10) : new ColorARGB(255, 255, 10, 90);
+            ColorARGB color;
+            if (isLong)
+                color = buy.Price < sell.Price ?
+                                new ColorARGB(255, 10, 255, 10) : ColorARGB.Blue ;
+            else
+                color = buy.Price < sell.Price ?
+                                ColorARGB.Blue : new ColorARGB(255, 10, 255, 10);
             this.Lines.Add(new Line() { Color = color, Points = new List<Point>() { p1, p2 } });
         }
     }
@@ -151,7 +156,12 @@ namespace SharpTrader
             G = g;
             B = b;
         }
+
+        public static ColorARGB Red => new ColorARGB(255, 255, 0, 0);
+        public static ColorARGB Green => new ColorARGB(255, 0, 255, 0);
+        public static ColorARGB Blue => new ColorARGB(255, 0, 0, 255);
     }
+
     public struct Point
     {
         public Point(DateTime x, double y) { X = x; Y = y; }

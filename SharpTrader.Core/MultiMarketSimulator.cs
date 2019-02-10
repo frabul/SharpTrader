@@ -20,13 +20,13 @@ namespace SharpTrader
 
         public IEnumerable<IMarketApi> Markets => _Markets;
         public DateTime Time { get; private set; }
-        public DateTime StartOfSimulation
+        public DateTime StartOfHistoryData
         {
             get => _startOfSimulation; set
             {
                 _startOfSimulation = value;
                 if (FirstTickTime == DateTime.MaxValue)
-                    this.Time = StartOfSimulation;
+                    this.Time = StartOfHistoryData;
                 foreach (var market in _Markets)
                     market.Time = this.Time;
             }
@@ -77,7 +77,7 @@ namespace SharpTrader
                         SymbolsData.TryGetValue(key, out var sdata);
                         if (sdata == null)
                         {
-                            sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60), StartOfSimulation);
+                            sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60), StartOfHistoryData);
                             SymbolsData.Add(key, sdata);
                         }
                         if (sdata.Ticks.Count > 0)

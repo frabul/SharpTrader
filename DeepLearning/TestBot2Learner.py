@@ -1,13 +1,14 @@
 import os
 import json
+import msvcrt as ms
 import numpy as np
 from random import shuffle
 import keras
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Conv2D, Conv3D, MaxPooling3D, MaxPooling2D
+from keras.layers import Conv2D, MaxPooling3D, MaxPooling2D
 from keras.callbacks import Callback
-import msvcrt as ms
+
 from enum import Enum, unique
 
 
@@ -68,14 +69,14 @@ def CheckKeyPress(comm):
         return False
     return False
 
-
+#-------------- class NBatchLogger ---------------
 class NBatchLogger(Callback):
     ''' display: Number of batches to wait before outputting loss '''
     def __init__(self, display=100):
         self.seen = 0
         self.display = display
 
-    def on_epoch_end(self, epoch, logs={}):
+    def on_epoch_end(self, epoch, logs ):
         self.seen += 1
         if self.seen % self.display == 0:
             if CheckKeyPress('stop'):
@@ -85,9 +86,9 @@ class NBatchLogger(Callback):
             for k, v in logs.items():
                 outStr += (str(k) + ": " + str(v) + "  ")
             print(outStr)
-            stats = PerformaceStats(model.predict(xTest), yTest, wonTest)
-            stats.print()
-
+            perfStats = PerformaceStats(model.predict(xTest), yTest, wonTest)
+            perfStats.print()
+#-------------- NBatchLogger END ---------------
 
 #-----------------------------------------------
 save_dir = "./"
