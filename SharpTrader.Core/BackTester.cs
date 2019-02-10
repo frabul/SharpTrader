@@ -38,7 +38,7 @@ namespace SharpTrader
         public void Start()
         {
             Logger = NLog.LogManager.GetLogger("BackTester");
-            Simulator.StartOfSimulation = StartTime - TimeSpan.FromDays(10);
+            Simulator.StartOfHistoryData = StartTime - TimeSpan.FromDays(10);
             if (Started)
                 return;
             Started = true;
@@ -51,9 +51,11 @@ namespace SharpTrader
             decimal BalancePeak = 0;
 
 
-            var startingBal = Simulator.GetEquity(BaseAsset);
+            var startingBal = -1m;
             while (Simulator.NextTick(raiseEvents) && Simulator.Time < EndTime)
             {
+                if (startingBal < 0)
+                    startingBal = Simulator.GetEquity(BaseAsset);
                 if (raiseEvents)
                     foreach (var Bot in Bots)
                         Bot.OnTickAsync().Wait();
