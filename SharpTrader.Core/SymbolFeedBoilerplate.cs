@@ -21,14 +21,14 @@ namespace SharpTrader
 
         public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>();
         public bool Disposed { get; protected set; }
-         
+
         public class DerivedChart
         {
             public TimeSpan Timeframe;
             public TimeSerie<ICandlestick> Ticks;
             public Candlestick FormingCandle;
         }
-         
+
         public virtual Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
         {
 
@@ -72,18 +72,15 @@ namespace SharpTrader
             if (der.FormingCandle == null)
             {
                 //the open time should be a multiple of der.TimeFrame
-                var opeTime = GetOpenTime(newCandle.OpenTime, der.Timeframe);
-                if (der.Timeframe.Minutes != 0)
-                    Debug.Assert(opeTime.Minute % der.Timeframe.Minutes == 0);
+                var opeTime = GetOpenTime(newCandle.CloseTime, der.Timeframe);
+
                 der.FormingCandle = new Candlestick(opeTime, newCandle, der.Timeframe);
             }
             else if (der.FormingCandle.CloseTime <= newCandle.OpenTime)
             {
                 //old candle is ended, the new candle is already part of the next one
                 der.Ticks.AddRecord(der.FormingCandle);
-                var opeTime = GetOpenTime(newCandle.OpenTime, der.Timeframe);
-                if (der.Timeframe.Minutes != 0)
-                    Debug.Assert(opeTime.Minute % der.Timeframe.Minutes == 0);
+                var opeTime = GetOpenTime(newCandle.CloseTime, der.Timeframe); 
                 der.FormingCandle = new Candlestick(opeTime, newCandle, der.Timeframe);
             }
             else
@@ -97,14 +94,11 @@ namespace SharpTrader
                 }
             }
         }
-
-        private DateTime GetOpenTime(DateTime mid, TimeSpan timeFrame)
-        {
-            long tfMs = (long)Math.Floor(timeFrame.TotalMilliseconds);
-            long timeNowMs = mid.Ticks / 10000;
-            long resto = timeNowMs % tfMs;
-            var toAdd = resto > 0 ? tfMs - resto : 0;
-            return new DateTime((timeNowMs + toAdd) * 10000, mid.Kind);
+        DateTime BaseTime = new DateTime(1970, 1, 1);
+        private DateTime GetOpenTime(DateTime timeNow, TimeSpan timeFrame)
+        { 
+            long resto = (timeNow - BaseTime).Ticks % timeFrame.Ticks;
+            return new DateTime((timeNow.Ticks - resto), timeNow.Kind);
         }
 
         protected void UpdateDerivedCharts(ICandlestick newCandle)
