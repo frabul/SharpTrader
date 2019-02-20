@@ -38,6 +38,9 @@ namespace SharpTrader
         public void Start()
         {
             Logger = NLog.LogManager.GetLogger("BackTester");
+            Logger.Info($"Starting backtest {StartTime} - {EndTime}");
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
             Simulator.StartOfHistoryData = StartTime - TimeSpan.FromDays(10);
             if (Started)
                 return;
@@ -83,7 +86,8 @@ namespace SharpTrader
             var lostInFee = Simulator.Trades.Select(tr => tr.Fee).Sum();
             var profit = totalBal - startingBal;
             var totalBuys = Simulator.Trades.Where(tr => tr.Type == TradeType.Buy).Count();
-
+            sw.Stop();
+            Logger.Info($"Test terminated in {sw.ElapsedMilliseconds} ms.");
             Logger.Info($"Balance: {totalBal} - Trades:{Simulator.Trades.Count()} - Lost in fee:{lostInFee}");
             if (totalBuys > 0)
                 Logger.Info($"Profit/buy: {(totalBal - startingBal) / totalBuys:F8} - MaxDrawDown:{MaxDrowDown} - Profit/MDD:{profit / MaxDrowDown}");
