@@ -46,8 +46,7 @@ namespace SharpTrader
 
             //if it is sell trade add lines from the last not signaled trades to this  
         }
-
-        public void PlotLine(List<(DateTime time, double value)> values, ColorARGB color, bool dedicatedAxis = false)
+        public void PlotLine( IEnumerable<(DateTime time, double value)> values, ColorARGB color, bool dedicatedAxis = false)
         {
             var chartLine = new Line() { Color = color };
 
@@ -59,6 +58,7 @@ namespace SharpTrader
             foreach (var val in values)
                 chartLine.Points.Add(new Point(val.time, (double)val.value));
         }
+       
 
         public void PlotLine<T>(TimeSerieNavigator<T> timeSerie,
                                 ColorARGB color,
