@@ -118,14 +118,14 @@ namespace SharpTrader
                 _Cursor = Records.Count - 1;
                 return;
             }
-            if (date == Records[_Cursor].Time)
+            if (_Cursor > -1 && date == Records[_Cursor].Time)
                 return;
             int lowerLimit = 0;
             int higherLimit = Records.Count - 1;
             int midpoint = 0;
             while (lowerLimit <= higherLimit)
             {
-                midpoint = lowerLimit + (higherLimit - lowerLimit) / 2;
+                midpoint = (lowerLimit + higherLimit) / 2;
                 // vediamo se ctime stà tra il punto e quello dopo (visto che dobbiamo prendere il punt appena precedente al ctime)
                 if (date >= Records[midpoint].Time && date < Records[midpoint + 1].Time)
                 {
@@ -140,11 +140,19 @@ namespace SharpTrader
             Debug.Assert(_Cursor > -1);
         }
 
+        /// <summary>
+        /// Sets the cursor to the nearest tick before  or exacty at provided time.
+        /// If the provided time is higher or lower than the know prices range it will be set to the last tick or first tick
+        /// </summary> 
         public void SeekNearestBefore(int unixTime)
         {
             SeekNearestBefore(unixTime.ToDatetime());
         }
 
+        /// <summary>
+        /// Sets the cursor to the nearest tick after or exacty at provided time.
+        /// If the provided time is higher or lower than the know prices range it will be set to the last tick or first tick
+        /// </summary> 
         public void SeekNearestAfter(DateTime time)
         {
             var ind = Records.BinarySearch(time);
@@ -199,7 +207,7 @@ namespace SharpTrader
 
     public class TimeRecordCollection<T> where T : ITimeRecord
     {
-        public event Action<TimeRecordCollection<T>, T> NewRecord; 
+        public event Action<TimeRecordCollection<T>, T> NewRecord;
         private List<T> Items;
         ReaderWriterLock Lock = new ReaderWriterLock();
 

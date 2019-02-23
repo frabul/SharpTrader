@@ -77,7 +77,7 @@ namespace SharpTrader
             };
         }
 
-        internal void Merge(ICandlestick c)
+        public void Merge(ICandlestick c)
         {
             if (this.High < c.High)
                 this.High = c.High;

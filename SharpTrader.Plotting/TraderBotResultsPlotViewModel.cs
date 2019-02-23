@@ -252,9 +252,7 @@ namespace SharpTrader.Plotting
 
 
             foreach (var el in PlotViewModel.Series)
-            {
-                XYAxisSeries ser;
-
+            { 
                 if (el is LineSeries ls || el is DataPointSeries ps)
                 {
 

@@ -21,7 +21,10 @@ namespace SharpTrader
         public decimal FinalBalance { get; set; }
         public decimal MaxDrowDown { get; private set; }
         public decimal MaxDrowDownPrc { get; private set; }
-
+        /// <summary>
+        /// How much history should be loaded back from the simulation start time
+        /// </summary>
+        public TimeSpan HistoryLookBack { get; private set; } = TimeSpan.FromDays(10);
         NLog.Logger Logger { get; set; }
 
         public BackTester(MultiMarketSimulator simulator, TraderBot bot)
@@ -41,7 +44,7 @@ namespace SharpTrader
             Logger.Info($"Starting backtest {StartTime} - {EndTime}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            Simulator.StartOfHistoryData = StartTime - TimeSpan.FromDays(10);
+            Simulator.StartOfHistoryData = StartTime - HistoryLookBack;
             if (Started)
                 return;
             Started = true;
