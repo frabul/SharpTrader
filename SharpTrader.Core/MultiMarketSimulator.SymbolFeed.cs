@@ -194,7 +194,7 @@ namespace SharpTrader
                                     price: (double)order.Price,
                                     amount: order.Amount,
                                     type: order.TradeType,
-                                    fee: order.Amount * ((decimal)this.MakerFee * order.Price),
+                                    fee: order.Amount * (decimal)this.MakerFee * order.Price,
                                     order: order
                                 );
                                 RegisterTrade(feed, trade);
@@ -359,7 +359,7 @@ namespace SharpTrader
 
             public void DisposeFeed(ISymbolFeed feed)
             {
-                 
+
             }
         }
 
