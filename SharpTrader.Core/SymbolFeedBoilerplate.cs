@@ -80,7 +80,7 @@ namespace SharpTrader
             {
                 //old candle is ended, the new candle is already part of the next one
                 der.Ticks.AddRecord(der.FormingCandle);
-                var opeTime = GetOpenTime(newCandle.CloseTime, der.Timeframe); 
+                var opeTime = GetOpenTime(newCandle.CloseTime, der.Timeframe);
                 der.FormingCandle = new Candlestick(opeTime, newCandle, der.Timeframe);
             }
             else
@@ -96,7 +96,7 @@ namespace SharpTrader
         }
         DateTime BaseTime = new DateTime(1970, 1, 1);
         private DateTime GetOpenTime(DateTime timeNow, TimeSpan timeFrame)
-        { 
+        {
             long resto = (timeNow - BaseTime).Ticks % timeFrame.Ticks;
             return new DateTime((timeNow.Ticks - resto), timeNow.Kind);
         }
@@ -127,7 +127,18 @@ namespace SharpTrader
         public virtual void Dispose()
         {
             Disposed = true;
+            foreach (var dev in DerivedTicks)
+                dev.Ticks.Dispose();
+            Ticks.Dispose();
             DerivedTicks = null;
+            Ticks = null;
+        }
+
+        public void ShrinkHistory(int recordsCount)
+        {
+            this.Ticks.Shrink(recordsCount);
+            foreach (var nav in this.DerivedTicks)
+                nav.Ticks.Shrink(recordsCount);
         }
     }
 }

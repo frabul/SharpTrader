@@ -59,6 +59,7 @@ namespace SharpTrader
         decimal GetSymbolPrecision(string symbol);
 
         decimal GetMinNotional(string asset);
+        
         void DisposeFeed(ISymbolFeed feed);
     }
 
@@ -83,15 +84,22 @@ namespace SharpTrader
         string QuoteAsset { get; }
 
         bool Disposed { get; }
+        
         /// <summary>
         /// Returns maker data history ( candlesticks ) with provided timeframe 
         /// </summary>  
         Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe);
+        
         /// <summary>
         /// Returns maker data history ( candlesticks ) with provided timeframe 
         /// </summary>  
         Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime);
 
+        /// <summary>
+        /// Shrinks maket data history to reduce memory usage
+        /// </summary>
+        /// <param name="recordsCount">number of records to maintain</param>
+        void ShrinkHistory(int recordsCount);
     }
 
 

@@ -63,5 +63,10 @@ namespace SharpTrader
             this.PositionPop();
             return res;
         }
+
+        internal void Shrink(int recordsCount)
+        {
+            Records.Shrink(recordsCount); 
+        }
     }
 }

@@ -2,15 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-
-
-using System.Threading;
 using System.Diagnostics;
-using Newtonsoft.Json;
-
-using BinanceExchange.API;
 using BinanceExchange.API.Models.Response;
 using BinanceExchange.API.Client;
 using BinanceExchange.API.Enums;
@@ -22,8 +15,7 @@ using BinanceExchange.API.Models.Response.Error;
 using LiteDB;
 using System.IO;
 using System.Text.RegularExpressions;
-using NLog;
-
+using NLog; 
 using System.Timers;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -1314,12 +1306,11 @@ namespace SharpTrader
                 catch (Exception ex)
                 {
                     Logger.Error("Exeption during SymbolFeed.Dispose: " + ex.Message);
-                }
-                Ticks = null;
-
+                }  
                 base.Dispose();
             }
 
+         
         }
 
         class ApiOrder : IOrder

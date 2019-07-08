@@ -30,8 +30,6 @@ namespace SharpTrader.Indicators
             CalculateAll();
         }
 
-
-
         public TimeSerieNavigator<FRecord> GetNavigator() => new TimeSerieNavigator<FRecord>(Filtered);
 
         public FRecord this[int i] { get => Filtered.GetFromLast(i); }
@@ -42,6 +40,11 @@ namespace SharpTrader.Indicators
         {
             var nextFilter = CalculatePeek(nextSignalSample);
             return nextFilter;
+        }
+
+        public void Shrink(int shrinkSize)
+        {
+            Filtered.Shrink(shrinkSize);
         }
 
         protected void CalculateAll()
