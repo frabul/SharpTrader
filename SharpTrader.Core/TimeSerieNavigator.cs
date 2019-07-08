@@ -80,7 +80,7 @@ namespace SharpTrader
             {
                 int itemsRemoved = oldItemsCount - serie.Count;
                 Cursor = Cursor - itemsRemoved;
-                Debug.Assert(Cursor > -1 || Cursor == -itemsRemoved, "Cursor is meant to be >= 0 unless it was 0 ( - itemsRemoved now )");
+                Debug.Assert(Cursor > -1 || Cursor <= -itemsRemoved, "Cursor is meant to be >= 0 unless it was 0 ( - itemsRemoved now )");
                 if (Cursor < 0)
                     Cursor = 0;
             }
@@ -131,7 +131,7 @@ namespace SharpTrader
             Cursor = Records.Count - 1;
         }
 
-        
+
         /// <summary>
         /// Sets the cursor to the nearest tick before  or exacty at provided time.
         /// If the provided time is higher or lower than the know prices range it will be set to the last tick or first tick
