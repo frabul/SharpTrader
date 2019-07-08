@@ -60,18 +60,10 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
-    <Page Include="ResultsPlotWindow_LC.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="Themes\Generic.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Compile Include="ResultsPlotWindow_LC.xaml.cs">
-      <DependentUpon>ResultsPlotWindow_LC.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="ResultsPlotWindow_LC_ViewModel.cs" />
     <Compile Include="TraderBotResultsPlot.xaml.cs">
       <DependentUpon>TraderBotResultsPlot.xaml</DependentUpon>
     </Compile>
