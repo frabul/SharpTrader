@@ -27,8 +27,8 @@ namespace SharpTrader
             private Logger Logger;
 
             public string MarketName { get; private set; }
-            public double MakerFee { get; set; } = 0.0015;
-            public double TakerFee { get; set; } = 0.0025;
+            public double MakerFee { get; set; } = 0.00075;
+            public double TakerFee { get; set; } = 0.00075;
             public DateTime Time { get; internal set; }
             public event Action<IMarketApi, ITrade> OnNewTrade;
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;

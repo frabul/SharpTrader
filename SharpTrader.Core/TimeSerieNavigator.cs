@@ -12,64 +12,92 @@ namespace SharpTrader
     {
         DateTime Time { get; }
     }
-
-
-    public class TimeSerieNavigator<T> where T : ITimeRecord
+     
+    public class TimeSerieNavigator<T> : IDisposable where T : ITimeRecord  
     {
+        private object Locker = new object();
         public event Action<T> OnNewRecord;
 
         private int _Cursor = -1;
         private Stack<int> PositionSaveStack = new Stack<int>();
+        private bool disposed;
+
         protected TimeRecordCollection<T> Records { get; private set; }
 
         public int Count { get { return Records.Count; } }
 
-        public DateTime NextTickTime => _Cursor < Records.Count - 1 ?
-                                            Records[_Cursor + 1].Time : DateTime.MaxValue;
+        public DateTime NextTickTime => Cursor < Records.Count - 1 ?
+                                            Records[Cursor + 1].Time : DateTime.MaxValue;
 
-        public DateTime PreviousTickTime => _Cursor > 0 ?
-                                            Records[_Cursor - 1].Time : DateTime.MinValue;
+        public DateTime PreviousTickTime => Cursor > 0 ?
+                                            Records[Cursor - 1].Time : DateTime.MinValue;
 
-        public DateTime Time => _Cursor > -1 ? Records[_Cursor].Time : DateTime.MinValue;
+        public DateTime Time => Cursor > -1 ? Records[Cursor].Time : DateTime.MinValue;
 
-        public int Position => _Cursor;
+        public int Position => Cursor;
 
-        public T Tick => Records[_Cursor];
-        public T NextTick => Records[_Cursor + 1];
-        public T PreviousTick => Records[_Cursor - 1];
+        public T Tick => Records[Cursor];
+        public T NextTick => Records[Cursor + 1];
+        public T PreviousTick => Records[Cursor - 1];
         public DateTime LastTickTime => Records[Records.Count - 1].Time;
         public DateTime FirstTickTime => Records[0].Time;
 
         public T LastTick => Records[Records.Count - 1];
 
-        public bool EndOfSerie => _Cursor >= Records.Count - 1;
+        public bool EndOfSerie => Cursor >= Records.Count - 1;
 
+        public int Cursor { get { lock (Locker) return _Cursor; } set { lock (Locker) _Cursor = value; } }
 
         public TimeSerieNavigator()
         {
             Records = new TimeRecordCollection<T>();
-            Records.NewRecord += (sender, rec) => OnNewRecord?.Invoke(rec);
+            Records.NewRecord += Records_NewRecord; ;
+            Records.OnShrink += OnRecordsShrunk;
         }
 
         public TimeSerieNavigator(TimeSerieNavigator<T> items)
         {
             Records = items.Records;
-            Records.NewRecord += (sender, rec) => OnNewRecord?.Invoke(rec);
+            Records.NewRecord += Records_NewRecord;
+            Records.OnShrink += OnRecordsShrunk;
         }
+
         public TimeSerieNavigator(IEnumerable<T> items)
         {
             Records = new TimeRecordCollection<T>(items);
-            Records.NewRecord += (sender, rec) => OnNewRecord?.Invoke(rec);
+            Records.NewRecord += Records_NewRecord;
+            Records.OnShrink += OnRecordsShrunk;
+        }
+
+        private void Records_NewRecord(TimeRecordCollection<T> sender, T rec)
+        {
+            OnNewRecord?.Invoke(rec);
+        }
+
+        private void OnRecordsShrunk(TimeRecordCollection<T> serie, int oldItemsCount)
+        {
+            lock (Locker)
+            {
+                int itemsRemoved = oldItemsCount - serie.Count;
+                Cursor = Cursor - itemsRemoved;
+                Debug.Assert(Cursor > -1 || Cursor == -itemsRemoved, "Cursor is meant to be >= 0 unless it was 0 ( - itemsRemoved now )");
+                if (Cursor < 0)
+                    Cursor = 0;
+            }
         }
 
         public T GetFromCursor(int ind)
         {
-            return Records[_Cursor - ind];
+            lock (Locker)
+                return Records[Cursor - ind];
         }
+
         public T GetFromLast(int ind)
         {
-            return Records[Records.Count - 1 - ind];
+            lock (Locker)
+                return Records[Records.Count - 1 - ind];
         }
+
         public bool TryGetRecord(DateTime time, out T record)
         {
 
@@ -89,17 +117,19 @@ namespace SharpTrader
 
         public void SeekFirst()
         {
-            if (Count < 1)
-                throw new InvalidOperationException("The serie has no elements.");
-            _Cursor = 0;
+            lock (Locker)
+            {
+                if (Count < 1)
+                    throw new InvalidOperationException("The serie has no elements.");
+                Cursor = 0;
+            }
+
         }
 
         public void SeekLast()
         {
-            _Cursor = Records.Count - 1;
+            Cursor = Records.Count - 1;
         }
-
-
 
         /// <summary>
         /// Sets the cursor to the nearest tick before  or exacty at provided time.
@@ -107,37 +137,40 @@ namespace SharpTrader
         /// </summary> 
         public void SeekNearestBefore(DateTime date)
         {
-            if (Records.Count < 1)
-                throw new Exception();
-            if (date < FirstTickTime)
+            lock (Locker)
             {
-                throw new Exception("Out of range");
-            }
-            if (date >= LastTickTime)
-            {
-                _Cursor = Records.Count - 1;
-                return;
-            }
-            if (date == Records[_Cursor].Time)
-                return;
-            int lowerLimit = 0;
-            int higherLimit = Records.Count - 1;
-            int midpoint = 0;
-            while (lowerLimit <= higherLimit)
-            {
-                midpoint = lowerLimit + (higherLimit - lowerLimit) / 2;
-                // vediamo se ctime stà tra il punto e quello dopo (visto che dobbiamo prendere il punt appena precedente al ctime)
-                if (date >= Records[midpoint].Time && date < Records[midpoint + 1].Time)
+                if (Records.Count < 1)
+                    throw new Exception();
+                if (date < FirstTickTime)
                 {
-                    _Cursor = midpoint;
+                    throw new Exception("Out of range");
+                }
+                if (date >= LastTickTime)
+                {
+                    Cursor = Records.Count - 1;
                     return;
                 }
-                else if (date < Records[midpoint].Time)
-                    higherLimit = midpoint - 1;
-                else
-                    lowerLimit = midpoint + 1;
+                if (date == Records[Cursor].Time)
+                    return;
+                int lowerLimit = 0;
+                int higherLimit = Records.Count - 1;
+                int midpoint = 0;
+                while (lowerLimit <= higherLimit)
+                {
+                    midpoint = lowerLimit + (higherLimit - lowerLimit) / 2;
+                    // vediamo se ctime stà tra il punto e quello dopo (visto che dobbiamo prendere il punt appena precedente al ctime)
+                    if (date >= Records[midpoint].Time && date < Records[midpoint + 1].Time)
+                    {
+                        Cursor = midpoint;
+                        return;
+                    }
+                    else if (date < Records[midpoint].Time)
+                        higherLimit = midpoint - 1;
+                    else
+                        lowerLimit = midpoint + 1;
+                }
+                Debug.Assert(Cursor > -1);
             }
-            Debug.Assert(_Cursor > -1);
         }
 
         public void SeekNearestBefore(int unixTime)
@@ -147,12 +180,15 @@ namespace SharpTrader
 
         public void SeekNearestAfter(DateTime time)
         {
-            var ind = Records.BinarySearch(time);
-            if (ind > -1)
-                _Cursor = ind;
-            else
-                _Cursor = ~ind;
-            Debug.Assert(_Cursor > -1);
+            lock (Locker)
+            {
+                var ind = Records.BinarySearch(time);
+                if (ind > -1)
+                    Cursor = ind;
+                else
+                    Cursor = ~ind;
+                Debug.Assert(Cursor > -1);
+            }
         }
 
         /// <summary>
@@ -160,11 +196,14 @@ namespace SharpTrader
         /// </summary>
         public bool Next()
         {
-            if (_Cursor == Records.Count - 1)
-                return false;
-            _Cursor++;
-            Debug.Assert(_Cursor > -1);
-            return true;
+            lock (Locker)
+            {
+                if (Cursor == Records.Count - 1)
+                    return false;
+                Cursor++;
+                Debug.Assert(Cursor > -1);
+                return true;
+            }
         }
 
         /// <summary>
@@ -173,21 +212,24 @@ namespace SharpTrader
         /// <returns></returns>
         public bool Previous()
         {
-            if (_Cursor < 1)
-                return false;
-            _Cursor--;
-            Debug.Assert(_Cursor > -1);
-            return true;
+            lock (Locker)
+            {
+                if (Cursor < 1)
+                    return false;
+                Cursor--;
+                Debug.Assert(Cursor > -1);
+                return true;
+            }
         }
 
         public void PositionPush()
         {
-            PositionSaveStack.Push(_Cursor);
+            PositionSaveStack.Push(Cursor);
         }
 
         public void PositionPop()
         {
-            _Cursor = PositionSaveStack.Pop();
+            Cursor = PositionSaveStack.Pop();
         }
 
         public Signal<T> ToSignal(Func<T, double> selector)
@@ -195,31 +237,60 @@ namespace SharpTrader
             return new Signal<T>(this, selector);
         }
 
+        // Public implementation of Dispose pattern callable by consumers.
+        public void Dispose()
+        {
+            lock (Locker)
+            {
+                Dispose(true);
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        // Protected implementation of Dispose pattern.
+        protected virtual void Dispose(bool disposing)
+        { 
+            if (disposed)
+                return;
+
+            if (disposing)
+            {
+                // Free managed objects 
+                if (Records != null)
+                {
+                    Records.OnShrink -= this.OnRecordsShrunk;
+                    Records.NewRecord -= Records_NewRecord;
+                }
+                Records = null;
+            }
+
+            disposed = true;
+        }
     }
 
     public class TimeRecordCollection<T> where T : ITimeRecord
     {
-        public event Action<TimeRecordCollection<T>, T> NewRecord; 
+        /// <summary>
+        /// Signals that a new record was added to the collection
+        /// </summary>
+        public event Action<TimeRecordCollection<T>, T> NewRecord;
+
+        /// <summary>
+        /// Signals that the collection was shrunk, second parameter indicates elements count before shrink
+        /// Warning: you should NOT use methods that read or write the collection to avoid a thread lock
+        /// </summary>
+        public event Action<TimeRecordCollection<T>, int> OnShrink;
+
         private List<T> Items;
-        ReaderWriterLock Lock = new ReaderWriterLock();
+        private ReaderWriterLock Lock = new ReaderWriterLock();
 
         public int Count => Items.Count;
 
+        public TimeRecordCollection() => Items = new List<T>();
 
-        public TimeRecordCollection()
-        {
-            Items = new List<T>();
-        }
+        public TimeRecordCollection(int capacity) => Items = new List<T>(capacity);
 
-        public TimeRecordCollection(int capacity)
-        {
-            Items = new List<T>(capacity);
-        }
-
-        public TimeRecordCollection(IEnumerable<T> items)
-        {
-            Items = items.ToList();
-        }
+        public TimeRecordCollection(IEnumerable<T> items) => Items = items.ToList();
 
         public T this[int index]
         {
@@ -333,5 +404,22 @@ namespace SharpTrader
 
             return ~lower;
         }
+
+        internal void Shrink(int recordsMax)
+        {
+            if (this.Count > recordsMax)
+            {
+                WriteOperation(() =>
+                {
+                    var old = Items;
+                    var oldCOunt = Items.Count;
+                    Items.RemoveRange(0, Items.Count - recordsMax);
+                    this.OnShrink?.Invoke(this, oldCOunt);
+                });
+
+            }
+        }
+
+
     }
 }

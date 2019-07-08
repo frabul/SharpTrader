@@ -133,7 +133,17 @@ namespace SharpTrader
         public virtual void Dispose()
         {
             Disposed = true;
+            foreach (var dev in DerivedTicks)
+                dev.Ticks.Dispose();
+            Ticks.Dispose();
             DerivedTicks = null;
+            Ticks = null;
         }
+
+        public void ShrinkHistory(int recordsCount)
+        {
+            foreach (var nav in this.DerivedTicks)
+                nav.Ticks.Shrink(recordsCount);
+            }
     }
 }

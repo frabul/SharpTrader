@@ -65,5 +65,6 @@ namespace SharpTrader.Indicators
             return value;
         }
 
+       
     }
 }
