@@ -46,7 +46,7 @@ namespace SharpTrader
                 _Markets[i++] = market;
             }
         }
-         
+
         public IMarketApi GetMarketApi(string marketName)
         {
             var market = Markets.Where(m => m.MarketName == marketName).FirstOrDefault();
@@ -63,7 +63,7 @@ namespace SharpTrader
                 raiseEvents = startTime <= this.Time;
             }
         }
-         
+
         public bool NextTick(bool raiseEvents)
         {
             if (FirstTickTime == DateTime.MaxValue)
@@ -77,9 +77,10 @@ namespace SharpTrader
                         SymbolsData.TryGetValue(key, out var sdata);
                         if (sdata == null)
                         {
-                            sdata = this.HistoryDb.GetSymbolHistory(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60), StartOfHistoryData);
+                            var histInfo = new HistoryInfo(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60));
+                            sdata = this.HistoryDb.GetSymbolHistory(histInfo, StartOfHistoryData);
                             SymbolsData.Add(key, sdata);
-                            this.HistoryDb.CloseFile(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60));
+                            this.HistoryDb.CloseFile(histInfo);
                         }
                         if (sdata.Ticks.Count > 0)
                             FirstTickTime = FirstTickTime > sdata.Ticks.FirstTickTime ? sdata.Ticks.FirstTickTime : FirstTickTime;

@@ -170,8 +170,10 @@ namespace SharpTrader.Utils
                 }
                 //---
                 HistoryDB.AddCandlesticks(MarketName, symbol, AllCandles);
-                HistoryDB.ValidateData(MarketName, symbol, TimeSpan.FromSeconds(60));
-                HistoryDB.Save(MarketName, symbol, AllCandles.First().Timeframe);
+                var histInfo = new HistoryInfo(MarketName, symbol, TimeSpan.FromSeconds(60));
+                HistoryDB.ValidateData(histInfo);
+                histInfo.timeframe = AllCandles.First().Timeframe;
+                HistoryDB.Save(histInfo);
                 Console.WriteLine($"{symbol} history downloaded");
             }
             catch (Exception ex)
