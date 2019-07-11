@@ -86,5 +86,22 @@ namespace SharpTrader
             this.Close = c.Close;
             this.Volume += c.Volume;
         }
+        public override bool Equals(object obj)
+        {
+            var c = obj as ICandlestick;
+            if (c == null)
+                return false;
+            var equal =
+                c.Close == this.Close &&
+                c.CloseTime == this.CloseTime &&
+                c.High == this.High &&
+                c.Low == this.Low &&
+                c.Open == this.Open &&
+                c.OpenTime == this.OpenTime &&
+                c.Time == this.Time &&
+                c.Timeframe == this.Timeframe &&
+                c.Volume == this.Volume;
+            return equal;
+        }
     }
 }

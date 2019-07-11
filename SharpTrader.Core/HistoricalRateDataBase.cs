@@ -44,7 +44,7 @@ namespace SharpTrader
 
         public string GetFileName()
         {
-            return $"{market}_{symbol}_{(int)timeframe.TotalMilliseconds}_{Date.ToString("yyyymm")}.bin";
+            return $"{market}_{symbol}_{(int)timeframe.TotalMilliseconds}_{Date.ToString("yyyyMM")}.bin";
         }
 
         public static HistoryFileInfo FromFileName(string fileName)
@@ -71,11 +71,12 @@ namespace SharpTrader
             var allFilesInDir = Directory.GetFiles(BaseDirectory, "*.bin");
             foreach (var file in allFilesInDir)
             {
-                Console.WriteLine($"Updating history file {file}");
                 var finfo = GetFileInfoV1(file);
                 if (finfo != null)
                 {
+                    Console.WriteLine($"Updating history file {file}");
                     bool ok = true;
+                    SymbolHistoryRaw shist = null;
                     using (var fs = File.Open(file, FileMode.Open))
                     {
                         try
@@ -91,18 +92,43 @@ namespace SharpTrader
                                 Timeframe = finfo.timeframe,
                                 StartOfData = DateTime.MinValue
                             };
+
                             SymbolsData.Add(history);
+                            shist = history;
                         }
-                        catch
+                        catch (Exception ex)
                         {
                             Console.WriteLine($"ERROR for file {file}");
                         }
                     }
 
-                    if (ok)
+                   
+                    if (shist != null)
                     {
                         Save(finfo);
-                        File.Delete(file);
+                        var shist2 = GetSymbolHistory(finfo);
+                        Debug.Assert(shist2.Ticks.Count == shist.Ticks.Count, "Hist count doesn't match");
+                        if (shist2.Ticks.Count != shist.Ticks.Count)
+                        {
+                            Console.WriteLine($"Hist count doesn't match for file conversion {file}");
+                            ok = false;
+                        }
+                        for(int i = 0; i < shist.Ticks.Count; i++)
+                        {
+                            shist2.Ticks.Next();
+                            if (!shist.Ticks[i].Equals(shist2.Ticks.Tick))
+                            {
+                                Console.WriteLine($"ERROR validation during conversion for file {file}");
+                                Debug.Assert(false, "Hist count doesn't match");
+                                ok = false;
+                            }
+
+                        }
+                        if (ok)
+                        {
+                            
+                            File.Delete(file);
+                        }
                     }
                 }
             }
@@ -171,7 +197,7 @@ namespace SharpTrader
             return new SymbolHistory(rawHist, startOfData);
         }
 
-        public ISymbolHistory GetSymbolHistory(HistoryFileInfo info)
+        public ISymbolHistory GetSymbolHistory(HistoryInfo info)
         {
             SymbolHistoryRaw sdata = GetHistoryRaw(info, DateTime.MinValue);
             return new SymbolHistory(sdata);
@@ -179,7 +205,7 @@ namespace SharpTrader
 
         private SymbolHistoryRaw GetHistoryRaw(HistoryInfo info, DateTime startOfData)
         {
-            startOfData = new DateTime(startOfData.Year, startOfData.Month, 0);
+            startOfData = new DateTime(startOfData.Year, startOfData.Month, 1);
             //check if we already have some records and load them  
             lock (SymbolsDataLocker)
             {
@@ -190,7 +216,7 @@ namespace SharpTrader
                     lock (history.Locker)
                     {
                         SymbolsData.Remove(history);
-                        startOfData = new DateTime(history.StartOfData.Year, history.StartOfData.Month, 0);
+                        startOfData = new DateTime(history.StartOfData.Year, history.StartOfData.Month, 1);
                     }
                     history = null;
                 }
@@ -211,13 +237,16 @@ namespace SharpTrader
                     try
                     {
                         var finfo = GetFileInfo(fileName);
-                        if (finfo.Date >= startOfData)
+                        if (finfo != null)
                         {
-                            using (var fs = File.Open(fileName, FileMode.Open))
+                            if (info.GetFileMask() == finfo?.GetFileMask() && finfo.Date >= startOfData)
                             {
-                                SymbolHistoryRaw fdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
-                                Debug.Assert(history.FileName != null);
-                                history.Ticks.AddRange(fdata.Ticks);
+                                using (var fs = File.Open(fileName, FileMode.Open))
+                                {
+                                    SymbolHistoryRaw fdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
+                                    Debug.Assert(history.FileName != null);
+                                    history.Ticks.AddRange(fdata.Ticks);
+                                }
                             }
                         }
                     }
@@ -300,14 +329,25 @@ namespace SharpTrader
 
         private HistoryFileInfo GetFileInfo(string fileName)
         {
-            fileName = Path.GetFileName(fileName);
-            string[] parts = fileName.Remove(fileName.Length - 4).Split('_');
-            var market = parts[0];
-            var symbol = parts[1];
-            var time = TimeSpan.FromMilliseconds(int.Parse(parts[2]));
-            var date = DateTime.ParseExact(parts[3], "yyyymm", CultureInfo.InvariantCulture);
-
-            return new HistoryFileInfo(market, symbol, time, date);
+            HistoryFileInfo ret = null;
+            try
+            {
+                fileName = Path.GetFileName(fileName);
+                string[] parts = fileName.Remove(fileName.Length - 4).Split('_');
+                if (parts.Length > 3)
+                {
+                    var market = parts[0];
+                    var symbol = parts[1];
+                    var time = TimeSpan.FromMilliseconds(int.Parse(parts[2]));
+                    var date = DateTime.ParseExact(parts[3], "yyyyMM", CultureInfo.InvariantCulture);
+                    ret = new HistoryFileInfo(market, symbol, time, date);
+                }
+            }
+            catch (Exception ex)
+            {
+                //Console.WriteLine($"Error while parsing file info for file {fileName}");
+            }
+            return ret;
         }
 
         public void SaveAll()
