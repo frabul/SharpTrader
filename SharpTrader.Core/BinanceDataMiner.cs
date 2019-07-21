@@ -21,7 +21,7 @@ namespace SharpTrader.Utils
         private BinanceClient Client;
         private HistoricalRateDataBase HistoryDB;
         private string DataDir;
-         
+        public int ConcurrencyCount { get; set; } = 10;
         public BinanceDataDownloader(string dataDir, double rateLimitFactor = 0.6f)
         {
             DataDir = dataDir;
@@ -29,7 +29,9 @@ namespace SharpTrader.Utils
             Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
 
             HistoryDB = new HistoricalRateDataBase(DataDir);
+            HistoryDB.FixDatabase( (symbol, startTime, endTime) =>   DownloadCandles(symbol, startTime, endTime).Result.ToArray() );
         }
+
 
         public BinanceDataDownloader(HistoricalRateDataBase db, double rateLimitFactor = 0.6f)
         {
@@ -57,7 +59,7 @@ namespace SharpTrader.Utils
             swReportRate.Start();
             while (downloadQueue.Count > 0)
             {
-                if (tasks.Count < 10)
+                if (tasks.Count < ConcurrencyCount)
                 {
                     var symbol = downloadQueue.Dequeue();
                     var task = DownloadHistoryAsync(symbol, DateTime.UtcNow.Subtract(TimeSpan.FromDays(360)), redownloadSpan);
@@ -84,25 +86,24 @@ namespace SharpTrader.Utils
             {
                 Console.WriteLine($"Downloading {symbol} history ");
                 DateTime endTime = DateTime.UtcNow.Subtract(TimeSpan.FromSeconds(60));
-                List<SharpTrader.Candlestick> AllCandles = new List<SharpTrader.Candlestick>();
-
+                 
                 //we need to convert all in UTC time 
                 var startTime = fromTime; //  
                 var epoch = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
                 if (startTime < epoch)
                     startTime = epoch;
 
-                //try to get the start time
-                ISymbolHistory symbolHistory = HistoryDB.GetSymbolHistory(MarketName, symbol, TimeSpan.FromSeconds(60));
-
-                if (symbolHistory.Ticks.Count > 0)
+                //try to get the first candle - use these functions for performance improvement
+                (var firstKnowCandle, var lastKnownCandle) = HistoryDB.GetFirstAndLastCandles(new HistoryInfo(MarketName, symbol, TimeSpan.FromSeconds(60)));
+                if (firstKnowCandle != null && lastKnownCandle != null)
                 {
-                    if (startTime > symbolHistory.Ticks.FirstTickTime) //if startTime is after the first tick we are ready to go
-                        startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
+                    //if startTime is after the first tick then we start downloading from the last tick to avoid holes
+                    if (startTime > firstKnowCandle.OpenTime)
+                        startTime = new DateTime(lastKnownCandle.OpenTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
                     else
                     {
-
-                        var firstCandle = (await Client.GetKlinesCandlesticks(
+                        //otherwise we search for first candle on the server
+                        var firstServerCandle = (await Client.GetKlinesCandlesticks(
                             new GetKlinesCandlesticksRequest
                             {
                                 Symbol = symbol,
@@ -111,69 +112,20 @@ namespace SharpTrader.Utils
                                 EndTime = startTime.AddYears(3),
                                 Limit = 10
                             })).FirstOrDefault();
-
-                        if (firstCandle != null && firstCandle.CloseTime + TimeSpan.FromSeconds(1) >= symbolHistory.Ticks.FirstTickTime)
-                            startTime = new DateTime(symbolHistory.Ticks.LastTickTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
-
+                        //if it's already been downloaded we can set our start time at the end of known data 
+                        if (firstServerCandle != null && firstServerCandle.CloseTime.AddSeconds(1) >= firstKnowCandle.OpenTime)
+                            startTime = new DateTime(lastKnownCandle.Time.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
+                        //otherwise we leave start time as it is to avoid creating holes ( //todo optimize adding end time = firstKnowCandle.OpenTme )
                     }
                 }
 
-                bool noMoreData = false;
-                int zeroCount = 0;
-                while (!noMoreData && ( AllCandles.Count < 1 || AllCandles.Last().CloseTime < endTime))
-                {
-                    //Console.WriteLine($"Downloading history for {symbol} - {startTime}");
-                    try
-                    {
-                        var candles = await Client.GetKlinesCandlesticks(new GetKlinesCandlesticksRequest
-                        {
-                            Symbol = symbol,
-                            StartTime = startTime,
-                            Interval = KlineInterval.OneMinute,
-                            EndTime = startTime.AddYears(3),
-                        });
-
-                        var batch = candles.Select(
-                            c => new SharpTrader.Candlestick()
-                            {
-                                Open = (double)c.Open,
-                                High = (double)c.High,
-                                Low = (double)c.Low,
-                                Close = (double)c.Close,
-                                OpenTime = c.OpenTime,
-                                CloseTime = c.OpenTime.AddSeconds(60), //+ c.CloseTime.AddMilliseconds(1),
-                                Volume = (double)c.QuoteAssetVolume
-                            }).ToList();
-                         
-                        AllCandles.AddRange(batch);
-
-                        //if we get no data for more than 3 requests then we can assume that there isn't any more data
-                        if (batch.Count < 1)
-                            zeroCount++;
-                        else
-                            zeroCount = 0;
-                        if (zeroCount > 3)
-                            noMoreData = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        var msg = $"Exception during {symbol} history download: ";
-                        if (ex is BinanceException binException)
-                            msg += binException.ErrorDetails;
-                        else
-                            msg += ex.Message;
-                        Console.WriteLine(msg);
-                        await Task.Delay(5000);
-                    }
-                    if (AllCandles.Count > 1)
-                        startTime = new DateTime((AllCandles[AllCandles.Count - 1].CloseTime - TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
-                }
+                var candlesDownloaded = await DownloadCandles(symbol, startTime, endTime);
                 //---
-                HistoryDB.AddCandlesticks(MarketName, symbol, AllCandles);
+                HistoryDB.AddCandlesticks(MarketName, symbol, candlesDownloaded);
                 var histInfo = new HistoryInfo(MarketName, symbol, TimeSpan.FromSeconds(60));
                 HistoryDB.ValidateData(histInfo);
-                histInfo.timeframe = AllCandles.First().Timeframe;
-                HistoryDB.Save(histInfo);
+                histInfo.timeframe = candlesDownloaded.First().Timeframe;
+                HistoryDB.SaveAndClose(histInfo);
                 Console.WriteLine($"{symbol} history downloaded");
             }
             catch (Exception ex)
@@ -185,6 +137,63 @@ namespace SharpTrader.Utils
                     msg += ex.Message;
                 Console.WriteLine(msg);
             }
+        }
+
+        private async Task<List<Candlestick>> DownloadCandles(string symbol, DateTime startTime, DateTime endTime)
+        {
+            bool noMoreData = false;
+            int zeroCount = 0;
+            List<Candlestick> allCandles = new List<SharpTrader.Candlestick>();
+            while (!noMoreData && (allCandles.Count < 1 || allCandles.Last().CloseTime < endTime))
+            {
+                //Console.WriteLine($"Downloading history for {symbol} - {startTime}");
+                try
+                {
+                    var candles = await Client.GetKlinesCandlesticks(new GetKlinesCandlesticksRequest
+                    {
+                        Symbol = symbol,
+                        StartTime = startTime,
+                        Interval = KlineInterval.OneMinute,
+                        EndTime = endTime,
+                    });
+
+                    var batch = candles.Select(
+                        c => new SharpTrader.Candlestick()
+                        {
+                            Open = (double)c.Open,
+                            High = (double)c.High,
+                            Low = (double)c.Low,
+                            Close = (double)c.Close,
+                            OpenTime = c.OpenTime,
+                            CloseTime = c.OpenTime.AddSeconds(60), //+ c.CloseTime.AddMilliseconds(1),
+                            Volume = (double)c.QuoteAssetVolume
+                        }).ToList();
+
+                    allCandles.AddRange(batch);
+
+                    //if we get no data for more than 3 requests then we can assume that there isn't any more data
+                    if (batch.Count < 1)
+                        zeroCount++;
+                    else
+                        zeroCount = 0;
+                    if (zeroCount > 2)
+                        noMoreData = true;
+                }
+                catch (Exception ex)
+                {
+                    var msg = $"Exception during {symbol} history download: ";
+                    if (ex is BinanceException binException)
+                        msg += binException.ErrorDetails;
+                    else
+                        msg += ex.Message;
+                    Console.WriteLine(msg);
+                    await Task.Delay(5000);
+                }
+                if (allCandles.Count > 1)
+                    startTime = new DateTime((allCandles[allCandles.Count - 1].CloseTime - TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
+            }
+
+            return allCandles;
         }
 
         public void SynchSymbolsTable(string DataDir)

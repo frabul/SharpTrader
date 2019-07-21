@@ -154,6 +154,7 @@ namespace SharpTrader
 
                 if (_Cursor > -1 && date == Records[_Cursor].Time)
                     return;
+
                 int lowerLimit = 0;
                 int higherLimit = Records.Count - 1;
                 int midpoint = 0;
