@@ -15,7 +15,7 @@ using BinanceExchange.API.Models.Response.Error;
 using LiteDB;
 using System.IO;
 using System.Text.RegularExpressions;
-using NLog; 
+using NLog;
 using System.Timers;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -448,7 +448,7 @@ namespace SharpTrader
                             {
                                 order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
                                 if (order == null)
-                                    order = OrdersArchive.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol); 
+                                    order = OrdersArchive.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
                             }
                             // put out of lokc to prevent deadlock
                             if (order == null)
@@ -691,9 +691,12 @@ namespace SharpTrader
                         throw new ArgumentException("The provided fromId is not from same symbol");
                     tradeId = int.Parse(match.Groups[2].Value);
                 }
-                var result = Trades.Find(tr => tr.TradeId > tradeId && tr.Symbol == symbol);
-                var ret = new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
-                return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(ret);
+                lock (LockOrdersTrades)
+                {
+                    var result = Trades.Find(tr => tr.TradeId > tradeId && tr.Symbol == symbol);
+                    var ret = new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
+                    return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(ret);
+                }
             }
             catch (Exception ex)
             {
@@ -704,9 +707,12 @@ namespace SharpTrader
 
         public Task<IMarketOperation<IEnumerable<ITrade>>> GetAllTradesAsync(string symbol)
         {
-            var result = Trades.Find(tr => tr.Symbol == symbol).ToArray<ITrade>();
-            return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(
-                new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result));
+            lock (LockOrdersTrades)
+            {
+                var result = Trades.Find(tr => tr.Symbol == symbol).ToArray<ITrade>();
+                return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(
+                    new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result));
+            }
         }
 
         public async Task<IMarketOperation<IOrder>> OrderSynchAsync(string id)
@@ -1271,19 +1277,22 @@ namespace SharpTrader
             {
                 if (!TicksInitialized)
                 {
+                    historyStartTime = historyStartTime - TimeSpan.FromMinutes(1);
                     //load missing data to hist db 
                     Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
 
-                    var historyToLoad = DateTime.UtcNow - historyStartTime;
+                    var historyPeriodSpan = DateTime.UtcNow - historyStartTime;
+
                     //--- download latest data
-                    var refreshTime = TimeSpan.FromHours(6) < historyToLoad ? TimeSpan.FromHours(4) : historyToLoad;
+                    var refreshTime = historyPeriodSpan > TimeSpan.FromHours(6) ? TimeSpan.FromHours(6) : historyPeriodSpan;
                     var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
-                    await downloader.DownloadHistoryAsync(Symbol, historyStartTime, refreshTime); //todo make async
+                    await downloader.DownloadHistoryAsync(Symbol, historyStartTime, refreshTime);
 
                     //--- load the history into this 
-                    ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(this.Market, Symbol, TimeSpan.FromSeconds(60));
+                    var historyInfo = new HistoryInfo(this.Market, Symbol, TimeSpan.FromSeconds(60));
+                    ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(historyInfo, historyStartTime);
                     HistoryDb.CloseFile(this.Market, Symbol, TimeSpan.FromSeconds(60));
-                    symbolHistory.Ticks.SeekNearestAfter(DateTime.UtcNow - historyToLoad);
+
                     lock (Locker)
                     {
                         while (symbolHistory.Ticks.Next())
@@ -1306,11 +1315,11 @@ namespace SharpTrader
                 catch (Exception ex)
                 {
                     Logger.Error("Exeption during SymbolFeed.Dispose: " + ex.Message);
-                }  
+                }
                 base.Dispose();
             }
 
-         
+
         }
 
         class ApiOrder : IOrder
