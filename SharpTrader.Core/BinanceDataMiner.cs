@@ -29,7 +29,9 @@ namespace SharpTrader.Utils
             Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
 
             HistoryDB = new HistoricalRateDataBase(DataDir);
-            HistoryDB.FixDatabase( (symbol, startTime, endTime) =>   DownloadCandles(symbol, startTime, endTime).Result.ToArray() );
+
+            //HistoryDB.FixDatabase((symbol, startTime, endTime) => DownloadCandles(symbol, startTime, endTime).Result.ToArray());
+            //HistoryDB.FixDatabase(null);
         }
 
 

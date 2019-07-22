@@ -87,13 +87,16 @@ namespace SharpTrader
                     for (int i = 1; i < oldTicks.Count; i++)
                     {
                         var candleToAdd = oldTicks[i];
-
                         if (candleToAdd.OpenTime == lastAdded().OpenTime)
                         {
                             //we skip this
                             if (candleToAdd.Equals(lastAdded()))
                                 matchErrors++;
                             duplicates++;
+                        }
+                        else if (candleToAdd.OpenTime < lastAdded().OpenTime)
+                        {
+                            Console.WriteLine($"   Bad candle at {candleToAdd.OpenTime}");
                         }
                         else
                         {
@@ -110,13 +113,11 @@ namespace SharpTrader
                                                         .OrderBy(c => c.OpenTime).ToArray();
                                     newTicks.AddRange(candlesToAdd);
                                     Console.WriteLine($"       Hole fixed!{candlesToAdd.FirstOrDefault()?.OpenTime} -> {candlesToAdd.LastOrDefault()?.OpenTime} ");
-                                } 
+                                }
                             }
-
                             //finally add the candle
                             if (candleToAdd.OpenTime > lastAdded().OpenTime)
                                 newTicks.Add(candleToAdd);
-
                         }
                     }
                     hist.Ticks.Clear();
@@ -228,7 +229,7 @@ namespace SharpTrader
                     myData = SymbolsData.First(sd => sd.HistoryInfoEquals(finfo));
                 for (int i = 1; i < myData.Ticks.Count; i++)
                 {
-                    if (myData.Ticks[i].OpenTime <= myData.Ticks[i - 1].OpenTime)
+                    if (myData.Ticks[i].OpenTime < myData.Ticks[i - 1].OpenTime)
                     {
                         Console.WriteLine($"{finfo.market} - {finfo.symbol} - {finfo.timeframe} -> bad data at {i}");
                     }
@@ -333,8 +334,8 @@ namespace SharpTrader
             var hinfo = new HistoryInfo(market, symbol, candles.First().Timeframe);
             var sdata = GetHistoryRaw(hinfo, candles.First().OpenTime);
             //add data 
-            Debug.Assert(sdata.Ticks.Count > 0);
-            Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
+            //Debug.Assert(sdata.Ticks.Count > 0);
+            //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
             AddCandlesToHistData(candles, sdata);
         }
         private static void AddCandlesToHistData(IEnumerable<ICandlestick> candles, SymbolHistoryRaw sdata)
@@ -355,11 +356,20 @@ namespace SharpTrader
                         var toAdd = new Candlestick(c);
                         if (lastCandle?.OpenTime > toAdd.OpenTime)
                         {
-                            int index = sdata.Ticks.BinarySearch(toAdd, CandlestickTimeComparer);
-                            if (index > -1)
+                            int i = sdata.Ticks.BinarySearch(toAdd, CandlestickTimeComparer);
+                            int index = i;
+                            if (i > -1)
                                 sdata.Ticks[index] = toAdd;
                             else
-                                sdata.Ticks.Insert(~index, toAdd);
+                            {
+                                index = ~i;
+                                sdata.Ticks.Insert(index, toAdd);
+                            }
+                            if (index > 0) 
+                                Debug.Assert(sdata.Ticks[index].OpenTime >= sdata.Ticks[index - 1].OpenTime);
+                            if (index + 1 < sdata.Ticks.Count)
+                                Debug.Assert(sdata.Ticks[index].OpenTime <= sdata.Ticks[index + 1].OpenTime);
+                           
                         }
                         else
                             sdata.Ticks.Add(toAdd);
