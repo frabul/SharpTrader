@@ -1,23 +1,23 @@
 ﻿
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Diagnostics;
-using BinanceExchange.API.Models.Response;
 using BinanceExchange.API.Client;
 using BinanceExchange.API.Enums;
-using be = BinanceExchange.API;
 using BinanceExchange.API.Models.Request;
-using BinanceExchange.API.Websockets;
-using BinanceExchange.API.Models.WebSocket;
+using BinanceExchange.API.Models.Response;
 using BinanceExchange.API.Models.Response.Error;
+using BinanceExchange.API.Models.WebSocket;
+using BinanceExchange.API.Websockets;
 using LiteDB;
-using System.IO;
-using System.Text.RegularExpressions;
-using NLog;
-using System.Timers;
 using Microsoft.Extensions.Caching.Memory;
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using System.Timers;
+using be = BinanceExchange.API;
 
 namespace SharpTrader
 {
@@ -693,7 +693,7 @@ namespace SharpTrader
                 }
                 lock (LockOrdersTrades)
                 {
-                    var result = Trades.Find(tr => tr.TradeId > tradeId && tr.Symbol == symbol);
+                    var result = Trades.Find(tr => tr.TradeId > tradeId && tr.Symbol == symbol).ToArray<ITrade>();
                     var ret = new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
                     return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(ret);
                 }
