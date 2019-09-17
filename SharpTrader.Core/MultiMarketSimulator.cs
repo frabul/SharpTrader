@@ -32,6 +32,19 @@ namespace SharpTrader
             }
         }
 
+        public MultiMarketSimulator(string dataDirectory, Configuration config, HistoricalRateDataBase historyDb)
+        { 
+            Config = config;
+            HistoryDb = historyDb;
+            this._Markets = new Market[Config.Markets.Length];
+            int i = 0;
+            foreach (var mc in Config.Markets)
+            {
+                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory);
+                _Markets[i++] = market;
+            }
+        }
+
         public MultiMarketSimulator(string dataDirectory, HistoricalRateDataBase historyDb)
         {
             HistoryDb = historyDb;
@@ -129,10 +142,9 @@ namespace SharpTrader
         }
 
 
-        class Configuration
+        public class Configuration
         {
-            public MarketConfiguration[] Markets { get; set; }
-            public SymbolConfiguration[] Symbols { get; set; }
+            public MarketConfiguration[] Markets { get; set; } 
         }
     }
 

@@ -2,8 +2,8 @@
   "Markets": [
     {
       "MarketName": "Binance",
-      "MakerFee": 0.001,
-      "TakerFee": 0.001 
+      "MakerFee": 0.00075,
+      "TakerFee": 0.00075 
     }
   ],
   "Symbols": [

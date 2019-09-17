@@ -72,11 +72,9 @@ namespace SharpTrader
 
     public interface ISymbolFeed
     {
-        event Action<ISymbolFeed> OnTick;
-
+        event Action<ISymbolFeed> OnTick; 
         string Symbol { get; }
-        string Market { get; }
-
+        string Market { get; } 
         double Spread { get; }
         double Bid { get; }
         double Ask { get; }

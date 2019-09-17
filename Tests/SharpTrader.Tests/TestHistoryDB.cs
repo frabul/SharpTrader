@@ -17,25 +17,20 @@ namespace SharpTrader.Tests
         {
             HistoryDB = new HistoricalRateDataBase(DataDir);
 
-            foreach (var (market, symbol, time) in HistoryDB.ListAvailableData())
+            foreach (var histInfo in HistoryDB.ListAvailableData())
             {
-                var data = HistoryDB.GetSymbolHistory(market, symbol, time);
+                var data = HistoryDB.GetSymbolHistory(histInfo, DateTime.MinValue);
                 List<ICandlestick> candles = new List<ICandlestick>();
                 while (data.Ticks.Next())
-                    candles.Add(data.Ticks.Tick);
-
-
-                Console.WriteLine($"Validate before shuffle  {market} - {symbol} - {time} ");
-                HistoryDB.ValidateData(market, symbol, time);
-
-
-
-                Console.WriteLine($"Validate after shuffle {market} - {symbol} - {time} ");
-                HistoryDB.Delete(market, symbol, time);
+                    candles.Add(data.Ticks.Tick); 
+                Console.WriteLine($"Validate before shuffle  {histInfo.market} - {histInfo.symbol} - {histInfo.timeframe} ");
+                HistoryDB.ValidateData(histInfo); 
+                Console.WriteLine($"Validate after shuffle {histInfo.market} - {histInfo.symbol} - {histInfo.timeframe}  ");
+                HistoryDB.Delete(histInfo.market, histInfo.symbol, histInfo.timeframe);
                 Shuffle(candles);
-                HistoryDB.AddCandlesticks(market, symbol, candles);
-                HistoryDB.ValidateData(market, symbol, time);
-                HistoryDB.Save(market, symbol, time);
+                HistoryDB.AddCandlesticks(histInfo.market, histInfo.symbol, candles);
+                HistoryDB.ValidateData(histInfo);
+                HistoryDB.SaveAndClose(histInfo);
             }
         }
 

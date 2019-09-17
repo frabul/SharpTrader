@@ -44,6 +44,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="TestBacktesting.cs" />
     <Compile Include="TestBinanceMarketApi.cs" />
     <Compile Include="TestCombinedWebSocketClient.cs" />
     <Compile Include="TestHistoryDB.cs" />
@@ -67,6 +68,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="MarketsSimulator.json" />
+    <None Include="NLog.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

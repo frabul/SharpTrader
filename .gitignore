@@ -13,3 +13,5 @@ packages/
 /Bin2
 /.vs/
 /Binance.API.Csharp.Client
+/Tests/SharpTrader.Tests/obj
+/Tests/TestConsole/obj

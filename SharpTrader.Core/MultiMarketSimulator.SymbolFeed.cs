@@ -42,7 +42,7 @@ namespace SharpTrader
                 MarketName = name;
                 MakerFee = makerFee;
                 TakerFee = takerFee;
-                var text = System.IO.File.ReadAllText(dataDir + "BinanceSymbolsTable.json");
+                var text = System.IO.File.ReadAllText(dataDir + name + "SymbolsTable.json");
                 SymbolsTable = Newtonsoft.Json.JsonConvert.DeserializeObject<SymbolsTable>(text);
             }
 
@@ -526,20 +526,12 @@ namespace SharpTrader
             }
         }
 
-        class MarketConfiguration
+        public class MarketConfiguration
         {
             public string MarketName { get; set; }
             public double MakerFee { get; set; }
             public double TakerFee { get; set; }
-        }
-
-        class SymbolConfiguration
-        {
-            public string SymbolName { get; set; }
-            public string MarketName { get; set; }
-            public string Spread { get; set; }
-        }
-
+        } 
     }
 
 

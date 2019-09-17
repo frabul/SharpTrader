@@ -13,13 +13,7 @@ namespace TestConsole
     {
         static void Main(string[] args)
         {
-            TestCombinedWebSocketClient.Test();
-        }
-
-        public class test
-        {
-            public string Symbol { get; set; }
-            public LiteCollection<string> Operations { get; set; }
-        }
+            TestBacktesting.Run();
+        } 
     }
 }

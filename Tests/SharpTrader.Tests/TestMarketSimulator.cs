@@ -90,10 +90,6 @@ namespace SharpTrader
                         Console.WriteLine("error");
                 }
             }
-        }
-
-
-
-
+        } 
     }
 }

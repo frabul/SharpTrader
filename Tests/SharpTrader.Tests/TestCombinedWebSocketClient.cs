@@ -13,7 +13,7 @@ namespace SharpTrader.Tests
 {
     public class TestCombinedWebSocketClient
     {
-        public static void Test()
+        public static void Run()
         {
             HistoricalRateDataBase histDb = new HistoricalRateDataBase(".\\Data2");
             BinanceMarketApi api = new BinanceMarketApi(null, null, histDb);
