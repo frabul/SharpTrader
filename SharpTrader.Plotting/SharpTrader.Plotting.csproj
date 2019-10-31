@@ -42,7 +42,7 @@
     <PackageReference Include="SharpDX.Direct3D9" Version="3.0.2" />
     <PackageReference Include="SharpDX.DXGI" Version="3.0.2" />
     <PackageReference Include="SharpDX.Mathematics" Version="3.0.2" />
-    <PackageReference Include="System.ValueTuple" Version="4.4.0" />
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />

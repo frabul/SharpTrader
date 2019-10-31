@@ -6,8 +6,7 @@ using BinanceExchange.API.Models.Response;
 using BinanceExchange.API.Models.Response.Error;
 using BinanceExchange.API.Models.WebSocket;
 using BinanceExchange.API.Websockets;
-using LiteDB;
-using Microsoft.Extensions.Caching.Memory;
+using LiteDB; 
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -61,8 +60,7 @@ namespace SharpTrader
         private System.Timers.Timer TimerOrdersTradesSynch;
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
         private string OperationsDbPath;
-        private string OperationsArchivePath;
-        private MemoryCache Cache = new MemoryCache(new MemoryCacheOptions());
+        private string OperationsArchivePath; 
 
         public BinanceClient Client { get; private set; }
 
@@ -797,13 +795,13 @@ namespace SharpTrader
             try
             {
                 List<SymbolPriceResponse> allPrices;
-                if (Cache.TryGetValue("allPrices", out object result))
-                    allPrices = result as List<SymbolPriceResponse>;
-                else
-                {
-                    allPrices = await Client.GetSymbolsPriceTicker();
-                    Cache.Set("allPrices", allPrices, DateTime.Now.AddSeconds(30));
-                }
+                //if (Cache.TryGetValue("allPrices", out object result))
+                //    allPrices = result as List<SymbolPriceResponse>;
+                //else
+                //{
+                allPrices = await Client.GetSymbolsPriceTicker();
+                //    Cache.Set("allPrices", allPrices, DateTime.Now.AddSeconds(30));
+                //}
                 if (asset == "ETH" || asset == "BNB" || asset == "BTC")
                 {
                     lock (LockBalances)
