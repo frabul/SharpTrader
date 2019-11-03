@@ -6,7 +6,7 @@ using BinanceExchange.API.Models.Response;
 using BinanceExchange.API.Models.Response.Error;
 using BinanceExchange.API.Models.WebSocket;
 using BinanceExchange.API.Websockets;
-using LiteDB; 
+using LiteDB;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -27,12 +27,11 @@ namespace SharpTrader
         private readonly object LockOrdersTrades = new object();
         private readonly object LockBalances = new object();
 
-        private Dictionary<string, ApiTrade> TradesPerSymbol = new Dictionary<string, ApiTrade>();
+ 
         private LiteCollection<ApiOrder> Orders;
-        private LiteCollection<ApiTrade> Trades;
-        private LiteCollection<BsonDocument> TradesRaw;
+        private LiteCollection<ApiTrade> Trades; 
         private LiteCollection<ApiOrder> OrdersArchive;
-        private LiteCollection<ApiTrade> TradesArchive;
+        private LiteCollection<ApiTrade> TradesArchive; 
         private List<ApiOrder> OrdersActive = new List<ApiOrder>();
 
 
@@ -60,7 +59,7 @@ namespace SharpTrader
         private System.Timers.Timer TimerOrdersTradesSynch;
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
         private string OperationsDbPath;
-        private string OperationsArchivePath; 
+        private string OperationsArchivePath;
 
         public BinanceClient Client { get; private set; }
 
@@ -159,8 +158,8 @@ namespace SharpTrader
                             .ContinueWith(t => SynchBalance().ContinueWith(t2 => TimerFastUpdates.Start()));
                     else
                         ServerTimeSynch().ContinueWith(t => TimerFastUpdates.Start());
-                }; 
-             
+                };
+
             Logger.Info("initialization complete");
         }
 
@@ -235,9 +234,7 @@ namespace SharpTrader
             }
             //----
             Orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
-            Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
-            TradesRaw = TradesAndOrdersDb.GetCollection("Trades");
-
+            Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades"); 
             OrdersArchive = TradesAndOrdersArch.GetCollection<ApiOrder>("Orders");
             TradesArchive = TradesAndOrdersArch.GetCollection<ApiTrade>("Trades");
         }
@@ -448,6 +445,7 @@ namespace SharpTrader
                             if (order == null)
                                 order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder;
                             tr.ClientOrderId = order.ClientId;
+
                             lock (LockOrdersTrades)
                                 TradesUpdateOrInsert(tr);
                         }
@@ -785,19 +783,22 @@ namespace SharpTrader
             return 0;
         }
 
+        
+        MemoryCache Cache = new MemoryCache();
         public async Task<IMarketOperation<decimal>> GetEquity(string asset)
         {
 
             try
             {
                 List<SymbolPriceResponse> allPrices;
-                //if (Cache.TryGetValue("allPrices", out object result))
-                //    allPrices = result as List<SymbolPriceResponse>;
-                //else
-                //{
-                allPrices = await Client.GetSymbolsPriceTicker();
-                //    Cache.Set("allPrices", allPrices, DateTime.Now.AddSeconds(30));
-                //}
+                if (Cache.TryGetValue("allPrices", out object result))
+                    allPrices = result as List<SymbolPriceResponse>;
+                else
+                {
+                    allPrices = await Client.GetSymbolsPriceTicker();
+                    Cache.Set("allPrices", allPrices, DateTime.Now.AddSeconds(30));
+                }
+
                 if (asset == "ETH" || asset == "BNB" || asset == "BTC")
                 {
                     lock (LockBalances)
