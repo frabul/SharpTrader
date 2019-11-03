@@ -520,7 +520,7 @@ namespace SharpTrader
                 Result = res;
             }
 
-            public static IMarketOperation<T> Completed<T>(T val)
+            public static IMarketOperation<T> Completed(T val)
             {
                 return new MarketOperation<T>(MarketOperationStatus.Completed, val);
             }

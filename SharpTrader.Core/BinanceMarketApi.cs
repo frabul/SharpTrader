@@ -42,7 +42,7 @@ namespace SharpTrader
 
         private HistoricalRateDataBase HistoryDb;
 
-        private DisposableBinanceWebSocketClient WSClient;
+        private BinanceWebSocketClient WSClient;
         private CombinedWebSocketClient CombinedWebSocketClient;
         private ExchangeInfoResponse ExchangeInfo;
         private NLog.Logger Logger;
@@ -98,7 +98,7 @@ namespace SharpTrader
             });
 
             ExchangeInfo = Client.GetExchangeInfo().Result;
-            WSClient = new DisposableBinanceWebSocketClient(Client);
+            WSClient = new BinanceWebSocketClient(Client);
             CombinedWebSocketClient = new CombinedWebSocketClient();
             this.ServerTimeSynch().Wait();
             Logger.Info("Archiving old oders...");
@@ -159,12 +159,8 @@ namespace SharpTrader
                             .ContinueWith(t => SynchBalance().ContinueWith(t2 => TimerFastUpdates.Start()));
                     else
                         ServerTimeSynch().ContinueWith(t => TimerFastUpdates.Start());
-                };
-
-
-            var websocks = new DisposableBinanceWebSocketClient(Client);
-
-
+                }; 
+             
             Logger.Info("initialization complete");
         }
 
@@ -848,6 +844,7 @@ namespace SharpTrader
             }
             catch (Exception ex)
             {
+                Debug.Assert(ex != null);
                 return new MarketOperation<decimal>(MarketOperationStatus.Failed);
             }
 

@@ -160,6 +160,7 @@ namespace SharpTrader
                         }
                         catch (Exception ex)
                         {
+                            Debug.Assert(ex != null);
                             Console.WriteLine($"ERROR for file {oldFile}");
                         }
                     }
@@ -415,6 +416,7 @@ namespace SharpTrader
             }
             catch (Exception ex)
             {
+                Debug.Assert(ex != null);
                 //Console.WriteLine($"Error while parsing file info for file {fileName}");
             }
             return ret;
