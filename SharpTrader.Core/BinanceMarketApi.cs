@@ -163,9 +163,7 @@ namespace SharpTrader
                         ServerTimeSynch().ContinueWith(t => TimerFastUpdates.Start());
                 };
 
-
-            var websocks = new DisposableBinanceWebSocketClient(Client);
-
+ 
 
             Logger.Info("initialization complete");
         }
