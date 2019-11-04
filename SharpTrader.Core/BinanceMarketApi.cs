@@ -124,15 +124,15 @@ namespace SharpTrader
                     Enabled = true,
                 };
                 TimerOrdersTradesSynch.Elapsed +=
-                    (s, e) =>
+                    async (s, e) =>
                     {
-                        //we first synch open orders
+                        //we first synch open orders 
+                        await SynchOpenOrders();
                         //then last trades
-                        //then finally we restart the timer and archive operations
-                        SynchOpenOrders()
-                            .ContinueWith(
-                                t => SynchLastTrades()
-                                    .ContinueWith(t2 => { TimerOrdersTradesSynch.Start(); ArchiveOldOperations(); }));
+                        await SynchLastTrades();
+                        //then finally we restart the timer and archive operations 
+                        TimerOrdersTradesSynch.Start();  
+                        ArchiveOldOperations();
                     };
             }
 
@@ -142,14 +142,20 @@ namespace SharpTrader
                 Enabled = true,
             };
             TimerFastUpdates.Elapsed +=
-                (s, e) =>
+                async (s, e) =>
                 {
                     //first synch server time then balance then restart timer
                     if (apiKey != null)
-                        ServerTimeSynch()
-                            .ContinueWith(t => SynchBalance().ContinueWith(t2 => TimerFastUpdates.Start()));
+                    {
+                        await ServerTimeSynch();
+                        await SynchBalance();
+                        TimerFastUpdates.Start();
+                    }
                     else
-                        ServerTimeSynch().ContinueWith(t => TimerFastUpdates.Start());
+                    {
+                        await ServerTimeSynch();
+                        TimerFastUpdates.Start();
+                    } 
                 };
 
             Logger.Info("initialization complete");

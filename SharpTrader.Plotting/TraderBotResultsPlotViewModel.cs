@@ -231,7 +231,7 @@ namespace SharpTrader.Plotting
             if (lastTick != null)
             {
                 PlotViewModel.Axes[0].Minimum =
-          lastTick.Time.Subtract(new TimeSpan(ChartWidth * lastTick.Timeframe.Ticks)).ToAxisDouble();
+                    lastTick.Time.Subtract(new TimeSpan(ChartWidth * lastTick.Timeframe.Ticks)).ToAxisDouble();
                 PlotViewModel.Axes[0].Maximum = lastTick.Time.ToAxisDouble();
                 PlotViewModel.Axes[0].Reset();
             }
