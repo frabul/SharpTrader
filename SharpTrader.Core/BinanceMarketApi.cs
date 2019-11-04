@@ -26,33 +26,25 @@ namespace SharpTrader
 
         private readonly object LockOrdersTrades = new object();
         private readonly object LockBalances = new object();
+        private readonly List<ApiOrder> OrdersActive = new List<ApiOrder>();
+        private readonly Stopwatch StopwatchSocketClose = new Stopwatch();
+        private readonly Stopwatch UserDataPingStopwatch = new Stopwatch();
+        private readonly Dictionary<string, long> UpdatedTrades = new Dictionary<string, long>();
 
- 
         private LiteCollection<ApiOrder> Orders;
         private LiteCollection<ApiTrade> Trades; 
         private LiteCollection<ApiOrder> OrdersArchive;
-        private LiteCollection<ApiTrade> TradesArchive; 
-        private List<ApiOrder> OrdersActive = new List<ApiOrder>();
-
-
-
-        private Stopwatch StopwatchSocketClose = new Stopwatch();
-        private Stopwatch UserDataPingStopwatch = new Stopwatch();
-
-        private HistoricalRateDataBase HistoryDb;
-
+        private LiteCollection<ApiTrade> TradesArchive;  
+        private HistoricalRateDataBase HistoryDb; 
         private BinanceWebSocketClient WSClient;
         private CombinedWebSocketClient CombinedWebSocketClient;
         private ExchangeInfoResponse ExchangeInfo;
-        private NLog.Logger Logger;
-        private Dictionary<string, long> UpdatedTrades = new Dictionary<string, long>();
-
+        private NLog.Logger Logger; 
         private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
         private System.Timers.Timer TimerListenUserData;
         private LiteDatabase TradesAndOrdersArch;
         private LiteDatabase TradesAndOrdersDb;
-        private List<SymbolFeed> Feeds = new List<SymbolFeed>();
-
+        private List<SymbolFeed> Feeds = new List<SymbolFeed>(); 
         private Guid UserDataSocket;
         private Regex IdRegex = new Regex("([A-Z]+)([0-9]+)", RegexOptions.Compiled);
         private System.Timers.Timer TimerFastUpdates;
@@ -465,7 +457,7 @@ namespace SharpTrader
         {
             try
             {
-                if (UserDataSocket != default(Guid) && (!UserDataPingStopwatch.IsRunning || UserDataPingStopwatch.Elapsed > TimeSpan.FromMinutes(1)))
+                if (UserDataSocket != default && (!UserDataPingStopwatch.IsRunning || UserDataPingStopwatch.Elapsed > TimeSpan.FromMinutes(1)))
                 {
                     UserDataPingStopwatch.Restart();
                     try
@@ -476,7 +468,7 @@ namespace SharpTrader
                             Logger.Info("Closing user data socket because ping returned false.");
                         }
                     }
-                    catch { UserDataSocket = default(Guid); }
+                    catch { UserDataSocket = default; }
                 }
 
                 //every 120 minutes close the socket
@@ -487,7 +479,7 @@ namespace SharpTrader
                 }
 
 
-                if (UserDataSocket == default(Guid))
+                if (UserDataSocket == default)
                 {
                     UserDataSocket = await WSClient.ConnectToUserDataWebSocket(new UserDataWebSocketMessages()
                     {
@@ -508,17 +500,16 @@ namespace SharpTrader
         {
             try
             {
-                if (UserDataSocket != default(Guid))
+                if (UserDataSocket != default)
                 {
-                    WSClient.CloseWebSocketInstance(UserDataSocket);
-
+                    WSClient.CloseWebSocketInstance(UserDataSocket); 
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error("Failed closing user data stream because: " + GetExceptionErrorInfo(ex));
             }
-            UserDataSocket = default(Guid);
+            UserDataSocket = default;
         }
 
         private void HandleAccountUpdatedMessage(BinanceAccountUpdateData msg)
@@ -884,8 +875,7 @@ namespace SharpTrader
 
         public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
         {
-            ResultCreateOrderResponse newOrd;
-            var side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell;
+            ResultCreateOrderResponse newOrd; 
             try
             {
 
@@ -1093,8 +1083,7 @@ namespace SharpTrader
             private DateTime LastKlineWarn = DateTime.Now;
             private DateTime LastDepthWarn = DateTime.Now;
             private BinanceKline LastKnownCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
-
-            private TimeSpan HistoryDepth { get; set; }
+             
             public string Symbol { get; private set; }
             public string Asset { get; private set; }
             public string QuoteAsset { get; private set; }
@@ -1273,7 +1262,7 @@ namespace SharpTrader
             {
                 if (!TicksInitialized)
                 {
-                    historyStartTime = historyStartTime - TimeSpan.FromMinutes(1);
+                    historyStartTime -= TimeSpan.FromMinutes(1);
                     //load missing data to hist db 
                     Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
 
