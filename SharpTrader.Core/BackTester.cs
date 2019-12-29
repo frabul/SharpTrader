@@ -19,8 +19,7 @@ namespace SharpTrader
         public string BaseAsset { get; set; }
         public List<(DateTime time, decimal bal)> EquityHistory { get; set; } = new List<(DateTime time, decimal bal)>();
         public decimal FinalBalance { get; set; }
-        public decimal MaxDrowDown { get; private set; }
-        public decimal MaxDrowDownPrc { get; private set; }
+        public decimal MaxDrowDown { get; private set; } 
         /// <summary>
         /// How much history should be loaded back from the simulation start time
         /// </summary>
@@ -80,8 +79,7 @@ namespace SharpTrader
                 BalancePeak = balance > BalancePeak ? balance : BalancePeak;
                 if (BalancePeak - balance > MaxDrowDown)
                 {
-                    MaxDrowDown = BalancePeak - balance;
-                    MaxDrowDownPrc = MaxDrowDown / BalancePeak;
+                    MaxDrowDown = BalancePeak - balance; 
                 }
             }
 
