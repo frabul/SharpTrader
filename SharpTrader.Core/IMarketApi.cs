@@ -51,7 +51,7 @@ namespace SharpTrader
         Task<IMarketOperation> OrderCancelAsync(string id);
 
         decimal GetFreeBalance(string asset);
-
+        decimal GetTotalBalance(string asset);
         Task<IMarketOperation<decimal>> GetEquity(string asset);
 
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
@@ -68,6 +68,8 @@ namespace SharpTrader
         public string Symbol { get; set; }
         public string Asset { get; set; }
         public string QuoteAsset { get; set; }
+        public bool IsMarginTadingAllowed { get; set; }
+        public bool IsSpotTadingAllowed { get; set; }
     }
 
     public interface ISymbolFeed

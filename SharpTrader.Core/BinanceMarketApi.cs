@@ -239,7 +239,7 @@ namespace SharpTrader
 
         private async Task SynchAllOperations()
         {
-            var symbols = ExchangeInfo.Symbols.Select(s => s.Symbol).ToArray();
+            var symbols = ExchangeInfo.Symbols.Select(s => s.symbol).ToArray();
             List<Task> tasks = new List<Task>();
             int cnt = 0;
             foreach (var sym in symbols)
@@ -404,7 +404,7 @@ namespace SharpTrader
 
         private async Task SynchLastTrades()
         {
-            foreach (var sym in ExchangeInfo.Symbols.Select(s => s.Symbol))
+            foreach (var sym in ExchangeInfo.Symbols.Select(s => s.symbol))
             {
                 await SynchLastTrades(sym);
             }
@@ -856,8 +856,8 @@ namespace SharpTrader
 
             if (feed == null)
             {
-                var symInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == symbol);
-                feed = new SymbolFeed(Client, CombinedWebSocketClient, HistoryDb, MarketName, symbol, symInfo.BaseAsset, symInfo.QuoteAsset);
+                var symInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == symbol);
+                feed = new SymbolFeed(Client, CombinedWebSocketClient, HistoryDb, MarketName, symbol, symInfo.baseAsset, symInfo.quoteAsset);
                 await feed.Initialize();
                 lock (LockBalances)
                 {
@@ -914,7 +914,7 @@ namespace SharpTrader
             var side = type == TradeType.Buy ? OrderSide.Buy : OrderSide.Sell;
             try
             {
-                var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == symbol);
+                var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == symbol);
                 ApiOrder newOrd = null;
                 var ord = (ResultCreateOrderResponse)await Client.CreateOrder(
                         new CreateOrderRequest()
@@ -939,8 +939,8 @@ namespace SharpTrader
 
                 lock (LockBalances)
                 {
-                    var quoteBal = _Balances[symbolInfo.QuoteAsset];
-                    var assetBal = _Balances[symbolInfo.BaseAsset];
+                    var quoteBal = _Balances[symbolInfo.quoteAsset];
+                    var assetBal = _Balances[symbolInfo.baseAsset];
                 }
 
                 //todo update balance
@@ -969,9 +969,9 @@ namespace SharpTrader
                     });
                     lock (LockBalances)
                     {
-                        var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.Symbol == order.Symbol);
-                        var quoteBal = _Balances[symbolInfo.QuoteAsset];
-                        var assetBal = _Balances[symbolInfo.BaseAsset];
+                        var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == order.Symbol);
+                        var quoteBal = _Balances[symbolInfo.quoteAsset];
+                        var assetBal = _Balances[symbolInfo.baseAsset];
 
                         if (order.TradeType == TradeType.Buy)
                         {
@@ -996,10 +996,10 @@ namespace SharpTrader
 
         public (decimal min, decimal step) GetMinTradable(string symbol)
         {
-            var info = ExchangeInfo.Symbols.Where(s => s.Symbol == symbol).FirstOrDefault();
+            var info = ExchangeInfo.Symbols.Where(s => s.symbol == symbol).FirstOrDefault();
             if (info != null)
             {
-                var filt = info.Filters.Where(f => f.FilterType == ExchangeInfoSymbolFilterType.LotSize).FirstOrDefault();
+                var filt = info.filters.Where(f => f.FilterType == ExchangeInfoSymbolFilterType.LotSize).FirstOrDefault();
                 if (filt is ExchangeInfoSymbolFilterLotSize lotsize)
                     return (lotsize.MinQty, lotsize.StepSize);
             }
@@ -1008,10 +1008,10 @@ namespace SharpTrader
 
         public decimal GetSymbolPrecision(string symbol)
         {
-            var info = ExchangeInfo.Symbols.Where(s => s.Symbol == symbol).FirstOrDefault();
+            var info = ExchangeInfo.Symbols.Where(s => s.symbol == symbol).FirstOrDefault();
             if (info != null)
             {
-                var filt = info.Filters.Where(f => f.FilterType == ExchangeInfoSymbolFilterType.PriceFilter).FirstOrDefault();
+                var filt = info.filters.Where(f => f.FilterType == ExchangeInfoSymbolFilterType.PriceFilter).FirstOrDefault();
                 if (filt is ExchangeInfoSymbolFilterPrice pf)
                     return pf.TickSize;
             }
@@ -1020,20 +1020,20 @@ namespace SharpTrader
 
         public IEnumerable<SymbolInfo> GetSymbols()
         {
-            return ExchangeInfo.Symbols.Where(sym => sym.Status == "TRADING").Select(sym => new SymbolInfo
+            return ExchangeInfo.Symbols.Where(sym => sym.status == "TRADING").Select(sym => new SymbolInfo
             {
-                Asset = sym.BaseAsset,
-                QuoteAsset = sym.QuoteAsset,
-                Symbol = sym.Symbol,
+                Asset = sym.baseAsset,
+                QuoteAsset = sym.quoteAsset,
+                Symbol = sym.symbol,
             });
         }
 
         public decimal GetMinNotional(string symbol)
         {
-            var info = ExchangeInfo.Symbols.Where(s => s.Symbol == symbol).FirstOrDefault();
+            var info = ExchangeInfo.Symbols.Where(s => s.symbol == symbol).FirstOrDefault();
             if (info != null)
             {
-                var filt = info.Filters.Where(f => f.FilterType == ExchangeInfoSymbolFilterType.MinNotional).FirstOrDefault();
+                var filt = info.filters.Where(f => f.FilterType == ExchangeInfoSymbolFilterType.MinNotional).FirstOrDefault();
                 if (filt is ExchangeInfoSymbolFilterMinNotional mn)
                     return mn.MinNotional;
             }

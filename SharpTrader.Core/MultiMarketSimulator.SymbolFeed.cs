@@ -27,15 +27,18 @@ namespace SharpTrader
             private Logger Logger;
 
             public string MarketName { get; private set; }
-            public double MakerFee { get; set; } = 0.00075;
-            public double TakerFee { get; set; } = 0.00075;
+            public decimal MakerFee { get; set; } = 0.00075m;
+            public decimal TakerFee { get; set; } = 0.00075m;
+
+            public bool AllowBorrow { get; set; } = false;
+
             public DateTime Time { get; internal set; }
             public event Action<IMarketApi, ITrade> OnNewTrade;
             public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
             public IEnumerable<ISymbolFeed> ActiveFeeds => SymbolsFeed.Values;
             public IEnumerable<ITrade> Trades => this._Trades;
 
-            public Market(string name, double makerFee, double takerFee, string dataDir)
+            public Market(string name, decimal makerFee, decimal takerFee, string dataDir)
             {
                 Logger = LogManager.GetCurrentClassLogger();
 
@@ -103,7 +106,8 @@ namespace SharpTrader
                     bal = _Balances[ass.QuoteAsset];
                     amount = order.Amount * (decimal)order.Price;
                 }
-                if (bal.Free < amount)
+
+                if (!AllowBorrow && bal.Free < amount)
                 {
                     return (false, "Insufficient balance");
                 }
@@ -128,8 +132,7 @@ namespace SharpTrader
 
                     var trade = new Trade(
                         this.MarketName, symbol, this.Time,
-                        type, price, amount,
-                        amount * (decimal)(this.TakerFee * price), order);
+                        type, price, amount, this.TakerFee, order);
 
                     RegisterTrade(feed, trade);
                     this.ClosedOrders.Add(order);
@@ -142,6 +145,11 @@ namespace SharpTrader
                 _Balances.TryGetValue(asset, out var res);
                 return res.Free;
             }
+            public decimal GetTotalBalance(string asset)
+            {
+                _Balances.TryGetValue(asset, out var res);
+                return res.Total;
+            }
 
             public (string Symbol, AssetBalance bal)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
 
@@ -153,6 +161,7 @@ namespace SharpTrader
                         return PendingOrders.ToArray();
                 }
             }
+
 
             internal void RaisePendingEvents()
             {
@@ -194,7 +203,7 @@ namespace SharpTrader
                                     price: (double)order.Price,
                                     amount: order.Amount,
                                     type: order.TradeType,
-                                    fee: order.Amount * (decimal)this.MakerFee * order.Price,
+                                    feeRatio: this.MakerFee,
                                     order: order
                                 );
                                 RegisterTrade(feed, trade);
@@ -214,7 +223,7 @@ namespace SharpTrader
                     var aBal = _Balances[feed.Asset];
                     if (trade.Type == TradeType.Buy)
                     {
-                        aBal.Free += trade.Amount - trade.Fee / trade.Price;
+                        aBal.Free += trade.Amount * (decimal)(1 - trade.FeeRatio);
                         qBal.Locked -= (trade.Amount * trade.Price);
                         Debug.Assert(qBal.Locked >= 0, "incoerent trade");
                     }
@@ -471,7 +480,8 @@ namespace SharpTrader
         class Trade : ITrade
         {
             private static long IdCounter = 0;
-            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, decimal fee, Order order)
+            public decimal FeeRatio { get; private set; }
+            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, decimal feeRatio, Order order)
             {
                 Market = market;
                 Symbol = symbol;
@@ -479,7 +489,8 @@ namespace SharpTrader
                 Type = type;
                 Price = (decimal)price;
                 Amount = amount;
-                Fee = fee;
+                FeeRatio = feeRatio;
+                Fee = amount * FeeRatio * (decimal)price;
                 Order = order;
                 Id = (IdCounter++).ToString();
             }
@@ -491,8 +502,15 @@ namespace SharpTrader
             /// <summary>
             /// Fee in quote asset
             /// </summary>
-            public decimal Fee { get; private set; }
-
+            public decimal Fee { get; }
+            /// <summary>
+            /// Commission paid
+            /// </summary>
+            public decimal Commission { get; }
+            /// <summary>
+            /// Asset on wich commission was paid
+            /// </summary>
+            public string CommissionAsset { get; }
             public string Market { get; private set; }
 
             public decimal Price { get; private set; }
@@ -529,9 +547,9 @@ namespace SharpTrader
         public class MarketConfiguration
         {
             public string MarketName { get; set; }
-            public double MakerFee { get; set; }
-            public double TakerFee { get; set; }
-        } 
+            public decimal MakerFee { get; set; }
+            public decimal TakerFee { get; set; }
+        }
     }
 
 

@@ -54,7 +54,7 @@ namespace SharpTrader.Utils
 
             var toDownload = symbols
                 .Where(filter)
-                .Select(sp => sp.Symbol).ToList();
+                .Select(sp => sp.symbol).ToList();
             var downloadQueue = new Queue<string>(toDownload);
             List<Task> tasks = new List<Task>();
             Stopwatch swReportRate = new Stopwatch();
@@ -204,12 +204,14 @@ namespace SharpTrader.Utils
             var tradingRules = Client.GetExchangeInfo().Result;
             foreach (var symb in tradingRules.Symbols)
             {
-                dict.Add(symb.Symbol,
+                dict.Add(symb.symbol,
                     new SymbolInfo
                     {
-                        Asset = symb.BaseAsset,
-                        QuoteAsset = symb.QuoteAsset,
-                        Symbol = symb.Symbol
+                        Asset = symb.baseAsset,
+                        QuoteAsset = symb.quoteAsset,
+                        Symbol = symb.symbol,
+                        IsMarginTadingAllowed = symb.isMarginTradingAllowed,
+                        IsSpotTadingAllowed = symb.isSpotTradingAllowed
                     });
 
             }
