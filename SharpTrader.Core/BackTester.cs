@@ -107,15 +107,17 @@ namespace SharpTrader
         public Func<MultiMarketSimulator> MarketFactory { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
+
+
         public string BaseAsset { get; set; }
         private NLog.Logger Logger;
 
         private OptimizationSpace BaseSpace;
 
-        public void Start()
+        public void Start( string sessionName = "unnamed" )
         {
             Logger = NLog.LogManager.GetLogger("Optimizer");
-
+            Logger.Info($"Starting optimization session: {sessionName}");
             BaseSpace = new OptimizationSpace();
 
             var dummyMarket = MarketFactory();
