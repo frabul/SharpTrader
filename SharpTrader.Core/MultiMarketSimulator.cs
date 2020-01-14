@@ -113,6 +113,7 @@ namespace SharpTrader
             foreach (var market in _Markets)
                 foreach (var feed in market.Feeds)
                 {
+                
                     var data = SymbolsData[market.MarketName + "_" + feed.Symbol];
                     if (data.Ticks.Count > 0)
                         while (data.Ticks.NextTickTime <= this.Time)

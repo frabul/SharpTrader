@@ -84,7 +84,17 @@ namespace SharpTrader
             }
 
             var totalBal = Simulator.GetEquity(BaseAsset);
-            var lostInFee = Simulator.Trades.Select(tr => tr.Fee).Sum();
+            //get the total fee paid calculated on commission asset
+            var feeList = Simulator.Trades.Select(
+                                                tr =>
+                                                {
+                                                    if (tr.Symbol.EndsWith(tr.CommissionAsset))
+                                                        return tr.Commission;  
+                                                    else
+                                                        return tr.Commission * tr.Price;
+                                                } ) ;
+            var lostInFee = feeList.Sum();
+            //get profit
             var profit = totalBal - startingBal;
             var totalBuys = Simulator.Trades.Where(tr => tr.Type == TradeType.Buy).Count();
             sw.Stop();

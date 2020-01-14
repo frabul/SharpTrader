@@ -30,7 +30,8 @@ namespace SharpTrader.Plotting
     public class TraderBotResultsPlotViewModel : ObservableObject
     {
         private PlotHelper Drawer;
-        private CandleStickSeries CandlesChart;
+        private CandleStickSeries Candles;
+        private VolumeSeries Volumes;
         private System.Timers.Timer timer;
         private Stopwatch yRangeUpdateWD = new Stopwatch();
 
@@ -42,41 +43,63 @@ namespace SharpTrader.Plotting
         public Dispatcher Dispatcher { get; set; }
 
         private DateTimeAxis XAxis;
-        private LinearAxis SymbolY;
+        private LinearAxis Candles_Yaxis;
 
         private List<(LineSeries line, Axis axis)> LinesOnDedicatedAxis = new List<(LineSeries, Axis)>();
+        private LinearAxis Volume_Yaxis;
+
+        public bool IsAlive => !(this.Dispatcher.HasShutdownStarted || this.Dispatcher.HasShutdownFinished);
+
+        public Axis[] DefaultAxes { get; private set; }
 
         public TraderBotResultsPlotViewModel(PlotHelper drawer)
         {
             Dispatcher = Dispatcher.CurrentDispatcher;
             Drawer = drawer;
-
             this.PlotViewModel = new PlotModel { Title = Drawer.Title };
-            CandlesChart = new CandleStickSeries()
-            {
-                IsVisible = true,
-                //CandleWidth = ChartCandleWidth * 0.5, 
-            };
-            CandlesChart.TrackerFormatString = "{0}\n{1}: {2}\nHigh: {3:0.#####}\nLow: {4:0.#####}\nOpen: {5:0.#####}\nClose: {6:0.#####}";
+
+            //add x axis 
             XAxis = new DateTimeAxis()
             {
-
                 Position = AxisPosition.Bottom,
                 StringFormat = "yyyy/MM/dd HH:mm",
                 Key = "Axis_X"
             };
-            SymbolY = new LinearAxis() { Position = AxisPosition.Left };
             PlotViewModel.Axes.Add(XAxis);
-            PlotViewModel.Axes.Add(SymbolY);
+
+            Candles_Yaxis = new LinearAxis() { Key = "Candles", Position = AxisPosition.Left };
+            PlotViewModel.Axes.Add(Candles_Yaxis);
+
+            Volume_Yaxis = new LinearAxis()
+            {
+                Key = "Volumes",
+                Position = AxisPosition.Right,
+                StartPosition = 0.0,
+                EndPosition = 0.25,
+
+            };
+            PlotViewModel.Axes.Add(Volume_Yaxis);
+
+            Candles = new CandleStickSeries();
+            Candles.TrackerFormatString = "{0}\n{1}: {2}\nHigh: {3:0.#####}\nLow: {4:0.#####}\nOpen: {5:0.#####}\nClose: {6:0.#####}";
+
+            Volumes = new VolumeSeries()
+            {
+                PositiveHollow = false,
+                VolumeStyle = VolumeStyle.Stacked,
+                YAxisKey = Volume_Yaxis.Key,
+            };
+
             PlotViewModel.KeyDown += PlotViewModel_KeyDown;
             timer = new System.Timers.Timer()
             {
                 Interval = 100,
                 AutoReset = true,
-
             };
             timer.Elapsed += UpdateOnTimerTick;
             timer.Start();
+
+            DefaultAxes = PlotViewModel.Axes.ToArray();
         }
 
         private void PlotViewModel_KeyDown(object sender, OxyKeyEventArgs e)
@@ -114,26 +137,31 @@ namespace SharpTrader.Plotting
 
         public void UpdateChart()
         {
-            ICandlestick lastTick = null;
             if (Thread.CurrentThread != Dispatcher.Thread)
             {
                 Dispatcher.BeginInvoke(new Action(UpdateChart));
                 return;
             }
 
+            //--- remove all series
             PlotViewModel.Series.Clear();
-
             while (Drawer.Candles.Next())
             {
-                this.CandlesChart.Items.Add(new ChartBar(Drawer.Candles.Tick));
+                this.Candles.Items.Add(new ChartBar(Drawer.Candles.Tick));
+                this.Volumes.Items.Add(new ChartBarVol(Drawer.Candles.Tick) { });
             }
-
-            //if (this.CandlesChart.Items.Count < 1)
-            //    return;
-
-            if (CandlesChart.Items.Count > 0)
+            //remove all axes and readd base axes
+            PlotViewModel.Axes.Clear();
+            foreach (var axis in DefaultAxes)
+                PlotViewModel.Axes.Add(axis);
+            //---
+            ICandlestick lastTick = null;
+            if (Candles.Items.Count > 0)
             {
-                PlotViewModel.Series.Add(CandlesChart);
+                PlotViewModel.Series.Add(Candles);
+                PlotViewModel.Series.Add(Volumes);
+                //draw volumes
+                //PlotViewModel.Series.Add(Volumes);
                 lastTick = Drawer.Candles.Tick;
             }
 
@@ -169,10 +197,11 @@ namespace SharpTrader.Plotting
             {
                 LineSeries lineserie = new LineSeries()
                 {
-                    MarkerStrokeThickness = 1,
+                    MarkerStrokeThickness = 2,
                     LineStyle = LineStyle.Solid,
                     Color = OxyColor.FromArgb(line.Color.A, line.Color.R, line.Color.G, line.Color.B),
                     StrokeThickness = 2f,
+                    YAxisKey = this.Candles_Yaxis.Key
                 };
 
                 lineserie.Points.AddRange(
@@ -199,14 +228,15 @@ namespace SharpTrader.Plotting
                     MarkerStrokeThickness = 1,
                     LineStyle = LineStyle.Solid,
                     Color = OxyColor.FromArgb(line.Color.A, line.Color.R, line.Color.G, line.Color.B),
-                    StrokeThickness = 3f,
+                    StrokeThickness = 1f,
                     YAxisKey = axis.Key,
                     XAxisKey = XAxis.Key
                 };
 
+                lock (line)
+                    lineserie.Points.AddRange(
+                        line.Points.Select(dot => new DataPoint(dot.X.ToAxisDouble(), dot.Y)));
 
-                lineserie.Points.AddRange(
-                    line.Points.Select(dot => new DataPoint(dot.X.ToAxisDouble(), dot.Y)));
                 PlotViewModel.Series.Add(lineserie);
                 linesAdded++;
 
@@ -227,78 +257,57 @@ namespace SharpTrader.Plotting
                     new ScatterPoint(Drawer.Points[p].Time.ToAxisDouble(), Drawer.Points[p].Value, 5));
             PlotViewModel.Series.Add(pointsSerie);
 
-            //---------- ADJUST X
+            //---------- ADJUST X to show 100 candles
             if (lastTick != null)
             {
-                PlotViewModel.Axes[0].Minimum =
-                    lastTick.Time.Subtract(new TimeSpan(ChartWidth * lastTick.Timeframe.Ticks)).ToAxisDouble();
-                PlotViewModel.Axes[0].Maximum = lastTick.Time.ToAxisDouble();
+                var Xmax = Candles.Items[Candles.Items.Count - 1].X;
+                var Xmin = Candles.Items[Candles.Items.Count - 288].X;
+                PlotViewModel.Axes[0].Minimum = Xmin;
+                PlotViewModel.Axes[0].Maximum = Xmax;
                 PlotViewModel.Axes[0].Reset();
             }
 
             //--------- ADJUST Y
             AdjustYAxisZoom();
-
             PlotViewModel.InvalidatePlot(true);
+            return;
         }
 
         private void AdjustYAxisZoom()
         {
-            //search for min and max value
+            var xmin = XAxis.ActualMinimum;
+            var xmax = XAxis.ActualMaximum;
 
-            double mainAxisMin = double.MaxValue;
-            double mainAxisMax = double.MinValue;
+            //adcjust candles and volume
+            if (Candles.Items.Count > 0)
+            {
+                var istart = Candles.FindByX(xmin);
+                var iend = Candles.FindByX(xmax, istart);
 
+                var ymin = double.MaxValue;
+                var ymax = double.MinValue;
 
-
-            foreach (var el in PlotViewModel.Series)
-            { 
-                if (el is LineSeries ls || el is DataPointSeries ps)
+                var volMin = double.MaxValue;
+                var volMax = double.MinValue;
+                for (int i = istart; i <= iend; i++)
                 {
+                    var bar = Candles.Items[i];
+                    ymin = Math.Min(ymin, bar.Low);
+                    ymax = Math.Max(ymax, bar.High);
 
-                    ls = el as LineSeries;
-                    ps = el as DataPointSeries;
-                    if (ps.YAxis == null || ps.YAxis == PlotViewModel.Axes[1])
-                    {
-                        var items = ls != null ? ls.Points : ps.Points;
-                        int i = items.Count - 1;
-                        while ((i > -1) && (items[i].X >= PlotViewModel.Axes[0].ActualMinimum))
-                        {
-                            if (items[i].X <= PlotViewModel.Axes[0].ActualMaximum)
-                            {
-                                mainAxisMax = Math.Max(mainAxisMax, items[i].Y);
-                                mainAxisMin = Math.Min(mainAxisMin, items[i].Y);
-                                if (mainAxisMin < 0.0007)
-                                    Console.Write("");
-                            }
-                            i--;
-                        }
-                    }
+                    var vol = Volumes.Items[i].BuyVolume + Volumes.Items[i].SellVolume;
+                    volMin = Math.Min(volMin, vol);
+                    volMax = Math.Max(volMax, vol);
                 }
-                else if (el is CandleStickSeries candles)
-                {
-                    var items = candles.Items;
-                    int i = items.Count - 1;
 
-                    while ((i > -1) && (items[i].X >= PlotViewModel.Axes[0].ActualMinimum))
-                    {
-                        if (items[i].X <= PlotViewModel.Axes[0].ActualMaximum)
-                        {
-                            mainAxisMax = Math.Max(mainAxisMax, items[i].High);
-                            mainAxisMin = Math.Min(mainAxisMin, items[i].Low);
-                        }
-                        i--;
-                    }
-                }
+                var extent = ymax - ymin;
+                var margin = extent * 0.10;
+
+                this.Candles_Yaxis.Zoom(ymin - margin, ymax + margin);
+                this.Volume_Yaxis.Zoom(0, volMax);
             }
-            var delta = Math.Max(0.000001, (mainAxisMax - mainAxisMin));
 
-            PlotViewModel.Axes[1].Minimum = mainAxisMin - delta * 0.03;
-            PlotViewModel.Axes[1].Maximum = mainAxisMax + delta * 0.03;
-
-            PlotViewModel.Axes[1].Reset();
-
-
+            //adjust other lines
             foreach (var lx in LinesOnDedicatedAxis)
             {
                 double min = double.MaxValue;
@@ -313,12 +322,9 @@ namespace SharpTrader.Plotting
                     if (p.X > XAxis.ActualMaximum)
                         break;
                 }
-                lx.axis.Minimum = min;
-                lx.axis.Maximum = max;
-                lx.axis.Reset();
+                lx.axis.Zoom(min, max);
             }
 
-            //PlotViewModel.InvalidatePlot(false);
         }
 
         public static TraderBotResultsPlotViewModel RunWindow(PlotHelper plot)
@@ -330,14 +336,14 @@ namespace SharpTrader.Plotting
                 vm = new Plotting.TraderBotResultsPlotViewModel(plot);
                 // Create our context, and install it:
                 SynchronizationContext.SetSynchronizationContext(
-                    new DispatcherSynchronizationContext(
-                        Dispatcher.CurrentDispatcher));
+            new DispatcherSynchronizationContext(
+                Dispatcher.CurrentDispatcher));
 
                 Window = new TraderBotResultsPlot();
 
                 // When the window closes, shut down the dispatcher
                 Window.Closed += (s, e) =>
-                   Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
+           Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
                 Window.DataContext = vm;
                 Window.Show();
                 // Start the Dispatcher Processing
@@ -376,6 +382,17 @@ namespace SharpTrader.Plotting
         public ChartBar(ICandlestick c)
             : base(c.Time.ToAxisDouble(), c.High, c.Low, c.Open, c.Close)
         {
+            Time = c.Time;
+        }
+    }
+    public class ChartBarVol : OhlcvItem
+    {
+        public DateTime Time { get; set; }
+        public ChartBarVol(ICandlestick c)
+            : base(c.Time.ToAxisDouble(), c.Open, c.High, c.Low, c.Close)
+        {
+            this.BuyVolume = c.Close > c.Open ? c.Volume : 0;
+            this.SellVolume = c.Close > c.Open ? 0 : c.Volume;
             Time = c.Time;
         }
     }

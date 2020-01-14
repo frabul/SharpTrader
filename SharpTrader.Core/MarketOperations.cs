@@ -131,7 +131,8 @@ namespace SharpTrader
         string Symbol { get; }
         decimal Amount { get; }
         decimal Price { get; }
-        decimal Fee { get; }
+        decimal Commission { get; }
+        string CommissionAsset { get; }
         TradeType Type { get; }
         string ClientOrderId { get; }
         string OrderId { get; }

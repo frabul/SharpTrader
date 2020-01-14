@@ -1452,14 +1452,13 @@ namespace SharpTrader
             }
             public ApiTrade(string symbol, AccountTradeReponse tr)
             {
-
                 Market = "Binance";
                 Symbol = symbol;
                 Type = tr.IsBuyer ? TradeType.Buy : TradeType.Sell;
                 Price = tr.Price;
                 Amount = tr.Quantity;
-                Fee = tr.Commission;
-                FeeAsset = tr.CommissionAsset;
+                Commission = tr.Commission;
+                CommissionAsset = tr.CommissionAsset;
                 Time = tr.Time;
                 OrderId = tr.OrderId;
                 TradeId = tr.Id;
@@ -1473,8 +1472,8 @@ namespace SharpTrader
                 Type = tr.Side == OrderSide.Buy ? TradeType.Buy : TradeType.Sell;
                 Price = tr.PriceOfLastFilledTrade;
                 Amount = tr.QuantityOfLastFilledTrade;
-                Fee = Fee;
-                FeeAsset = FeeAsset;
+                Commission = Commission;
+                CommissionAsset = CommissionAsset;
                 Time = tr.TimeStamp;
                 OrderId = tr.OrderId;
                 ClientOrderId = tr.NewClientOrderId;
@@ -1487,12 +1486,12 @@ namespace SharpTrader
             public long OrderId { get; set; }
             public string ClientOrderId { get; set; }
             public decimal Amount { get; set; }
-            public decimal Fee { get; set; }
+            public decimal Commission { get; set; }
             public string Market { get; set; }
             public decimal Price { get; set; }
             public string Symbol { get; set; }
             public TradeType Type { get; set; }
-            public string FeeAsset { get; set; }
+            public string CommissionAsset { get; set; }
             public DateTime Time { get; set; }
 
             [BsonIgnore]

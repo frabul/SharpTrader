@@ -29,7 +29,11 @@ namespace SharpTrader
             public string MarketName { get; private set; }
             public decimal MakerFee { get; set; } = 0.00075m;
             public decimal TakerFee { get; set; } = 0.00075m;
-
+           
+            /// <summary>
+            /// Initial spread for all symbols
+            /// </summary>
+            public double Spread { get; set; }
             public bool AllowBorrow { get; set; } = false;
 
             public DateTime Time { get; internal set; }
@@ -60,7 +64,7 @@ namespace SharpTrader
                 if (!feedFound)
                 {
                     var sInfo = SymbolsTable[symbol];
-                    feed = new SymbolFeed(this.MarketName, symbol, sInfo.Asset, sInfo.QuoteAsset);
+                    feed = new SymbolFeed(this.MarketName, symbol, sInfo.Asset, sInfo.QuoteAsset); 
                     lock (LockObject)
                         SymbolsFeed.Add(symbol, feed);
                 }
@@ -132,9 +136,9 @@ namespace SharpTrader
 
                     var trade = new Trade(
                         this.MarketName, symbol, this.Time,
-                        type, price, amount, this.TakerFee, order);
+                        type, price, amount,   order);
 
-                    RegisterTrade(feed, trade);
+                    RegisterTrade(feed, trade, isTaker: true);
                     this.ClosedOrders.Add(order);
                     return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
                 }
@@ -192,7 +196,7 @@ namespace SharpTrader
                         if (order.Type == OrderType.Limit)
                         {
                             var willBuy = (order.TradeType == TradeType.Buy && feed.Ticks.LastTick.Low + feed.Spread <= (double)order.Price);
-                            var willSell = (order.TradeType == TradeType.Sell && feed.Ticks.LastTick.High >= (double)order.Price);
+                            var willSell = (order.TradeType == TradeType.Sell && feed.Ticks.LastTick.High - feed.Spread >= (double)order.Price);
 
                             if (willBuy || willSell)
                             {
@@ -202,11 +206,10 @@ namespace SharpTrader
                                     time: feed.Ticks.LastTick.OpenTime.AddSeconds(feed.Ticks.LastTick.Timeframe.Seconds / 2),
                                     price: (double)order.Price,
                                     amount: order.Amount,
-                                    type: order.TradeType,
-                                    feeRatio: this.MakerFee,
+                                    type: order.TradeType, 
                                     order: order
                                 );
-                                RegisterTrade(feed, trade);
+                                RegisterTrade(feed, trade, isTaker: false);
                                 ClosedOrders.Add(PendingOrders[i]);
                                 PendingOrders.RemoveAt(i--);
                             }
@@ -215,26 +218,34 @@ namespace SharpTrader
                 }
             }
 
-            private void RegisterTrade(SymbolFeed feed, Trade trade)
+            private void RegisterTrade(SymbolFeed feed, Trade trade, bool isTaker)
             {
                 lock (LockObject)
                 {
+                  
                     var qBal = _Balances[feed.QuoteAsset];
                     var aBal = _Balances[feed.Asset];
+                    
+
                     if (trade.Type == TradeType.Buy)
-                    {
-                        aBal.Free += trade.Amount * (decimal)(1 - trade.FeeRatio);
+                    { 
+                        aBal.Free += trade.Amount;
                         qBal.Locked -= (trade.Amount * trade.Price);
                         Debug.Assert(qBal.Locked >= 0, "incoerent trade");
                     }
-
-                    if (trade.Type == TradeType.Sell)
+                    else if (trade.Type == TradeType.Sell)
                     {
-                        qBal.Free += trade.Amount * trade.Price - trade.Fee;
-                        aBal.Locked -= Convert.ToDecimal(trade.Amount);
+                        qBal.Free += trade.Amount * trade.Price;
+                        aBal.Locked -= trade.Amount;
                         Debug.Assert(_Balances[feed.Asset].Locked >= -0.0000000001m, "incoerent trade");
                     }
+                    //always pay commissions on quote asset
+                    var feeRatio = isTaker ? TakerFee : MakerFee; 
+                    trade.Commission = trade.Amount * feeRatio * trade.Price;
+                    trade.CommissionAsset = feed.QuoteAsset;
+                    qBal.Free -= trade.Commission;
 
+                    //set order status
                     trade.Order.Status = OrderStatus.Filled;
                     trade.Order.Filled = trade.Amount;
                     this._Trades.Add(trade);
@@ -245,7 +256,9 @@ namespace SharpTrader
             public void AddNewCandle(SymbolFeed feed, Candlestick tick)
             {
                 Time = tick.CloseTime;
+                feed.Spread = tick.Close * Spread;
                 feed.AddNewCandle(tick);
+                
             }
 
             public class AssetBalance
@@ -479,18 +492,15 @@ namespace SharpTrader
 
         class Trade : ITrade
         {
-            private static long IdCounter = 0;
-            public decimal FeeRatio { get; private set; }
-            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, decimal feeRatio, Order order)
+            private static long IdCounter = 0; 
+            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount,   Order order)
             {
                 Market = market;
                 Symbol = symbol;
                 Time = time;
                 Type = type;
                 Price = (decimal)price;
-                Amount = amount;
-                FeeRatio = feeRatio;
-                Fee = amount * FeeRatio * (decimal)price;
+                Amount = amount; 
                 Order = order;
                 Id = (IdCounter++).ToString();
             }
@@ -498,19 +508,15 @@ namespace SharpTrader
             public decimal Amount { get; private set; }
 
             public DateTime Time { get; private set; }
-
-            /// <summary>
-            /// Fee in quote asset
-            /// </summary>
-            public decimal Fee { get; }
+             
             /// <summary>
             /// Commission paid
             /// </summary>
-            public decimal Commission { get; }
+            public decimal Commission { get; set; }
             /// <summary>
-            /// Asset on wich commission was paid
+            /// Asset used to pay the commission
             /// </summary>
-            public string CommissionAsset { get; }
+            public string CommissionAsset { get; set; }
             public string Market { get; private set; }
 
             public decimal Price { get; private set; }
