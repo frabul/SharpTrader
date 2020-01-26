@@ -74,17 +74,14 @@ namespace SharpTrader
 
     public interface ISymbolFeed
     {
-        event Action<ISymbolFeed> OnTick; 
-        string Symbol { get; }
+        event Action<ISymbolFeed> OnTick;
+        SymbolInfo Symbol { get; }
         string Market { get; } 
         double Spread { get; }
         double Bid { get; }
-        double Ask { get; }
-        string Asset { get; }
-        string QuoteAsset { get; }
+        double Ask { get; } 
+        bool Disposed { get; } 
 
-        bool Disposed { get; }
-        
         /// <summary>
         /// Returns maker data history ( candlesticks ) with provided timeframe 
         /// </summary>  

@@ -24,7 +24,7 @@ namespace SharpTrader
         }
 
         public abstract Task OnStartAsync();
-        public abstract Task OnTickAsync();
+        public abstract Task OnTickAsync(); 
     }
 
 
