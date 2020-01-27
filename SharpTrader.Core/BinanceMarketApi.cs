@@ -1024,7 +1024,7 @@ namespace SharpTrader
             {
                 Asset = sym.baseAsset,
                 QuoteAsset = sym.quoteAsset,
-                Symbol = sym.symbol,
+                Key = sym.symbol,
             });
         }
 
@@ -1259,12 +1259,12 @@ namespace SharpTrader
                 }
             }
 
-            public override async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
+            public override async Task<TimeSerieNavigator<ITradeBar>> GetNavigatorAsync(TimeSpan timeframe)
             {
                 return await GetNavigatorAsync(timeframe, new DateTime(2016, 1, 1));
             }
 
-            public override async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
+            public override async Task<TimeSerieNavigator<ITradeBar>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
             {
                 if (!TicksInitialized)
                 {

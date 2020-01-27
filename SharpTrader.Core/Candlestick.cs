@@ -7,7 +7,7 @@ using ProtoBuf;
 namespace SharpTrader
 {
     [ProtoContract]
-    public class Candlestick : ICandlestick
+    public class Candlestick : ITradeBar
     {
         [ProtoMember(1)]
         public virtual DateTime OpenTime { get; set; }
@@ -38,10 +38,14 @@ namespace SharpTrader
 
         [ProtoIgnore]
         public virtual double Length { get { return this.High - this.Low; } }
+        [ProtoIgnore]
+        public double Value => this.Close;
+        [ProtoIgnore]
+        public MarketDataKind Kind => MarketDataKind.TradeBar;
 
         public Candlestick() { }
 
-        public Candlestick(DateTime openTime, ICandlestick toCopy, TimeSpan duration)
+        public Candlestick(DateTime openTime, ITradeBar toCopy, TimeSpan duration)
         {
             Open = toCopy.Open;
             Close = toCopy.Close;
@@ -52,7 +56,7 @@ namespace SharpTrader
             CloseTime = openTime + duration;
         }
 
-        public Candlestick(ICandlestick toCopy)
+        public Candlestick(ITradeBar toCopy)
         {
             Open = toCopy.Open;
             Close = toCopy.Close;
@@ -77,7 +81,7 @@ namespace SharpTrader
             };
         }
 
-        public void Merge(ICandlestick c)
+        public void Merge(ITradeBar c)
         {
             if (this.High < c.High)
                 this.High = c.High;
@@ -88,7 +92,7 @@ namespace SharpTrader
         }
         public override bool Equals(object obj)
         {
-            var c = obj as ICandlestick;
+            var c = obj as ITradeBar;
             if (c == null)
                 return false;
             var equal =
@@ -102,6 +106,10 @@ namespace SharpTrader
                 c.Timeframe == this.Timeframe &&
                 c.Volume == this.Volume;
             return equal;
+        }
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
         }
     }
 }

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class TrueRange<T> : Indicator where T : ICandlestick
+    public class TrueRange<T> : Indicator where T : ITradeBar
     {
 
         TimeSerieNavigator<T> Candles;
@@ -32,8 +32,8 @@ namespace SharpTrader.Indicators
             {
                 if (Candles.Position > 1)
                 {
-                    ICandlestick candle = Candles.Tick;
-                    ICandlestick previous = Candles.PreviousTick;
+                    ITradeBar candle = Candles.Tick;
+                    ITradeBar previous = Candles.PreviousTick;
                     var tr = Math.Max(Math.Max(candle.High - candle.Low, candle.High - previous.Close), previous.Close - candle.Low);
                     TrueRanges.AddRecord(new FRecord(candle.Time, tr));
                 }
@@ -42,7 +42,7 @@ namespace SharpTrader.Indicators
         }
     }
 
-    public class AverageTrueRange<T> : Indicator where T : ICandlestick
+    public class AverageTrueRange<T> : Indicator where T : ITradeBar
     {
         private TimeSerie<FRecord> TrueRanges;
 

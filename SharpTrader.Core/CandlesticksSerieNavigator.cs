@@ -10,7 +10,7 @@ namespace SharpTrader
     {
         private Stack<int> PositionSaveStack = new Stack<int>();
         private static CandlestickTimeComparer CandlestickTimeComparer = new CandlestickTimeComparer();
-        private ICandlestick[] Records;
+        private ITradeBar[] Records;
 
         private int _Cursor = 0;
         public int Count { get { return Records.Length; } }
@@ -41,19 +41,19 @@ namespace SharpTrader
         public DateTime Time { get { return Records[_Cursor].OpenTime; } }
 
         public int Position { get { return _Cursor; } }
-        public ICandlestick Tick { get { return Records[_Cursor]; } }
-        public ICandlestick NextTick { get { return Records[_Cursor + 1]; } }
-        public ICandlestick PreviousTick { get { return Records[_Cursor - 1]; } }
+        public ITradeBar Tick { get { return Records[_Cursor]; } }
+        public ITradeBar NextTick { get { return Records[_Cursor + 1]; } }
+        public ITradeBar PreviousTick { get { return Records[_Cursor - 1]; } }
         public DateTime LastTickTime { get { return Records[Records.Length - 1].OpenTime; } }
         public DateTime FirstTickTime { get { return Records[0].OpenTime; } }
 
       
         public CandlesticksSerieNavigator(IList<Candlestick> list)
         {
-            Records = list.Cast<ICandlestick>().ToArray();
+            Records = list.Cast<ITradeBar>().ToArray();
         }
 
-        public bool TryGetRecord(DateTime time, out ICandlestick record)
+        public bool TryGetRecord(DateTime time, out ITradeBar record)
         {
             record = null;
 
@@ -67,11 +67,11 @@ namespace SharpTrader
                 return false;
         }
 
-        public ICandlestick GetLast(Func<ICandlestick, bool> criteria)
+        public ITradeBar GetLast(Func<ITradeBar, bool> criteria)
         {
             this.PositionPush();
             this.SeekNearestPreceding(LastTickTime);
-            ICandlestick res = null;
+            ITradeBar res = null;
             while (this.Previous())
                 if (criteria(this.Tick))
                 {

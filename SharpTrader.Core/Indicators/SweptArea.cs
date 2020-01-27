@@ -8,17 +8,17 @@ namespace SharpTrader.Indicators
 {
     public class SweptArea : Indicator
     {
-        public SweptArea(int steps, TimeSerieNavigator<ICandlestick> candles) : base("SweptArea")
+        public SweptArea(int steps, TimeSerieNavigator<ITradeBar> candles) : base("SweptArea")
         {
             Steps = steps;
-            Candles = new TimeSerieNavigator<ICandlestick>(candles);
+            Candles = new TimeSerieNavigator<ITradeBar>(candles);
             candles.OnNewRecord += r => { CalculateAll(); };
             CalculateAll();
         }
 
         public int Steps { get; set; }
 
-        private TimeSerieNavigator<ICandlestick> Candles;
+        private TimeSerieNavigator<ITradeBar> Candles;
         private TimeSerie<FRecord> Values = new TimeSerie<FRecord>();
         public override bool IsReady => Candles.Count > Steps;
 

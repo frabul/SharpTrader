@@ -155,7 +155,7 @@ namespace SharpTrader.Plotting
             foreach (var axis in DefaultAxes)
                 PlotViewModel.Axes.Add(axis);
             //---
-            ICandlestick lastTick = null;
+            ITradeBar lastTick = null;
             if (Candles.Items.Count > 0)
             {
                 PlotViewModel.Series.Add(Candles);
@@ -379,7 +379,7 @@ namespace SharpTrader.Plotting
     public class ChartBar : HighLowItem
     {
         public DateTime Time { get; set; }
-        public ChartBar(ICandlestick c)
+        public ChartBar(ITradeBar c)
             : base(c.Time.ToAxisDouble(), c.High, c.Low, c.Open, c.Close)
         {
             Time = c.Time;
@@ -388,7 +388,7 @@ namespace SharpTrader.Plotting
     public class ChartBarVol : OhlcvItem
     {
         public DateTime Time { get; set; }
-        public ChartBarVol(ICandlestick c)
+        public ChartBarVol(ITradeBar c)
             : base(c.Time.ToAxisDouble(), c.Open, c.High, c.Low, c.Close)
         {
             this.BuyVolume = c.Close > c.Open ? c.Volume : 0;

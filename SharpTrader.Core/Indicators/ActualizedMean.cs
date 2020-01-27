@@ -16,7 +16,7 @@ namespace SharpTrader.Indicators
         public int Period { get; private set; } = 5;
         public int SlopeSmoothingSteps { get; set; } = 3;
         private TimeSerie<Record> Records = new TimeSerie<Record>();
-        private TimeSerieNavigator<ICandlestick> Chart;
+        private TimeSerieNavigator<ITradeBar> Chart;
 
         public class Record : ITimeRecord
         {
@@ -43,16 +43,16 @@ namespace SharpTrader.Indicators
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified period.
         /// </summary>  
-        public ZeroLagMA(int period, TimeSerieNavigator<ICandlestick> chart) : this("Variance_" + period, period, chart)
+        public ZeroLagMA(int period, TimeSerieNavigator<ITradeBar> chart) : this("Variance_" + period, period, chart)
         {
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified name and period.
         /// </summary>  
-        public ZeroLagMA(string name, int period, TimeSerieNavigator<ICandlestick> chart) : base(name)
+        public ZeroLagMA(string name, int period, TimeSerieNavigator<ITradeBar> chart) : base(name)
         {
-            Chart = new TimeSerieNavigator<ICandlestick>(chart);
+            Chart = new TimeSerieNavigator<ITradeBar>(chart);
             Period = period;
             chart.OnNewRecord += rec => this.Calculate();
             this.Calculate();

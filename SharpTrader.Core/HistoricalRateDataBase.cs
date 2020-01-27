@@ -194,10 +194,10 @@ namespace SharpTrader
             }
             Console.WriteLine("Updating history db....completed");
         }
-        internal (ICandlestick first, ICandlestick last) GetFirstAndLastCandles(HistoryInfo historyInfo)
+        internal (ITradeBar first, ITradeBar last) GetFirstAndLastCandles(HistoryInfo historyInfo)
         {
-            ICandlestick first = null;
-            ICandlestick last = null;
+            ITradeBar first = null;
+            ITradeBar last = null;
             var infos = GetHistoryFiles(historyInfo).OrderBy(fi => fi.Date).ToArray();
             if (infos.Length > 0)
             {
@@ -330,7 +330,7 @@ namespace SharpTrader
                 return history;
             }
         }
-        public void AddCandlesticks(string market, string symbol, IEnumerable<ICandlestick> candles)
+        public void AddCandlesticks(string market, string symbol, IEnumerable<ITradeBar> candles)
         {
             var hinfo = new HistoryInfo(market, symbol, candles.First().Timeframe);
             var sdata = GetHistoryRaw(hinfo, candles.First().OpenTime);
@@ -339,13 +339,13 @@ namespace SharpTrader
             //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
             AddCandlesToHistData(candles, sdata);
         }
-        private static void AddCandlesToHistData(IEnumerable<ICandlestick> candles, SymbolHistoryRaw sdata)
+        private static void AddCandlesToHistData(IEnumerable<ITradeBar> candles, SymbolHistoryRaw sdata)
         {
             lock (sdata.Locker)
             {
                 foreach (var c in candles)
                 {
-                    ICandlestick lastCandle = sdata.Ticks.Count > 0 ? sdata.Ticks[sdata.Ticks.Count - 1] : null;
+                    ITradeBar lastCandle = sdata.Ticks.Count > 0 ? sdata.Ticks[sdata.Ticks.Count - 1] : null;
                     if (c.Timeframe != sdata.Timeframe)
                     {
                         //throw new InvalidOperationException("Bad timeframe for candle");
@@ -548,14 +548,14 @@ namespace SharpTrader
             public string Market { get; }
             public string Symbol { get; }
             public TimeSpan Timeframe { get; }
-            public TimeSerieNavigator<ICandlestick> Ticks { get; }
+            public TimeSerieNavigator<ITradeBar> Ticks { get; }
             public double Spread { get; }
             public SymbolHistory(SymbolHistoryRaw raw, DateTime startOfData)
             {
                 Market = raw.Market;
                 Symbol = raw.Symbol;
                 Timeframe = raw.Timeframe;
-                Ticks = new TimeSerieNavigator<ICandlestick>(raw.Ticks.Where(t => t.Time >= startOfData));
+                Ticks = new TimeSerieNavigator<ITradeBar>(raw.Ticks.Where(t => t.Time >= startOfData));
                 Spread = raw.Spread;
             }
             public SymbolHistory(SymbolHistoryRaw raw)
@@ -563,7 +563,7 @@ namespace SharpTrader
                 Market = raw.Market;
                 Symbol = raw.Symbol;
                 Timeframe = raw.Timeframe;
-                Ticks = new TimeSerieNavigator<ICandlestick>(raw.Ticks);
+                Ticks = new TimeSerieNavigator<ITradeBar>(raw.Ticks);
                 Spread = raw.Spread;
             }
         }
@@ -573,7 +573,7 @@ namespace SharpTrader
         string Market { get; }
         string Symbol { get; }
         TimeSpan Timeframe { get; }
-        TimeSerieNavigator<ICandlestick> Ticks { get; }
+        TimeSerieNavigator<ITradeBar> Ticks { get; }
         double Spread { get; }
     }
 }

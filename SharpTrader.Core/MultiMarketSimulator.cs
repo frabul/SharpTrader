@@ -11,15 +11,18 @@ namespace SharpTrader
     {
         private static string ConfigFile = "MarketsSimulator.json";
         private Market[] _Markets;
-        private Dictionary<string, ISymbolHistory> SymbolsData = new Dictionary<string, ISymbolHistory>();
+
         private HistoricalRateDataBase HistoryDb;
         private Configuration Config;
         private DateTime FirstTickTime = DateTime.MaxValue;
-        private TimeSpan Delta = TimeSpan.Zero;
+        private TimeSpan Resolution = TimeSpan.Zero;
         private DateTime _startOfSimulation = new DateTime(2000, 1, 1);
 
         public IEnumerable<IMarketApi> Markets => _Markets;
         public DateTime Time { get; private set; }
+
+        private DateTime NextTickTime;
+
         public DateTime StartOfHistoryData
         {
             get => _startOfSimulation; set
@@ -33,7 +36,7 @@ namespace SharpTrader
         }
 
         public MultiMarketSimulator(string dataDirectory, Configuration config, HistoricalRateDataBase historyDb)
-        { 
+        {
             Config = config;
             HistoryDb = historyDb;
             this._Markets = new Market[Config.Markets.Length];
@@ -79,47 +82,45 @@ namespace SharpTrader
 
         public bool NextTick(bool raiseEvents)
         {
+            //if we don't have yet a first tick then we need to try and load the first tick for all symbols
             if (FirstTickTime == DateTime.MaxValue)
             {
-                //find the nearest candle of all SymbolsData between the symbols that have been requested
-
+                //find the nearest candle of all SymbolsData between the symbols that have been requested 
                 foreach (var market in _Markets)
-                    foreach (var feed in market.Feeds)
+                    foreach (var feed in market.SymbolsFeeds.Values)
                     {
-                        var key = market.MarketName + "_" + feed.Symbol;
-                        SymbolsData.TryGetValue(key, out var sdata);
-                        if (sdata == null)
+                        if (feed.DataSource == null)
                         {
-                            var histInfo = new HistoryInfo(market.MarketName, feed.Symbol, TimeSpan.FromSeconds(60));
-                            sdata = this.HistoryDb.GetSymbolHistory(histInfo, StartOfHistoryData);
-                            SymbolsData.Add(key, sdata);
+                            var histInfo = new HistoryInfo(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
+                            feed.DataSource = this.HistoryDb.GetSymbolHistory(histInfo, StartOfHistoryData);
                             this.HistoryDb.CloseFile(histInfo);
                         }
-                        if (sdata.Ticks.Count > 0)
-                            FirstTickTime = FirstTickTime > sdata.Ticks.FirstTickTime ? sdata.Ticks.FirstTickTime : FirstTickTime;
+                        if (feed.DataSource.Ticks.Count > 0 && FirstTickTime > feed.DataSource.Ticks.FirstTickTime) 
+                            FirstTickTime = feed.DataSource.Ticks.FirstTickTime;  
                     }
             }
+            
             if (FirstTickTime == DateTime.MaxValue)
                 throw new Exception("Error...FirstTickTime not found");
-            Delta = Delta + TimeSpan.FromSeconds(60);
-            var nextTick = FirstTickTime + Delta;
 
+            Resolution = TimeSpan.FromSeconds(60);
+            var nextTick = FirstTickTime + Resolution;
 
             //update market time
             this.Time = nextTick;
 
-            //add new candle to all symbol feeds that have it
-
+            //add new data to all symbol feeds that have it  
+            //todo it's possible to optimize this loop by remembering the minimum next tick time of all sources
+            this.NextTickTime = default(DateTime);
             foreach (var market in _Markets)
-                foreach (var feed in market.Feeds)
+                foreach (var feed in market.SymbolsFeeds.Values)
                 {
-                
-                    var data = SymbolsData[market.MarketName + "_" + feed.Symbol];
-                    if (data.Ticks.Count > 0)
-                        while (data.Ticks.NextTickTime <= this.Time)
+                    var dataSource = feed.DataSource;
+                    if (dataSource.Ticks.Count > 0)
+                        while (dataSource.Ticks.NextTickTime <= this.Time)
                         {
-                            data.Ticks.Next();
-                            var candle = data.Ticks.Tick is Candlestick c ? c : new Candlestick(data.Ticks.Tick);
+                            dataSource.Ticks.Next();
+                            var candle = dataSource.Ticks.Tick is Candlestick c ? c : new Candlestick(dataSource.Ticks.Tick);
                             market.AddNewCandle(feed as SymbolFeed, candle);// new Candlestick(data.Ticks.Tick)); //use less memory
                         }
                 }
@@ -145,7 +146,7 @@ namespace SharpTrader
 
         public class Configuration
         {
-            public MarketConfiguration[] Markets { get; set; } 
+            public MarketConfiguration[] Markets { get; set; }
         }
     }
 

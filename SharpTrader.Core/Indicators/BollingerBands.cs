@@ -8,7 +8,7 @@ namespace SharpTrader.Indicators
         // (Closing price-EMA(previous day)) x multiplier + EMA(previous day)
 
         TimeSerie<Record> Ticks = new TimeSerie<Record>();
-        TimeSerieNavigator<ICandlestick> Chart;
+        TimeSerieNavigator<ITradeBar> Chart;
         MeanAndVariance MeanAndVariance;
         TimeSerieNavigator<MeanAndVariance.Record> MeanAndVarianceValues;
 
@@ -22,14 +22,14 @@ namespace SharpTrader.Indicators
             return new TimeSerieNavigator<Record>(Ticks);
         }
 
-        public BollingerBands(string name, int period, double deviation, TimeSerieNavigator<ICandlestick> data) : base(name)
+        public BollingerBands(string name, int period, double deviation, TimeSerieNavigator<ITradeBar> data) : base(name)
         {
             MeanAndVariance = new MeanAndVariance(period, data);
             MeanAndVarianceValues = MeanAndVariance.GetNavigator();
             Period = period;
             Deviation = deviation;
 
-            Chart = new TimeSerieNavigator<ICandlestick>(data);
+            Chart = new TimeSerieNavigator<ITradeBar>(data);
             MeanAndVarianceValues.OnNewRecord += rec => this.Calculate();
             Calculate();
         }

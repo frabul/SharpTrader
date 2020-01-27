@@ -32,16 +32,16 @@ namespace SharpTrader
         public static bool EpsilonEqual(this double x1, double x2, double epsilon) => Math.Abs((x1 - x2) / x1) < epsilon;
         public static bool EpsilonEqual(this decimal x1, decimal x2, double epsilon) => Math.Abs((x1 - x2) / x1) < (decimal)epsilon;
     }
-    public class CandlestickTimeComparer<Tc> : IComparer<Tc> where Tc : ICandlestick
+    public class CandlestickTimeComparer<Tc> : IComparer<Tc> where Tc : ITradeBar
     {
         public int Compare(Tc x, Tc y)
         {
             return x.Time.CompareTo(y.Time);
         }
     }
-    public class CandlestickTimeComparer : IComparer<ICandlestick>
+    public class CandlestickTimeComparer : IComparer<ITradeBar>
     {
-        public int Compare(ICandlestick x, ICandlestick y)
+        public int Compare(ITradeBar x, ITradeBar y)
         {
             return x.OpenTime.CompareTo(y);
             //return (int)(x.OpenTime.Ticks - y.OpenTime.Ticks);

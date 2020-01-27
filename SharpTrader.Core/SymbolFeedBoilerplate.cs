@@ -11,30 +11,27 @@ namespace SharpTrader
     {
         public event Action<ISymbolFeed> OnTick;
         private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
-
-
+         
         private bool onTickPending = false;
         private object Locker = new object();
 
-        private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
-
-
-        public TimeSerie<ICandlestick> Ticks { get; set; } = new TimeSerie<ICandlestick>();
+        private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20); 
+        public TimeSerie<ITradeBar> Ticks { get; set; } = new TimeSerie<ITradeBar>();
         public bool Disposed { get; protected set; }
 
         public class DerivedChart
         {
             public TimeSpan Timeframe;
-            public TimeSerie<ICandlestick> Ticks;
+            public TimeSerie<ITradeBar> Ticks;
             public Candlestick FormingCandle;
         }
 
-        public virtual Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe)
+        public virtual Task<TimeSerieNavigator<ITradeBar>> GetNavigatorAsync(TimeSpan timeframe)
         {
 
             if (BaseTimeframe == timeframe)
             {
-                return Task.FromResult<TimeSerieNavigator<ICandlestick>>(Ticks);
+                return Task.FromResult<TimeSerieNavigator<ITradeBar>>(Ticks);
             }
             else
             {
@@ -45,11 +42,11 @@ namespace SharpTrader
                     {
                         Timeframe = timeframe,
                         FormingCandle = null,
-                        Ticks = new TimeSerie<ICandlestick>()
+                        Ticks = new TimeSerie<ITradeBar>()
                     };
 
                     //we need to initialize it with all the data that we have
-                    var tticks = new TimeSerieNavigator<ICandlestick>(this.Ticks);
+                    var tticks = new TimeSerieNavigator<ITradeBar>(this.Ticks);
                     while (tticks.Next())
                     {
                         var newCandle = tticks.Tick;
@@ -58,16 +55,16 @@ namespace SharpTrader
                     }
                     DerivedTicks.Add(der);
                 }
-                return Task.FromResult(new TimeSerieNavigator<ICandlestick>(der.Ticks));
+                return Task.FromResult(new TimeSerieNavigator<ITradeBar>(der.Ticks));
             }
         }
 
-        public virtual async Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
+        public virtual async Task<TimeSerieNavigator<ITradeBar>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime)
         {
             return await GetNavigatorAsync(timeframe);
         }
 
-        private void AddTickToDerivedChart(DerivedChart der, ICandlestick newCandle)
+        private void AddTickToDerivedChart(DerivedChart der, ITradeBar newCandle)
         {
             if (der.FormingCandle == null)
             {
@@ -94,6 +91,7 @@ namespace SharpTrader
                 }
             }
         }
+
         DateTime BaseTime = new DateTime(1970, 1, 1);
         private DateTime GetOpenTime(DateTime timeNow, TimeSpan timeFrame)
         {
@@ -101,7 +99,7 @@ namespace SharpTrader
             return new DateTime((timeNow.Ticks - resto), timeNow.Kind);
         }
 
-        protected void UpdateDerivedCharts(ICandlestick newCandle)
+        protected void UpdateDerivedCharts(ITradeBar newCandle)
         {
             foreach (var der in DerivedTicks)
             {

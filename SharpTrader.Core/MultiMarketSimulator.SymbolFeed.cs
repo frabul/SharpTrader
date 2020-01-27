@@ -19,7 +19,7 @@ namespace SharpTrader
             //private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
             private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
             private List<Trade> _Trades = new List<Trade>();
-            private Dictionary<string, SymbolFeed> SymbolsFeed = new Dictionary<string, SymbolFeed>();
+            internal Dictionary<string, SymbolFeed> SymbolsFeeds = new Dictionary<string, SymbolFeed>();
             private List<Order> PendingOrders = new List<Order>();
             private List<Order> ClosedOrders = new List<Order>();
             private List<ITrade> TradesToSignal = new List<ITrade>();
@@ -38,8 +38,7 @@ namespace SharpTrader
 
             public DateTime Time { get; internal set; }
             public event Action<IMarketApi, ITrade> OnNewTrade;
-            public IEnumerable<ISymbolFeed> Feeds => SymbolsFeed.Values;
-            public IEnumerable<ISymbolFeed> ActiveFeeds => SymbolsFeed.Values;
+            public IEnumerable<ISymbolFeed> Feeds => SymbolsFeeds.Values; 
             public IEnumerable<ITrade> Trades => this._Trades;
 
             public Market(string name, decimal makerFee, decimal takerFee, string dataDir)
@@ -60,18 +59,18 @@ namespace SharpTrader
 
             public Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)
             {
-                var feedFound = SymbolsFeed.TryGetValue(symbol, out SymbolFeed feed);
+                var feedFound = SymbolsFeeds.TryGetValue(symbol, out SymbolFeed feed);
                 if (!feedFound)
                 {
                     var sInfo = SymbolsTable[symbol];
-                    feed = new SymbolFeed(this.MarketName, symbol, sInfo.Asset, sInfo.QuoteAsset); 
+                    feed = new SymbolFeed(this.MarketName, sInfo); 
                     lock (LockObject)
-                        SymbolsFeed.Add(symbol, feed);
+                        SymbolsFeeds.Add(symbol, feed);
                 }
-                if (!_Balances.ContainsKey(feed.Asset))
-                    _Balances.Add(feed.Asset, new AssetBalance());
-                if (!_Balances.ContainsKey(feed.QuoteAsset))
-                    _Balances.Add(feed.QuoteAsset, new AssetBalance());
+                if (!_Balances.ContainsKey(feed.Symbol.Asset))
+                    _Balances.Add(feed.Symbol.Asset, new AssetBalance());
+                if (!_Balances.ContainsKey(feed.Symbol.QuoteAsset))
+                    _Balances.Add(feed.Symbol.QuoteAsset, new AssetBalance());
 
                 return Task.FromResult<ISymbolFeed>(feed);
             }
@@ -126,7 +125,7 @@ namespace SharpTrader
             {
                 lock (LockObject)
                 {
-                    var feed = SymbolsFeed[symbol];
+                    var feed = SymbolsFeeds[symbol];
                     var price = type == TradeType.Buy ? feed.Ask : feed.Bid;
                     var order = new Order(this.MarketName, symbol, Time, type, OrderType.Market, amount, price, clientOrderId);
 
@@ -166,7 +165,6 @@ namespace SharpTrader
                 }
             }
 
-
             internal void RaisePendingEvents()
             {
                 List<ITrade> trades;
@@ -180,7 +178,7 @@ namespace SharpTrader
                     this.OnNewTrade?.Invoke(this, trade);
                 }
 
-                foreach (var feed in SymbolsFeed.Values)
+                foreach (var feed in SymbolsFeeds.Values)
                     feed.RaisePendingEvents(feed);
             }
 
@@ -192,7 +190,7 @@ namespace SharpTrader
                     for (int i = 0; i < PendingOrders.Count; i++)
                     {
                         var order = PendingOrders[i];
-                        var feed = SymbolsFeed[order.Symbol];
+                        var feed = SymbolsFeeds[order.Symbol];
                         if (order.Type == OrderType.Limit)
                         {
                             var willBuy = (order.TradeType == TradeType.Buy && feed.Ticks.LastTick.Low + feed.Spread <= (double)order.Price);
@@ -202,7 +200,7 @@ namespace SharpTrader
                             {
                                 var trade = new Trade(
                                     market: this.MarketName,
-                                    symbol: feed.Symbol,
+                                    symbol: feed.Symbol.Key,
                                     time: feed.Ticks.LastTick.OpenTime.AddSeconds(feed.Ticks.LastTick.Timeframe.Seconds / 2),
                                     price: (double)order.Price,
                                     amount: order.Amount,
@@ -223,8 +221,8 @@ namespace SharpTrader
                 lock (LockObject)
                 {
                   
-                    var qBal = _Balances[feed.QuoteAsset];
-                    var aBal = _Balances[feed.Asset];
+                    var qBal = _Balances[feed.Symbol.QuoteAsset];
+                    var aBal = _Balances[feed.Symbol.Asset];
                     
 
                     if (trade.Type == TradeType.Buy)
@@ -237,12 +235,12 @@ namespace SharpTrader
                     {
                         qBal.Free += trade.Amount * trade.Price;
                         aBal.Locked -= trade.Amount;
-                        Debug.Assert(_Balances[feed.Asset].Locked >= -0.0000000001m, "incoerent trade");
+                        Debug.Assert(_Balances[feed.Symbol.Asset].Locked >= -0.0000000001m, "incoerent trade");
                     }
                     //always pay commissions on quote asset
                     var feeRatio = isTaker ? TakerFee : MakerFee; 
                     trade.Commission = trade.Amount * feeRatio * trade.Price;
-                    trade.CommissionAsset = feed.QuoteAsset;
+                    trade.CommissionAsset = feed.Symbol.QuoteAsset;
                     qBal.Free -= trade.Commission;
 
                     //set order status
@@ -258,7 +256,6 @@ namespace SharpTrader
                 Time = tick.CloseTime;
                 feed.Spread = tick.Close * Spread;
                 feed.AddNewCandle(tick);
-                
             }
 
             public class AssetBalance
@@ -278,15 +275,15 @@ namespace SharpTrader
                     else if (kv.Value.Total != 0)
                     {
                         var symbol = (kv.Key + asset);
-                        if (SymbolsFeed.ContainsKey(symbol))
+                        if (SymbolsFeeds.ContainsKey(symbol))
                         {
-                            var feed = SymbolsFeed[symbol];
+                            var feed = SymbolsFeeds[symbol];
                             val += ((decimal)feed.Ask * kv.Value.Total);
                         }
                         var sym2 = asset + kv.Key;
-                        if (SymbolsFeed.ContainsKey(sym2))
+                        if (SymbolsFeeds.ContainsKey(sym2))
                         {
-                            var feed = SymbolsFeed[sym2];
+                            var feed = SymbolsFeeds[sym2];
                             val += (kv.Value.Total / (decimal)feed.Bid);
                         }
                     }
@@ -392,28 +389,23 @@ namespace SharpTrader
 
         public class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
         {
-
             private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
 
             private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
             private object Locker = new object();
 
-            public string Symbol { get; private set; }
-            public string Asset { get; private set; }
-            public string QuoteAsset { get; private set; }
+            public SymbolInfo Symbol { get; private set; } 
             public double Ask { get; private set; }
             public double Bid { get; private set; }
             public string Market { get; private set; }
             public double Spread { get; set; }
-            public double Volume24H { get; private set; }
+            public double Volume24H { get; private set; } 
+            public ISymbolHistory DataSource { get; set; }
 
-
-            public SymbolFeed(string market, string symbol, string asset, string quoteAsset)
+            public SymbolFeed(string market, SymbolInfo symbol  )
             {
                 this.Symbol = symbol;
-                this.Market = market;
-                this.QuoteAsset = quoteAsset;
-                this.Asset = asset;
+                this.Market = market; 
             }
 
             internal void AddNewCandle(Candlestick newCandle)
@@ -454,11 +446,7 @@ namespace SharpTrader
                 SignalTick();
             }
 
-            public Task SetHistoryStartAsync()
-            {
-                throw new NotImplementedException();
-            }
-
+            
         }
 
         class Order : IOrder

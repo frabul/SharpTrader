@@ -17,7 +17,7 @@ namespace SharpTrader
 
         public List<double> HorizontalLines { get; set; } = new List<double>();
         public List<double> VerticalLines { get; set; } = new List<double>();
-        public TimeSerieNavigator<ICandlestick> Candles { get; set; } = new TimeSerieNavigator<ICandlestick>();
+        public TimeSerieNavigator<ITradeBar> Candles { get; set; } = new TimeSerieNavigator<ITradeBar>();
         List<ITrade> TradesToAdd { get; } = new List<ITrade>();
 
         public void PlotTrade(ITrade newTrade)

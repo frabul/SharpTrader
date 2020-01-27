@@ -209,7 +209,7 @@ namespace SharpTrader.Utils
                     {
                         Asset = symb.baseAsset,
                         QuoteAsset = symb.quoteAsset,
-                        Symbol = symb.symbol,
+                        Key = symb.symbol,
                         IsMarginTadingAllowed = symb.isMarginTradingAllowed,
                         IsSpotTadingAllowed = symb.isSpotTradingAllowed
                     });

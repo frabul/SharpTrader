@@ -10,10 +10,10 @@ namespace SharpTrader.Indicators
     {
         public override bool IsReady => throw new NotImplementedException();
 
-        private TimeSerieNavigator<ICandlestick> Chart;
+        private TimeSerieNavigator<ITradeBar> Chart;
         private int Period;
 
-        public MMI(string name, int period, TimeSerieNavigator<ICandlestick> chart) : base(name)
+        public MMI(string name, int period, TimeSerieNavigator<ITradeBar> chart) : base(name)
         {
             Chart = chart;
             Period = period;

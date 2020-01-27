@@ -65,7 +65,7 @@ namespace SharpTrader
 
     public class SymbolInfo
     {
-        public string Symbol { get; set; }
+        public string Key { get; set; }
         public string Asset { get; set; }
         public string QuoteAsset { get; set; }
         public bool IsMarginTadingAllowed { get; set; }
@@ -74,7 +74,7 @@ namespace SharpTrader
 
     public interface ISymbolFeed
     {
-        event Action<ISymbolFeed> OnTick;
+        event Action<ISymbolFeed, IBaseData> OnData;       
         SymbolInfo Symbol { get; }
         string Market { get; } 
         double Spread { get; }
@@ -85,12 +85,12 @@ namespace SharpTrader
         /// <summary>
         /// Returns maker data history ( candlesticks ) with provided timeframe 
         /// </summary>  
-        Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe);
+        Task<TimeSerieNavigator<ITradeBar>> GetNavigatorAsync(TimeSpan timeframe);
         
         /// <summary>
         /// Returns maker data history ( candlesticks ) with provided timeframe 
         /// </summary>  
-        Task<TimeSerieNavigator<ICandlestick>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime);
+        Task<TimeSerieNavigator<ITradeBar>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime);
 
         /// <summary>
         /// Shrinks maket data history to reduce memory usage
