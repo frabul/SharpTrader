@@ -2,13 +2,11 @@
 
 namespace SharpTrader
 {
-    public interface ITradeBar : IBaseData,ITimeRecord
+    public interface ITradeBar : IBaseData, ITimeRecord
     {
         DateTime OpenTime { get; }
         DateTime CloseTime { get; }
         double Open { get; }
-        double High { get; }
-        double Low { get; }
         double Close { get; }
         double Volume { get; }
         TimeSpan Timeframe { get; }
@@ -16,8 +14,10 @@ namespace SharpTrader
 
     public interface IBaseData : ITimeRecord
     {
+        double Low { get; }
+        double High { get; }
         double Value { get; }
-        MarketDataKind Kind  { get; }
+        MarketDataKind Kind { get; }
     }
 
     public enum MarketDataKind
@@ -28,5 +28,6 @@ namespace SharpTrader
         TradeBar,
         /// Tick market data type (price-time pair)
         Tick,
+        QuoteTick,
     }
 }

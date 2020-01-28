@@ -75,7 +75,7 @@ namespace SharpTrader
                 return Task.FromResult<ISymbolFeed>(feed);
             }
 
-            public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeType type, decimal amount, decimal rate, string clientOrderId = null)
+            public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
             {
                 var order = new Order(this.MarketName, symbol, Time, type, OrderType.Limit, amount, (double)rate, clientOrderId);
 
@@ -99,7 +99,7 @@ namespace SharpTrader
                 var ass = SymbolsTable[order.Symbol];
                 AssetBalance bal;
                 decimal amount;
-                if (order.TradeType == TradeType.Sell)
+                if (order.TradeType == TradeDirection.Sell)
                 {
                     bal = _Balances[ass.Asset];
                     amount = order.Amount;
@@ -121,12 +121,12 @@ namespace SharpTrader
 
             }
 
-            public async Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeType type, decimal amount, string clientOrderId = null)
+            public async Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null)
             {
                 lock (LockObject)
                 {
                     var feed = SymbolsFeeds[symbol];
-                    var price = type == TradeType.Buy ? feed.Ask : feed.Bid;
+                    var price = type == TradeDirection.Buy ? feed.Ask : feed.Bid;
                     var order = new Order(this.MarketName, symbol, Time, type, OrderType.Market, amount, price, clientOrderId);
 
                     var (result, error) = RegisterOrder(order);
@@ -193,15 +193,15 @@ namespace SharpTrader
                         var feed = SymbolsFeeds[order.Symbol];
                         if (order.Type == OrderType.Limit)
                         {
-                            var willBuy = (order.TradeType == TradeType.Buy && feed.Ticks.LastTick.Low + feed.Spread <= (double)order.Price);
-                            var willSell = (order.TradeType == TradeType.Sell && feed.Ticks.LastTick.High - feed.Spread >= (double)order.Price);
+                            var willBuy = (order.TradeType == TradeDirection.Buy && feed.LastTick.Low + feed.Spread <= (double)order.Price);
+                            var willSell = (order.TradeType == TradeDirection.Sell && feed.LastTick.High - feed.Spread >= (double)order.Price);
 
                             if (willBuy || willSell)
                             {
                                 var trade = new Trade(
                                     market: this.MarketName,
                                     symbol: feed.Symbol.Key,
-                                    time: feed.Ticks.LastTick.OpenTime.AddSeconds(feed.Ticks.LastTick.Timeframe.Seconds / 2),
+                                    time: feed.LastTick.Time,
                                     price: (double)order.Price,
                                     amount: order.Amount,
                                     type: order.TradeType,
@@ -225,13 +225,13 @@ namespace SharpTrader
                     var aBal = _Balances[feed.Symbol.Asset];
 
 
-                    if (trade.Type == TradeType.Buy)
+                    if (trade.Type == TradeDirection.Buy)
                     {
                         aBal.Free += trade.Amount;
                         qBal.Locked -= (trade.Amount * trade.Price);
                         Debug.Assert(qBal.Locked >= 0, "incoerent trade");
                     }
-                    else if (trade.Type == TradeType.Sell)
+                    else if (trade.Type == TradeDirection.Sell)
                     {
                         qBal.Free += trade.Amount * trade.Price;
                         aBal.Locked -= trade.Amount;
@@ -311,7 +311,7 @@ namespace SharpTrader
                             var ass = SymbolsTable[order.Symbol];
                             AssetBalance bal;
                             decimal amount;
-                            if (order.TradeType == TradeType.Sell)
+                            if (order.TradeType == TradeDirection.Sell)
                             {
                                 bal = _Balances[ass.Asset];
                                 amount = order.Amount;
@@ -401,6 +401,7 @@ namespace SharpTrader
             public string Market { get; private set; }
             public double Spread { get; set; }
             public ISymbolHistory DataSource { get; set; }
+            public IBaseData LastTick { get; private set; }
 
             public SymbolFeed(string market, SymbolInfo symbol)
             {
@@ -434,11 +435,16 @@ namespace SharpTrader
 
             public void RaisePendingEvents(ISymbolFeed sender)
             {
-                foreach (var data in NewData)
+                if (NewData.Count > 0)
                 {
-                    OnData?.Invoke(this, data);
+                    LastTick = NewData[NewData.Count - 1];
+                    foreach (var data in NewData)
+                    {
+                        OnData?.Invoke(this, data);
+
+                    }
+                    NewData.Clear();
                 }
-                NewData.Clear();
             }
 
         }
@@ -454,11 +460,11 @@ namespace SharpTrader
             public string ClientId { get; private set; }
             public OrderStatus Status { get; internal set; } = OrderStatus.Pending;
 
-            public TradeType TradeType { get; private set; }
+            public TradeDirection TradeType { get; private set; }
             public OrderType Type { get; private set; }
             public decimal Filled { get; set; }
             public DateTime Time { get; set; }
-            public Order(string market, string symbol, DateTime time, TradeType tradeSide, OrderType orderType, decimal amount, double rate, string clientId)
+            public Order(string market, string symbol, DateTime time, TradeDirection tradeSide, OrderType orderType, decimal amount, double rate, string clientId)
             {
                 Id = (idCounter++).ToString();
                 ClientId = clientId;
@@ -475,7 +481,7 @@ namespace SharpTrader
         class Trade : ITrade
         {
             private static long IdCounter = 0;
-            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, Order order)
+            public Trade(string market, string symbol, DateTime time, TradeDirection type, double price, decimal amount, Order order)
             {
                 Market = market;
                 Symbol = symbol;
@@ -505,7 +511,7 @@ namespace SharpTrader
 
             public string Symbol { get; private set; }
 
-            public TradeType Type { get; private set; }
+            public TradeDirection Type { get; private set; }
 
             public Order Order { get; private set; }
 

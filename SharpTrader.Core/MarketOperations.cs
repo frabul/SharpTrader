@@ -48,7 +48,7 @@ namespace SharpTrader
         Short,
     }
 
-    public enum TradeType
+    public enum TradeDirection
     {
         Buy,
         Sell
@@ -81,7 +81,7 @@ namespace SharpTrader
     {
         OrderStatus Status { get; }
         OrderType Type { get; }
-        TradeType TradeType { get; }
+        TradeDirection TradeType { get; }
         string Id { get; }
         decimal Amount { get; }
         decimal Filled { get; }
@@ -133,7 +133,7 @@ namespace SharpTrader
         decimal Price { get; }
         decimal Commission { get; }
         string CommissionAsset { get; }
-        TradeType Type { get; }
+        TradeDirection Type { get; }
         string ClientOrderId { get; }
         string OrderId { get; }
         DateTime Time { get; }
