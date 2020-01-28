@@ -1,0 +1,74 @@
+﻿using System;
+#pragma warning disable CS1998
+namespace SharpTrader
+{
+    public class TradeBarConsolidator
+    {
+        public TimeSpan Resolution { get; }
+        private TimeSerie<Candlestick> Candlesticks = new TimeSerie<Candlestick>();
+        private Candlestick FormingCandle;
+
+        DateTime BaseTime = new DateTime(1970, 1, 1);
+        public TradeBarConsolidator(TimeSpan resolution)
+        {
+            this.Resolution = resolution;
+        }
+
+        public void Update(IBaseData data)
+        {
+            if (data.Kind == MarketDataKind.TradeBar)
+            {
+                OnTradeBar(data as ITradeBar);
+            }
+            else if (data.Kind == MarketDataKind.TradeBar)
+            {
+                throw new NotImplementedException();
+            }
+        }
+        public void Scan(DateTime timeNow)
+        {
+            if (timeNow >= FormingCandle.Time)
+            {
+                Candlesticks.AddRecord(FormingCandle);
+                FormingCandle = null;
+            }
+        }
+        private DateTime GetOpenTime(DateTime timeNow, TimeSpan timeFrame)
+        {
+            long resto = (timeNow - BaseTime).Ticks % timeFrame.Ticks;
+            return new DateTime((timeNow.Ticks - resto), timeNow.Kind);
+        }
+        private void OnTradeBar(ITradeBar newCandle)
+        {
+            DateTime tclose = newCandle.Time;
+            DateTime topen = newCandle.OpenTime;
+
+            if (FormingCandle == null)
+            {
+                //tbere isn't any currently forming candle, create one using new candle as generator
+                var opeTime = GetOpenTime(newCandle.CloseTime, Resolution);
+                FormingCandle = new Candlestick(opeTime, newCandle, Resolution);
+            }
+            if (topen >= FormingCandle.CloseTime || tclose > FormingCandle.CloseTime)
+            {
+                //old candle is ended, the new candle is already part of the next one
+                Candlesticks.AddRecord(FormingCandle);
+                //use new candle as generator
+                var opeTime = GetOpenTime(newCandle.CloseTime, Resolution);
+                FormingCandle = new Candlestick(opeTime, newCandle, Resolution);
+            }
+            else
+            {
+                //the new candle is part of the forming candle
+                FormingCandle.Merge(newCandle);
+                //check if candle is completed and emit it
+                if (tclose == FormingCandle.Time)
+                {
+                    Candlesticks.AddRecord(FormingCandle);
+                    FormingCandle = null;
+                }
+            }
+        }
+
+    }
+}

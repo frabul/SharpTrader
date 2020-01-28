@@ -547,14 +547,14 @@ namespace SharpTrader
         {
             public string Market { get; }
             public string Symbol { get; }
-            public TimeSpan Timeframe { get; }
+            public TimeSpan Resolution { get; }
             public TimeSerieNavigator<ITradeBar> Ticks { get; }
             public double Spread { get; }
             public SymbolHistory(SymbolHistoryRaw raw, DateTime startOfData)
             {
                 Market = raw.Market;
                 Symbol = raw.Symbol;
-                Timeframe = raw.Timeframe;
+                Resolution = raw.Timeframe;
                 Ticks = new TimeSerieNavigator<ITradeBar>(raw.Ticks.Where(t => t.Time >= startOfData));
                 Spread = raw.Spread;
             }
@@ -562,7 +562,7 @@ namespace SharpTrader
             {
                 Market = raw.Market;
                 Symbol = raw.Symbol;
-                Timeframe = raw.Timeframe;
+                Resolution = raw.Timeframe;
                 Ticks = new TimeSerieNavigator<ITradeBar>(raw.Ticks);
                 Spread = raw.Spread;
             }
@@ -572,8 +572,13 @@ namespace SharpTrader
     {
         string Market { get; }
         string Symbol { get; }
-        TimeSpan Timeframe { get; }
+        TimeSpan Resolution { get; }
         TimeSerieNavigator<ITradeBar> Ticks { get; }
         double Spread { get; }
     }
+
+
+ 
+
+
 }

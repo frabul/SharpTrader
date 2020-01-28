@@ -29,7 +29,7 @@ namespace SharpTrader
             public string MarketName { get; private set; }
             public decimal MakerFee { get; set; } = 0.00075m;
             public decimal TakerFee { get; set; } = 0.00075m;
-           
+
             /// <summary>
             /// Initial spread for all symbols
             /// </summary>
@@ -38,7 +38,7 @@ namespace SharpTrader
 
             public DateTime Time { get; internal set; }
             public event Action<IMarketApi, ITrade> OnNewTrade;
-            public IEnumerable<ISymbolFeed> Feeds => SymbolsFeeds.Values; 
+            public IEnumerable<ISymbolFeed> Feeds => SymbolsFeeds.Values;
             public IEnumerable<ITrade> Trades => this._Trades;
 
             public Market(string name, decimal makerFee, decimal takerFee, string dataDir)
@@ -63,7 +63,7 @@ namespace SharpTrader
                 if (!feedFound)
                 {
                     var sInfo = SymbolsTable[symbol];
-                    feed = new SymbolFeed(this.MarketName, sInfo); 
+                    feed = new SymbolFeed(this.MarketName, sInfo);
                     lock (LockObject)
                         SymbolsFeeds.Add(symbol, feed);
                 }
@@ -135,7 +135,7 @@ namespace SharpTrader
 
                     var trade = new Trade(
                         this.MarketName, symbol, this.Time,
-                        type, price, amount,   order);
+                        type, price, amount, order);
 
                     RegisterTrade(feed, trade, isTaker: true);
                     this.ClosedOrders.Add(order);
@@ -204,7 +204,7 @@ namespace SharpTrader
                                     time: feed.Ticks.LastTick.OpenTime.AddSeconds(feed.Ticks.LastTick.Timeframe.Seconds / 2),
                                     price: (double)order.Price,
                                     amount: order.Amount,
-                                    type: order.TradeType, 
+                                    type: order.TradeType,
                                     order: order
                                 );
                                 RegisterTrade(feed, trade, isTaker: false);
@@ -220,13 +220,13 @@ namespace SharpTrader
             {
                 lock (LockObject)
                 {
-                  
+
                     var qBal = _Balances[feed.Symbol.QuoteAsset];
                     var aBal = _Balances[feed.Symbol.Asset];
-                    
+
 
                     if (trade.Type == TradeType.Buy)
-                    { 
+                    {
                         aBal.Free += trade.Amount;
                         qBal.Locked -= (trade.Amount * trade.Price);
                         Debug.Assert(qBal.Locked >= 0, "incoerent trade");
@@ -238,7 +238,7 @@ namespace SharpTrader
                         Debug.Assert(_Balances[feed.Symbol.Asset].Locked >= -0.0000000001m, "incoerent trade");
                     }
                     //always pay commissions on quote asset
-                    var feeRatio = isTaker ? TakerFee : MakerFee; 
+                    var feeRatio = isTaker ? TakerFee : MakerFee;
                     trade.Commission = trade.Amount * feeRatio * trade.Price;
                     trade.CommissionAsset = feed.Symbol.QuoteAsset;
                     qBal.Free -= trade.Commission;
@@ -255,7 +255,7 @@ namespace SharpTrader
             {
                 Time = tick.CloseTime;
                 feed.Spread = tick.Close * Spread;
-                feed.AddNewCandle(tick);
+                feed.AddNewData(tick);
             }
 
             public class AssetBalance
@@ -387,66 +387,60 @@ namespace SharpTrader
             return Markets.Sum(m => m.GetEquity(baseAsset).Result.Result);
         }
 
-        public class SymbolFeed : SymbolFeedBoilerplate, ISymbolFeed
+        public class SymbolFeed : ISymbolFeed
         {
-            private TimeSpan BaseTimeframe = TimeSpan.FromSeconds(60);
+            public event Action<ISymbolFeed, IBaseData> OnData;
 
-            private List<DerivedChart> DerivedTicks = new List<DerivedChart>(20);
-            private object Locker = new object();
+            private TimeSpan Resolution = TimeSpan.FromSeconds(60);
 
-            public SymbolInfo Symbol { get; private set; } 
+            private bool onTickPending = false;
+
+            public SymbolInfo Symbol { get; private set; }
             public double Ask { get; private set; }
             public double Bid { get; private set; }
             public string Market { get; private set; }
             public double Spread { get; set; }
-            public double Volume24H { get; private set; } 
             public ISymbolHistory DataSource { get; set; }
 
-            public SymbolFeed(string market, SymbolInfo symbol  )
+            public SymbolFeed(string market, SymbolInfo symbol)
             {
                 this.Symbol = symbol;
-                this.Market = market; 
+                this.Market = market;
             }
 
-            internal void AddNewCandle(Candlestick newCandle)
+            public virtual async Task<TimeSerie<ITradeBar>> GetHistoryNavigator(DateTime historyStartTime)
             {
-                BaseTimeframe = newCandle.CloseTime - newCandle.OpenTime;
-
-                var previousTime = newCandle.OpenTime;
-                //Volume24H += newCandle.Volume;
-                //let's calculate the volume
-                //if (Ticks.Count > 0)
-                //{
-                //    Ticks.PositionPush();
-                //    Ticks.SeekLast();
-                //    previousTime = Ticks.Tick.CloseTime;
-                //    var delta = newCandle.CloseTime - previousTime;
-                //    var timeAt24 = newCandle.CloseTime - TimeSpan.FromHours(24);
-                //    var removeStart = timeAt24 - delta;
-                //    if (removeStart < Ticks.FirstTickTime)
-                //        Ticks.SeekFirst();
-                //    else
-                //        Ticks.SeekNearestBefore(timeAt24 - delta);
-
-                //    //todo 
-                //    //while (Ticks.Tick.OpenTime < timeAt24)
-                //    //{
-                //    //    Volume24H -= Ticks.Tick.Volume;
-                //    //    Ticks.Next();
-                //    //}
-                //    Ticks.PositionPop();
-                //}
-
-                Ticks.AddRecord(newCandle);
-
-                Bid = newCandle.Close;
+                TimeSerie<ITradeBar> newNavigator = new TimeSerie<ITradeBar>();
+                //consolidate the currently available data
+                using (var navigator = new TimeSerieNavigator<ITradeBar>(this.DataSource.Ticks))
+                {
+                    //add all records up to current time
+                    navigator.SeekNearestBefore(historyStartTime);
+                    while (navigator.Next() && navigator.Time <= this.DataSource.Ticks.Time)
+                    {
+                        newNavigator.AddRecord(navigator.Tick);
+                    }
+                }
+                return newNavigator;
+            }
+            List<IBaseData> NewData = new List<IBaseData>(10);
+            internal void AddNewData(IBaseData newMarketData)
+            {
+                Bid = newMarketData.Value;
                 Ask = Bid + Spread;
+                NewData.Add(newMarketData);
 
-                UpdateDerivedCharts(newCandle);
-                SignalTick();
             }
 
-            
+            public void RaisePendingEvents(ISymbolFeed sender)
+            {
+                foreach (var data in NewData)
+                {
+                    OnData?.Invoke(this, data);
+                }
+                NewData.Clear();
+            }
+
         }
 
         class Order : IOrder
@@ -480,15 +474,15 @@ namespace SharpTrader
 
         class Trade : ITrade
         {
-            private static long IdCounter = 0; 
-            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount,   Order order)
+            private static long IdCounter = 0;
+            public Trade(string market, string symbol, DateTime time, TradeType type, double price, decimal amount, Order order)
             {
                 Market = market;
                 Symbol = symbol;
                 Time = time;
                 Type = type;
                 Price = (decimal)price;
-                Amount = amount; 
+                Amount = amount;
                 Order = order;
                 Id = (IdCounter++).ToString();
             }
@@ -496,7 +490,7 @@ namespace SharpTrader
             public decimal Amount { get; private set; }
 
             public DateTime Time { get; private set; }
-             
+
             /// <summary>
             /// Commission paid
             /// </summary>
@@ -545,6 +539,4 @@ namespace SharpTrader
             public decimal TakerFee { get; set; }
         }
     }
-
-
 }

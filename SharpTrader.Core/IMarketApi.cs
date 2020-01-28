@@ -59,7 +59,7 @@ namespace SharpTrader
         decimal GetSymbolPrecision(string symbol);
 
         decimal GetMinNotional(string asset);
-        
+
         void DisposeFeed(ISymbolFeed feed);
     }
 
@@ -74,29 +74,17 @@ namespace SharpTrader
 
     public interface ISymbolFeed
     {
-        event Action<ISymbolFeed, IBaseData> OnData;       
+        event Action<ISymbolFeed, IBaseData> OnData;
         SymbolInfo Symbol { get; }
-        string Market { get; } 
+        string Market { get; }
         double Spread { get; }
         double Bid { get; }
-        double Ask { get; } 
-        bool Disposed { get; } 
+        double Ask { get; }
 
         /// <summary>
-        /// Returns maker data history ( candlesticks ) with provided timeframe 
+        /// Returns market data history ( candlesticks ) from give time
         /// </summary>  
-        Task<TimeSerieNavigator<ITradeBar>> GetNavigatorAsync(TimeSpan timeframe);
-        
-        /// <summary>
-        /// Returns maker data history ( candlesticks ) with provided timeframe 
-        /// </summary>  
-        Task<TimeSerieNavigator<ITradeBar>> GetNavigatorAsync(TimeSpan timeframe, DateTime historyStartTime);
-
-        /// <summary>
-        /// Shrinks maket data history to reduce memory usage
-        /// </summary>
-        /// <param name="recordsCount">number of records to maintain</param>
-        void ShrinkHistory(int recordsCount);
+        Task<TimeSerie<ITradeBar>> GetHistoryNavigator(DateTime historyStartTime); 
     }
 
 
