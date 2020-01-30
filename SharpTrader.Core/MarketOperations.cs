@@ -133,7 +133,7 @@ namespace SharpTrader
         decimal Price { get; }
         decimal Commission { get; }
         string CommissionAsset { get; }
-        TradeDirection Type { get; }
+        TradeDirection Direction { get; }
         string ClientOrderId { get; }
         string OrderId { get; }
         DateTime Time { get; }

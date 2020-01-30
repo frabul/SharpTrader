@@ -24,7 +24,7 @@ namespace SharpTrader
         {
             lock (Locker)
             {
-                if (newTrade.Type == TradeDirection.Buy)
+                if (newTrade.Direction == TradeDirection.Buy)
                 {
                     TradesToAdd.Add(newTrade);
                 }

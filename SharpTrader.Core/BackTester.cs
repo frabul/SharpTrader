@@ -96,7 +96,7 @@ namespace SharpTrader
             var lostInFee = feeList.Sum();
             //get profit
             var profit = totalBal - startingBal;
-            var totalBuys = Simulator.Trades.Where(tr => tr.Type == TradeDirection.Buy).Count();
+            var totalBuys = Simulator.Trades.Where(tr => tr.Direction == TradeDirection.Buy).Count();
             sw.Stop();
             Logger.Info($"Test terminated in {sw.ElapsedMilliseconds} ms.");
             Logger.Info($"Balance: {totalBal} - Trades:{Simulator.Trades.Count()} - Lost in fee:{lostInFee}");

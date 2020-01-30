@@ -1461,7 +1461,7 @@ namespace SharpTrader
         {
             Market = "Binance";
             Symbol = symbol;
-            Type = tr.IsBuyer ? TradeDirection.Buy : TradeDirection.Sell;
+            Direction = tr.IsBuyer ? TradeDirection.Buy : TradeDirection.Sell;
             Price = tr.Price;
             Amount = tr.Quantity;
             Commission = tr.Commission;
@@ -1476,7 +1476,7 @@ namespace SharpTrader
         {
             Market = "Binance";
             Symbol = tr.Symbol;
-            Type = tr.Side == OrderSide.Buy ? TradeDirection.Buy : TradeDirection.Sell;
+            Direction = tr.Side == OrderSide.Buy ? TradeDirection.Buy : TradeDirection.Sell;
             Price = tr.PriceOfLastFilledTrade;
             Amount = tr.QuantityOfLastFilledTrade;
             Commission = Commission;
@@ -1497,7 +1497,7 @@ namespace SharpTrader
         public string Market { get; set; }
         public decimal Price { get; set; }
         public string Symbol { get; set; }
-        public TradeDirection Type { get; set; }
+        public TradeDirection Direction { get; set; }
         public string CommissionAsset { get; set; }
         public DateTime Time { get; set; }
 

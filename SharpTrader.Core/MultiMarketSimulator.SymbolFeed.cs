@@ -225,13 +225,13 @@ namespace SharpTrader
                     var aBal = _Balances[feed.Symbol.Asset];
 
 
-                    if (trade.Type == TradeDirection.Buy)
+                    if (trade.Direction == TradeDirection.Buy)
                     {
                         aBal.Free += trade.Amount;
                         qBal.Locked -= (trade.Amount * trade.Price);
                         Debug.Assert(qBal.Locked >= 0, "incoerent trade");
                     }
-                    else if (trade.Type == TradeDirection.Sell)
+                    else if (trade.Direction == TradeDirection.Sell)
                     {
                         qBal.Free += trade.Amount * trade.Price;
                         aBal.Locked -= trade.Amount;
@@ -486,7 +486,7 @@ namespace SharpTrader
                 Market = market;
                 Symbol = symbol;
                 Time = time;
-                Type = type;
+                Direction = type;
                 Price = (decimal)price;
                 Amount = amount;
                 Order = order;
@@ -511,7 +511,7 @@ namespace SharpTrader
 
             public string Symbol { get; private set; }
 
-            public TradeDirection Type { get; private set; }
+            public TradeDirection Direction { get; private set; }
 
             public Order Order { get; private set; }
 
