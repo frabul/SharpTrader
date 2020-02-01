@@ -93,6 +93,7 @@ namespace SharpTrader
     public interface IMarketOperation<T> : IMarketOperation
     {
         T Result { get; }
+        bool Successful { get; }
     }
 
     public interface IMarketOperation
