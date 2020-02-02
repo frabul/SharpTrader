@@ -6,97 +6,87 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
+    public class MeanAndVarianceRecord : IBaseData
+    {
+        public DateTime Time { get; set; }
+        public double Mean { get; set; }
+        public double Variance { get; set; }
+
+        public double Low => Mean;
+
+        public double High => Mean;
+
+        public double Value => Mean;
+
+        public MarketDataKind Kind => MarketDataKind.Tick;
+
+        public MeanAndVarianceRecord(DateTime time, double mean, double variance)
+        {
+            Mean = mean;
+            Variance = variance;
+            Time = time;
+        }
+    }
     /// <summary>
     /// This indicator computes the n-period population variance.
     /// </summary>
-    public class MeanAndVariance : Indicator
+    public class MeanAndVariance : Indicator<ITradeBar, MeanAndVarianceRecord>
     {
         private double _rollingSum;
         private double _rollingSumOfSquares;
         public int Period { get; private set; }
-        private TimeSerie<Record> Records = new TimeSerie<Record>();
-        private TimeSerieNavigator<ITradeBar> Chart;
-
-        public struct Record : ITimeRecord
-        {
-            public DateTime Time { get; set; }
-            public double Mean { get; set; }
-            public double Variance { get; set; }
-            public Record(DateTime time, double mean, double variance) : this()
-            {
-                Mean = mean;
-                Variance = variance;
-                Time = time;
-            }
-        }
-
-        public TimeSerieNavigator<Record> GetNavigator()
-        {
-            return new TimeSerieNavigator<Record>(Records);
-        }
+        private RollingWindow<ITradeBar> Inputs;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified period.
         /// </summary>  
-        public MeanAndVariance(int period, TimeSerieNavigator<ITradeBar> chart) : this("Variance_" + period, period, chart)
+        public MeanAndVariance(string name, int period, TimeSerieNavigator<ITradeBar> chart, DateTime warmUpTime)
+            : base(name, chart, warmUpTime)
         {
+            Inputs = new RollingWindow<ITradeBar>(Period);
+            Period = period;
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified name and period.
         /// </summary>  
-        public MeanAndVariance(string name, int period, TimeSerieNavigator<ITradeBar> chart) : base(name)
+        public MeanAndVariance(string name, int period) : base(name)
         {
-            Chart = new TimeSerieNavigator<ITradeBar>(chart);
+            Inputs = new RollingWindow<ITradeBar>(Period);
             Period = period;
-            chart.OnNewRecord += rec => this.Calculate();
-            this.Calculate();
         }
 
         /// <summary>
         /// Gets a flag indicating when this indicator is ready and fully initialized
         /// </summary>
-        public override bool IsReady => Records.Count >= Period;
+        public override bool IsReady => Samples >= Period;
 
-        public Record Value => Records.Count > 0 ? Records.LastTick : default(Record);
-
-        private void Calculate()
+        protected override MeanAndVarianceRecord Calculate(ITradeBar input)
         {
-            while (Chart.Next())
+            _rollingSum += input.Value;
+            _rollingSumOfSquares += input.Value * input.Value;
+
+            //remove the sample that's exiting the window from the rolling sum
+            if (Inputs.Count >= Period)
             {
-                var chartTick = Chart.Tick;
-                var value = Chart.Tick.Close;
-
-                _rollingSum += value;
-                _rollingSumOfSquares += value * value;
-
-                if (Chart.Count < 2)
-                    return;
-
-                var indexToRemove = Period;
-                if (Chart.Position < indexToRemove)
-                    indexToRemove = (int)Chart.Position + 1;
-
-                if (indexToRemove == Period && indexToRemove <= Chart.Position)
-                {
-                    var valueToRemove = Chart.GetFromCursor(indexToRemove).Close;
-                    _rollingSum -= valueToRemove;
-                    _rollingSumOfSquares -= valueToRemove * valueToRemove;
-                }
-
-                var mean = _rollingSum / indexToRemove;
-                var meanOfSquares = _rollingSumOfSquares / indexToRemove;
-
-
-                var variance = meanOfSquares - mean * mean;
-
-                Records.AddRecord(
-                    new Record(chartTick.CloseTime, mean, variance)
-                );
+                var valueToRemove = Inputs[Period - 1].Value;
+                _rollingSum -= valueToRemove;
+                _rollingSumOfSquares -= valueToRemove * valueToRemove;
             }
+            Inputs.Add(input);
 
+            //inputs has been set as Period + 1 so max size is number of sampes + 1
+            var mean = _rollingSum / Inputs.Count;
+            var meanOfSquares = _rollingSumOfSquares / Inputs.Count;
+
+
+            var variance = meanOfSquares - mean * mean;
+            return new MeanAndVarianceRecord(input.Time, mean, variance);
         }
 
-
+        protected override MeanAndVarianceRecord CalculatePeek(double sample)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

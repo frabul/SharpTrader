@@ -71,19 +71,19 @@ namespace SharpTrader
             else
                 LinesOnDedicatedAxis.Add(chartLine);
 
-            while (myNavigator.Next())
+            while (myNavigator.MoveNext())
             {
-                var value = valuesSelector(myNavigator.Tick);
-                chartLine.Points.Add(new Point(myNavigator.Tick.Time, value));
+                var value = valuesSelector(myNavigator.Current);
+                chartLine.Points.Add(new Point(myNavigator.Current.Time, value));
             }
 
             myNavigator.OnNewRecord += (T obj) =>
             {
-                while (myNavigator.Next())
+                while (myNavigator.MoveNext())
                 {
-                    var value = valuesSelector(myNavigator.Tick);
+                    var value = valuesSelector(myNavigator.Current);
                     lock (chartLine)
-                        chartLine.Points.Add(new Point(myNavigator.Tick.Time, value));
+                        chartLine.Points.Add(new Point(myNavigator.Current.Time, value));
                 }
             };
         }
@@ -95,20 +95,20 @@ namespace SharpTrader
         {
             var myNavigator = new TimeSerieNavigator<T>(timeSerie);
             List<Line> lines = new List<Line>();
-            var firstTickValues = valuesSelector(myNavigator.LastTick);
+            var firstTickValues = valuesSelector(myNavigator.Last);
             foreach (var val in firstTickValues)
                 lines.Add(new Line() { Color = color });
             LinesOnDedicatedAxis.AddRange(lines);
 
             void AddAllValues(T obj)
             {
-                while (myNavigator.Next())
+                while (myNavigator.MoveNext())
                 {
-                    var values = valuesSelector(myNavigator.Tick);
+                    var values = valuesSelector(myNavigator.Current);
                     for (int i = 0; i < values.Length; i++)
                     {
                         lock (lines[i])
-                            lines[i].Points.Add(new Point(myNavigator.Tick.Time, values[i]));
+                            lines[i].Points.Add(new Point(myNavigator.Current.Time, values[i]));
                     }
                 }
             }

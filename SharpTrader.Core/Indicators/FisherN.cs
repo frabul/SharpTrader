@@ -3,48 +3,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
- 
+
 namespace SharpTrader.Indicators
 {
 
-    public class FisherN<T> : Indicator where T : ITimeRecord
-    { 
-        public int Period { get; } 
-        private TimeSerie<FRecord> Filtered { get; } = new TimeSerie<FRecord>();
-
-
+    public class FisherN<T> : Indicator<T, IndicatorDataPoint> where T : IBaseData
+    {
+        public int Period { get; }
         private Normalize<T> Normalize { get; }
-        private TimeSerieNavigator<FRecord> Normalized = new TimeSerieNavigator<FRecord>();
         //private List<double> MidValues = new List<double>();
-
-        public override bool IsReady => Filtered.Count > Period;
-
-        public FisherN(TimeSerieNavigator<T> signal, Func<T, double> valueSelector, int period) : base("FisherN")
-        {
-            Normalize = new Normalize<T>(signal, valueSelector, period);
-            Normalized = Normalize.GetNavigator();
-            Normalized.OnNewRecord += rec => CalculateAll();
-            Filtered.AddRecord(new FRecord(DateTime.MinValue, 0));
-            //MidValues = new List<double>() { 0 };
-            CalculateAll();
-
-        }
+        IndicatorDataPoint LastValue;
         double LastMidValue;
+        public override bool IsReady => Samples > Period;
 
-        private void CalculateAll()
+        public FisherN(string name, int period) : base(name)
         {
-            while (Normalized.Next())
-            {
-                var normalizedTick = Normalized.Tick.Value;
-           
-                var newMidValue = 0.33 * normalizedTick + 0.67 * LastMidValue;
-                // MidValues.Add(midVal);
-                var val = Fisher(newMidValue) + 0.5 * Filtered.LastTick.Value;
-                Filtered.AddRecord(new FRecord(Normalized.Tick.Time, val));
-                LastMidValue = newMidValue;
-            }
+            Normalize = new Normalize<T>($"{name} Companion", period);
+            LastValue = IndicatorDataPoint.Zero;
         }
-
 
         double Fisher(double signalIn)
         {
@@ -52,11 +28,22 @@ namespace SharpTrader.Indicators
             return 0.5 * Math.Log((1d + v) / (1d - v));
         }
 
-        public TimeSerieNavigator<FRecord> GetNavigator()
+        protected override IndicatorDataPoint Calculate(T input)
         {
-            return new TimeSerieNavigator<FRecord>(Filtered);
+            Normalize.Update(input);
+            var normalizedTick = Normalize.Current.Value;
+
+            var newMidValue = 0.33 * normalizedTick + 0.67 * LastMidValue;
+            // MidValues.Add(midVal);
+            var val = Fisher(newMidValue) + 0.5 * LastValue.Value;
+            LastMidValue = newMidValue;
+            LastValue = new IndicatorDataPoint(Normalize.Current.Time, val);
+            return LastValue;
+        }
+
+        protected override IndicatorDataPoint CalculatePeek(double sample)
+        {
+            throw new NotImplementedException();
         }
     }
-
-
 }

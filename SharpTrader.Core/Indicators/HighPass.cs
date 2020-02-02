@@ -7,64 +7,51 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class HighPass<T> : Filter<T> where T : ITimeRecord
+    public class HighPass<T> : Indicator<T, IndicatorDataPoint> where T : IBaseData
     {
         public int CutoffPeriod { get; private set; }
-
-        private double a;
-        private double alpha1;
-        private double b;
-        private double c;
         private double alpha;
-        public override bool IsReady => Filtered.Count > CutoffPeriod + 3;
+        private IndicatorDataPoint LastOutput;
+        private T LastInput;
 
-        public HighPass(TimeSerieNavigator<T> signal, Func<T, double> valueSelector, int cutOffPeriod)
-            : base("HighPass", signal, valueSelector)
+        public override bool IsReady => Samples > CutoffPeriod / 2;
+
+        public HighPass(string name, int cutOffPeriod, TimeSerieNavigator<T> signal, DateTime warmUpTime)
+            : base(name, signal, warmUpTime)
         {
-            //bisogna fare una timeserie navigator che ritorna FIlter.Record (ha il suo selector interno )
             CutoffPeriod = cutOffPeriod;
-
-
-            a = (0.707d * 2 * Math.PI) / CutoffPeriod;
-            alpha1 = 1d + (Math.Sin(a) - 1d) / Math.Cos(a);
-            b = 1d - alpha1 / 2d;
-            c = 1d - alpha1;
             alpha = (double)CutoffPeriod / (1 + CutoffPeriod);
-
         }
 
+        public HighPass(string name, int highPassPeriod)
+            : base(name)
+        { 
+            this.CutoffPeriod = highPassPeriod;
+        }
 
-        override protected double Calculate()
+        protected override IndicatorDataPoint Calculate(T input)
         {
-
             // alpha1 = (Cosine(.707*360 / 48) + Sine (.707*360 / 48) - 1) / Cosine(.707*360 / 48);
             // HP = (1 - alpha1 / 2)*(1 - alpha1 / 2)*(Close - 2*Close[1] + Close[2]) + 2*(1 - alpha1)*HP[1] - (1 - alpha1)*(1 - alpha1)*HP[2];
             var value = 0d;
-            if (GetSignalCursor() > 3)
-            {
-                if (Filtered.Count < 1)
-                {
-                    value = alpha * (0 + GetSignal(0) - GetSignal(1));
-                }
-                else
-                    value = alpha * (Filtered.GetFromLast(0).Value + GetSignal(0) - GetSignal(1));
-                //b * b * (GetSignal(0) - 2 * GetSignal(1) + GetSignal(2))
-                //+ 2 * c * Filtered.GetFromLast(1).Value
-                //- c * c * Filtered.GetFromLast(2).Value;
-
-
-            }
-            return value;
+            if (LastOutput == null)
+                value = alpha * (0 + input.Value - LastInput.Value);
+            else
+                value = alpha * (LastOutput.Value + input.Value - LastInput.Value);
+            //b * b * (GetSignal(0) - 2 * GetSignal(1) + GetSignal(2))
+            //+ 2 * c * Filtered.GetFromLast(1).Value
+            //- c * c * Filtered.GetFromLast(2).Value; 
+            LastOutput = new IndicatorDataPoint(input.Time, value);
+            LastInput = input;
+            return LastOutput;
         }
 
-        protected override double CalculatePeek(double sample)
+        protected override IndicatorDataPoint CalculatePeek(double sample)
         {
-            var value = 0d;
-            if (GetSignalCursor() > 3)
-                value = alpha * (Filtered.GetFromLast(0).Value + sample - GetSignal(0));
-            return value;
+            double value = 0d;
+            if (this.IsReady)
+                value = alpha * (LastOutput.Value + sample - LastInput.Value);
+            return new IndicatorDataPoint(DateTime.MinValue, value);
         }
-
-
     }
 }

@@ -95,8 +95,8 @@ namespace SharpTrader
                             feed.DataSource = this.HistoryDb.GetSymbolHistory(histInfo, StartOfHistoryData);
                             this.HistoryDb.CloseFile(histInfo);
                         }
-                        if (feed.DataSource.Ticks.Count > 0 && FirstTickTime > feed.DataSource.Ticks.FirstTickTime) 
-                            FirstTickTime = feed.DataSource.Ticks.FirstTickTime;  
+                        if (feed.DataSource.Ticks.Count > 0 && FirstTickTime > feed.DataSource.Ticks.StartTime) 
+                            FirstTickTime = feed.DataSource.Ticks.StartTime;  
                     }
             }
             
@@ -119,8 +119,8 @@ namespace SharpTrader
                     if (dataSource.Ticks.Count > 0)
                         while (dataSource.Ticks.NextTickTime <= this.Time)
                         {
-                            dataSource.Ticks.Next();
-                            var candle = dataSource.Ticks.Tick is Candlestick c ? c : new Candlestick(dataSource.Ticks.Tick);
+                            dataSource.Ticks.MoveNext();
+                            var candle = dataSource.Ticks.Current is Candlestick c ? c : new Candlestick(dataSource.Ticks.Current);
                             market.AddNewCandle(feed as SymbolFeed, candle);// new Candlestick(data.Ticks.Tick)); //use less memory
                         }
                 }

@@ -176,8 +176,8 @@ namespace SharpTrader
                         }
                         for (int i = 0; i < shist.Ticks.Count; i++)
                         {
-                            shist2.Ticks.Next();
-                            if (!shist.Ticks[i].Equals(shist2.Ticks.Tick))
+                            shist2.Ticks.MoveNext();
+                            if (!shist.Ticks[i].Equals(shist2.Ticks.Current))
                             {
                                 Console.WriteLine($"ERROR validation during conversion for file {oldFile}");
                                 Debug.Assert(false, "Hist count doesn't match");

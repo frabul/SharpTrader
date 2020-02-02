@@ -6,53 +6,48 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class Max<T> : Filter<T> where T : ITimeRecord
+    public class Max <T> : Indicator<T, T> where T : IBaseData
     {
+        T LastOutput;
+        public RollingWindow<T> Inputs { get; }
         public int Period { get; }
-        public Max(TimeSerieNavigator<T> signal, Func<T, double> valueSelector, int period)
-            : base("Max(serie)", signal, valueSelector)
+        public override bool IsReady => Samples > Period;
+        public Max(string name, int period)
+            : base(name)
         {
+            Inputs = new RollingWindow<T>(period + 1);
             Period = period;
-            CalculateAll();
         }
-
-        public override bool IsReady => Filtered.Count > Period;
-
-        /// <summary>
-        /// The record that generated the min 
-        /// </summary>
-        public FRecord Current { get; private set; }
-
-        protected override double Calculate()
+         
+        protected override T Calculate(T input)
         {
-            var sout = GetSignalCursor() >= Period ? GetSignal(Period) : double.MaxValue;
-            var sin = GetSignalAndTime(0);
-
-            if (Filtered.Count < 1)
-                Current = sin;
-            else if (sout < Filtered.LastTick.Value)
+            T output;
+            var sampleOut = Inputs[Period - 1];
+            Inputs.Add(input);  
+            if (Inputs.Count < 2)
+                output = input;
+            else if (sampleOut.Value < LastOutput.Value)
                 //if the sample that's going out of range is NOT the current max then we only need to check if the new sample is higher than current max
-                Current = sin.Value > Filtered.LastTick.Value ? sin : Current;
-            else if (sin.Value > sout)
+                output = input.Value > LastOutput.Value ? input : LastOutput;
+            else if (input.Value > sampleOut.Value)
                 //the MAX is going out of range, but signalIn is higher than old max then signalIn IS the new MAX
-                Current = sin;
+                output = input;
             else
             {
                 //sample that was the old max is going out of range so we need to search again
-                Current = new FRecord(default(DateTime), double.MinValue);
-                var steps = Math.Min(GetSignalCursor() + 1, Period);
-                for (int i = 0; i < steps; i++)
+                output = Inputs[0]; 
+                for (int i = 1; i < Inputs.Count; i++)
                 {
-                    var rec = GetSignalAndTime(i);
-                    if (rec.Value > Current.Value)
-                        Current = rec;
-                }
-
+                    var rec = Inputs[i];
+                    if (rec.Value > output.Value)
+                        output = rec;
+                } 
             }
-            return Current.Value;
+            LastOutput = output;
+            return output;
         }
 
-        protected override double CalculatePeek(double sample)
+        protected override T CalculatePeek(double sample)
         {
             throw new NotImplementedException();
         }

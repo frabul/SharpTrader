@@ -41,7 +41,7 @@ namespace SharpTrader
             }
             else
             {
-                if (Records.Count > 0 && LastTickTime > historyRecord.Time)
+                if (Records.Count > 0 && EndTime > historyRecord.Time)
                     throw new Exception("you cannot add a tick that's preceding the last one ");
                 Records.Add(historyRecord);
             }
@@ -52,12 +52,12 @@ namespace SharpTrader
         public T GetLast(Func<T, bool> criteria)
         {
             this.PositionPush();
-            this.SeekNearestBefore(LastTickTime);
+            this.SeekNearestBefore(EndTime);
             var res = default(T);
             while (this.Previous())
-                if (criteria(this.Tick))
+                if (criteria(this.Current))
                 {
-                    res = this.Tick;
+                    res = this.Current;
                     break;
                 }
             this.PositionPop();

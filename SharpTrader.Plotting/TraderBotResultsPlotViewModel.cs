@@ -145,10 +145,10 @@ namespace SharpTrader.Plotting
 
             //--- remove all series
             PlotViewModel.Series.Clear();
-            while (Drawer.Candles.Next())
+            while (Drawer.Candles.MoveNext())
             {
-                this.Candles.Items.Add(new ChartBar(Drawer.Candles.Tick));
-                this.Volumes.Items.Add(new ChartBarVol(Drawer.Candles.Tick) { });
+                this.Candles.Items.Add(new ChartBar(Drawer.Candles.Current));
+                this.Volumes.Items.Add(new ChartBarVol(Drawer.Candles.Current) { });
             }
             //remove all axes and readd base axes
             PlotViewModel.Axes.Clear();
@@ -162,7 +162,7 @@ namespace SharpTrader.Plotting
                 PlotViewModel.Series.Add(Volumes);
                 //draw volumes
                 //PlotViewModel.Series.Add(Volumes);
-                lastTick = Drawer.Candles.Tick;
+                lastTick = Drawer.Candles.Current;
             }
 
             //-----------------  HORIZONTAL LINES --------------

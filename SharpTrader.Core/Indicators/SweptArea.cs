@@ -6,48 +6,41 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class SweptArea : Indicator
+    public class SweptArea : Indicator<IBaseData, IndicatorDataPoint>
     {
-        public SweptArea(int steps, TimeSerieNavigator<ITradeBar> candles) : base("SweptArea")
+        public int Period { get; set; }
+
+        private RollingWindow<IBaseData> Inputs; 
+        public override bool IsReady => Inputs.Count > Period;
+        public SweptArea(string name, int period, TimeSerieNavigator<ITradeBar> candles) 
+            : base(name)
         {
-            Steps = steps;
-            Candles = new TimeSerieNavigator<ITradeBar>(candles);
-            candles.OnNewRecord += r => { CalculateAll(); };
-            CalculateAll();
+            Period = period;
+            Inputs = new RollingWindow<IBaseData>(period); 
         }
-
-        public int Steps { get; set; }
-
-        private TimeSerieNavigator<ITradeBar> Candles;
-        private TimeSerie<FRecord> Values = new TimeSerie<FRecord>();
-        public override bool IsReady => Candles.Count > Steps;
-
-        public double Value => Values.LastTick.Value;
-
-        private void CalculateAll()
+         
+        protected override IndicatorDataPoint Calculate(IBaseData input)
         {
-            while (Candles.Next())
-                Values.AddRecord(Calculate());
-        }
+            if (Inputs.Count < Period)
+                return IndicatorDataPoint.Zero;
 
-        protected FRecord Calculate()
-        {
-            if (Candles.Position < Steps)
-                return new FRecord() { Time = Candles.Tick.Time, Value = 0 };
             double min = double.MaxValue;
             double max = double.MinValue;
             double swept = 0;
-            foreach (var candle in Enumerable.Range(0, Steps).Select(i => Candles.GetFromCursor(i)))
+            foreach (var candle in Enumerable.Range(0, Period).Select(i => Inputs[i]))
             {
                 min = Math.Min(min, candle.Low);
                 max = Math.Max(max, candle.High);
                 swept += candle.High - candle.Low;
             }
-            var area = (max - min) * Steps;
+            var area = (max - min) * Period;
             var ret = swept / area;
-            return new FRecord() { Time = Candles.Tick.Time, Value = ret };
+            return new IndicatorDataPoint(input.Time ,ret);
         }
 
-
+        protected override IndicatorDataPoint CalculatePeek(double sample)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

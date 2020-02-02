@@ -6,76 +6,77 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class TrueRange<T> : Indicator where T : ITradeBar
+    public class TrueRange : Indicator<ITradeBar, IndicatorDataPoint>
     {
 
-        TimeSerieNavigator<T> Candles;
-        TimeSerie<FRecord> TrueRanges = new TimeSerie<FRecord>();
 
+        private ITradeBar LastSample;
+        public override bool IsReady => Samples > 1;
+        public TrueRange(string name) : base(name) { }
+        public TrueRange(string name, TimeSerieNavigator<ITradeBar> chart, DateTime warmUpTime) :
+            base(name, chart, warmUpTime)
+        { }
 
-        public override bool IsReady => Candles.Count > 1;
-
-        public TrueRange(TimeSerieNavigator<T> signal) : base("ATR")
+        protected override IndicatorDataPoint Calculate(ITradeBar input)
         {
-
-            Candles = new TimeSerieNavigator<T>(signal);
-            Calculate();
-            Candles.OnNewRecord += r => Calculate();
-        }
-        public TimeSerie<FRecord> GetNavigator()
-        {
-            return new TimeSerie<FRecord>(TrueRanges);
-        }
-        private void Calculate()
-        {
-            while (Candles.Next())
+            IndicatorDataPoint result = null;
+            if (LastSample != null)
             {
-                if (Candles.Position > 1)
-                {
-                    ITradeBar candle = Candles.Tick;
-                    ITradeBar previous = Candles.PreviousTick;
-                    var tr = Math.Max(Math.Max(candle.High - candle.Low, candle.High - previous.Close), previous.Close - candle.Low);
-                    TrueRanges.AddRecord(new FRecord(candle.Time, tr));
-                }
+                ITradeBar candle = input;
+                var vals = new[] { candle.High - candle.Low, candle.High - LastSample.Close, LastSample.Close - candle.Low };
+                var tr = vals.Max();
+                result = new IndicatorDataPoint(input.Time, tr);
             }
+            LastSample = input;
+            return result;
+        }
 
+        protected override IndicatorDataPoint CalculatePeek(double sample)
+        {
+            throw new NotImplementedException();
         }
     }
 
-    public class AverageTrueRange<T> : Indicator where T : ITradeBar
+    public class AverageTrueRange : Indicator<ITradeBar, IndicatorDataPoint>
     {
-        private TimeSerie<FRecord> TrueRanges;
+        private RollingWindow<IndicatorDataPoint> TrueRanges;
 
-        public override bool IsReady => TrueRanges.Count >= Steps;
-        public int Steps { get; private set; }
-        public double Value { get; private set; }
-
-
-        public AverageTrueRange(TimeSerieNavigator<T> signal, int steps) : base("AverageTrueRange")
-        {
-            Steps = steps;
-            var trueRange = new TrueRange<T>(signal);
-            TrueRanges = trueRange.GetNavigator();
-
-            Calculate();
-            TrueRanges.OnNewRecord += nr => Calculate();
-        }
+        public override bool IsReady => TrueRanges.Count >= Period + 1;
+        public int Period { get; private set; }
+        public TrueRange TrueRange { get; }
 
         double RollingSum = 0;
 
-        private void Calculate()
+        public AverageTrueRange(string name, int period, TimeSerieNavigator<ITradeBar> chart, DateTime warmUpTime) :
+           base(name, chart, warmUpTime)
         {
-            while (TrueRanges.Next())
-            {
-                int stepsCnt = Math.Min(TrueRanges.Count, Steps);
+            Period = period;
+            TrueRange = new TrueRange($"{name} Companion");
 
-                RollingSum += TrueRanges.Tick.Value; 
-                if (TrueRanges.Position >= Steps)
+        }
+
+        protected override IndicatorDataPoint Calculate(ITradeBar input)
+        {
+            TrueRange.Update(input);
+            if (TrueRange.IsReady)
+            {
+                TrueRanges.Add(TrueRange.Current);
+                int stepsCnt = Math.Min(TrueRanges.Count, Period);
+                RollingSum += TrueRange.Current.Value;
+                if (TrueRanges.Count >= Period)
                 {
-                    RollingSum -= TrueRanges.GetFromCursor(Steps).Value;
+                    RollingSum -= TrueRanges[Period].Value;
                 }
-                Value = RollingSum / stepsCnt;
+                var res = new IndicatorDataPoint(input.Time, RollingSum / stepsCnt);
+                return res;
             }
+            return null;
+
+        }
+
+        protected override IndicatorDataPoint CalculatePeek(double sample)
+        {
+            throw new NotImplementedException();
         }
     }
 }

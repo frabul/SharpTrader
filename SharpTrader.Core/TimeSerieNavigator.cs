@@ -36,13 +36,13 @@ namespace SharpTrader
 
         public int Position => Cursor;
 
-        public T Tick => Records[Cursor];
-        public T NextTick => Records[Cursor + 1];
-        public T PreviousTick => Records[Cursor - 1];
-        public DateTime LastTickTime => Records[Records.Count - 1].Time;
-        public DateTime FirstTickTime => Records[0].Time;
+        public T Current => Records[Cursor];
+        public T Next => Records[Cursor + 1];
+        public T Previus => Records[Cursor - 1];
+        public DateTime EndTime => Records[Records.Count - 1].Time;
+        public DateTime StartTime => Records[0].Time;
 
-        public T LastTick => Records[Records.Count - 1];
+        public T Last => Records[Records.Count - 1];
 
         public bool EndOfSerie => Cursor >= Records.Count - 1;
 
@@ -142,11 +142,11 @@ namespace SharpTrader
             {
                 if (Records.Count < 1)
                     throw new Exception();
-                if (date < FirstTickTime)
+                if (date < StartTime)
                 {
                     throw new Exception("Out of range");
                 }
-                if (date >= LastTickTime)
+                if (date >= EndTime)
                 {
                     _Cursor = Records.Count - 1;
                     return;
@@ -205,7 +205,7 @@ namespace SharpTrader
         /// <summary>
         /// ritorna true se ci sono altri cosi in avanti cursore di uno in avanti
         /// </summary>
-        public bool Next()
+        public bool MoveNext()
         {
             lock (Locker)
             {
@@ -243,9 +243,9 @@ namespace SharpTrader
             Cursor = PositionSaveStack.Pop();
         }
 
-        public Signal<T> ToSignal(Func<T, double> selector)
+        public TimeSerieTransform<T, TOut> ToSignal<TOut>(Func<T, TOut> selector) where TOut : IBaseData
         {
-            return new Signal<T>(this, selector);
+            return new TimeSerieTransform<T, TOut>(this, selector);
         }
 
         // Public implementation of Dispose pattern callable by consumers.

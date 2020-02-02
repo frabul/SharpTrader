@@ -6,44 +6,47 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class Normalize<T> : Filter<T> where T : ITimeRecord
+    public class Normalize<T> : Indicator<T, IndicatorDataPoint> where T : IBaseData
     {
+
+        RollingWindow<T> Inputs;
         public int Period { get; }
-        public Normalize(TimeSerieNavigator<T> signal, Func<T, double> valueSelector, int period)
-            : base("Normalize", signal, valueSelector)
+        public Normalize(string name, int period)
+            : base(name)
         {
             Period = period;
-            CalculateAll();
+            Inputs = new RollingWindow<T>(period);
         }
 
-        public override bool IsReady => this.Filtered.Count >= Period;
+        public override bool IsReady => Samples >= Period;
 
-        protected override double Calculate()
+        protected override IndicatorDataPoint Calculate(T input)
         {
-            var len = GetSignalCursor() - 1;
-            if (len + 1 < Period)
-                return 0;
+            Inputs.Add(input);
+            if (Inputs.Count < Period)
+                return IndicatorDataPoint.Zero;
 
             double min = double.MaxValue, max = double.MinValue;
             for (int i = 0; i < Period; i++)
             {
-                var val = GetSignal(i);
+                var val = Inputs[i].Value;
                 if (val > max)
                     max = val;
                 if (val < min)
                     min = val;
             }
+
             if (max > min)
-                return 2d * (GetSignal(0) - min) / (max - min) - 1;
+                return new IndicatorDataPoint(input.Time, 2d * (input.Value - min) / (max - min) - 1);
             else
-                return 0;
+                throw new Exception("Unexpected error in Normalize indicator");
         }
 
-        protected override double CalculatePeek(double sample)
+        protected override IndicatorDataPoint CalculatePeek(double sample)
         {
             throw new NotImplementedException();
         }
     }
 
-    
+
 }

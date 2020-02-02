@@ -11,9 +11,9 @@ namespace SharpTrader
     {
         private volatile bool _started;
 
+        public PlotHelper Plot { get; } = new PlotHelper();
         public bool BackTesting { get; private set; }
         public bool Active { get; set; }
-        public PlotHelper Drawer { get; } = new PlotHelper();
         public bool Started { get { Thread.MemoryBarrier(); return _started; } private set => _started = value; }
         public async Task Start(bool backtesting)
         {
@@ -24,7 +24,7 @@ namespace SharpTrader
         }
 
         public abstract Task OnStartAsync();
-        public abstract Task OnTickAsync(); 
+        public abstract Task OnTickAsync();
     }
 
 

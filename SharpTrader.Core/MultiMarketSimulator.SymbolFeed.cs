@@ -417,9 +417,9 @@ namespace SharpTrader
                 {
                     //add all records up to current time
                     navigator.SeekNearestBefore(historyStartTime);
-                    while (navigator.Next() && navigator.Time <= this.DataSource.Ticks.Time)
+                    while (navigator.MoveNext() && navigator.Time <= this.DataSource.Ticks.Time)
                     {
-                        newNavigator.AddRecord(navigator.Tick);
+                        newNavigator.AddRecord(navigator.Current);
                     }
                 }
                 return newNavigator;
@@ -525,6 +525,8 @@ namespace SharpTrader
             public MarketOperationStatus Status { get; internal set; }
             public T Result { get; }
             public string ErrorInfo { get; internal set; }
+
+            public bool Successful => Status == MarketOperationStatus.Completed;
 
             public MarketOperation(MarketOperationStatus status, T res)
             {

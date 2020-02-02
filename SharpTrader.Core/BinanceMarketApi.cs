@@ -20,7 +20,7 @@ using be = BinanceExchange.API;
 
 namespace SharpTrader
 {
-    class QuoteTick : IBaseData
+    public class QuoteTick : IBaseData
     {
         public double Bid { get; }
         public double Ask { get; }
@@ -1084,7 +1084,7 @@ namespace SharpTrader
             public T Result { get; }
             public string ErrorInfo { get; internal set; }
             public MarketOperationStatus Status { get; internal set; }
-
+            public bool Successful => Status == MarketOperationStatus.Completed;
             public MarketOperation(MarketOperationStatus status)
             {
                 Status = status;
@@ -1294,8 +1294,8 @@ namespace SharpTrader
                 HistoryDb.CloseFile(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
 
                 var history = new TimeSerie<ITradeBar>();
-                while (symbolHistory.Ticks.Next())
-                    history.AddRecord(symbolHistory.Ticks.Tick, true);
+                while (symbolHistory.Ticks.MoveNext())
+                    history.AddRecord(symbolHistory.Ticks.Current, true);
 
                 return history;
             }

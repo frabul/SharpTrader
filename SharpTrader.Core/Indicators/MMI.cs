@@ -6,35 +6,46 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class MMI : Indicator
+    public class MarketMeannessIndex : Indicator<ITradeBar, IndicatorDataPoint>  
     {
-        public override bool IsReady => throw new NotImplementedException();
+        public override bool IsReady => Samples >= Period;
 
-        private TimeSerieNavigator<ITradeBar> Chart;
+        private RollingWindow <ITradeBar> Inputs;
         private int Period;
 
-        public MMI(string name, int period, TimeSerieNavigator<ITradeBar> chart) : base(name)
+        public MarketMeannessIndex(string name, int period, TimeSerieNavigator<ITradeBar> chart) : base(name)
         {
-            Chart = chart;
+            
             Period = period;
+            Inputs = new RollingWindow<ITradeBar>(period);
         }
+ 
 
-        private void Calculate()
+        protected override IndicatorDataPoint Calculate(ITradeBar input)
         {
-            var m = 0d;
-
-            int nh = 0, nl = 0;
-            for (int i = 1; i < Period; i++)
+            Inputs.Add(input);
+            if(Inputs.Count >= Period)
             {
-                var vi = Chart.GetFromCursor(i).Close;
-                var vi1 = Chart.GetFromCursor(i - 1).Close;
-                if (vi > m && vi > vi1)
-                    nl++;
-                else if (vi < m && vi < vi1)
-                    nh++;
+                var m = 0d;
+                int nh = 0, nl = 0;
+                for (int i = 1; i < Period; i++)
+                {
+                    var vi = Inputs[i].Value;
+                    var vi1 = Inputs[i - 1].Value;
+                    if (vi > m && vi > vi1)
+                        nl++;
+                    else if (vi < m && vi < vi1)
+                        nh++;
+                }
+                var value = 100d * (nl + nh) / (Period - 1);
+                return new IndicatorDataPoint(input.Time, value);
             }
-            var value = 100d * (nl + nh) / (Period - 1);
+            return IndicatorDataPoint.Zero;
         }
 
+        protected override IndicatorDataPoint CalculatePeek(double sample)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

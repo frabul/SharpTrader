@@ -6,86 +6,87 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public abstract class Indicator
+    public abstract class Indicator<TIn, TOut> where TIn : IBaseData where TOut : IBaseData
     {
+        NLog.Logger Log { get; }
+
+        private TimeSerieNavigator<TIn> Signal;
+        /// <summary>the most recent input that was given to this indicator</summary>
+        private TIn _previousInput;
+
+        /// <summary>
+        /// Event handler that fires after this indicator is updated
+        /// </summary>
+        public event Action<Indicator<TIn, TOut>, TOut> Updated;
+
         public string Name { get; private set; }
+        public abstract bool IsReady { get; }
+
+        public virtual TOut Current { get; private set; }
+
+        public virtual double Value => Current.Value;
+
+        public virtual int Samples { get; private set; }
         public Indicator(string name)
         {
+            Log = NLog.LogManager.GetLogger(name);
             Name = name;
         }
-        public abstract bool IsReady { get; }
-    }
 
-    public abstract class Filter<T> : Indicator where T : ITimeRecord
-    {
-        private TimeSerieNavigator<T> Signal;
-        private Func<T, double> Selector;
-        protected TimeSerie<FRecord> Filtered { get; } = new TimeSerie<FRecord>();
-
-        public Filter(string name, TimeSerieNavigator<T> signal, Func<T, double> valueSelector) : base(name)
+        public Indicator(string name, TimeSerieNavigator<TIn> signal, DateTime warmUpTime)
+            : this(name)
         {
-            Signal = new TimeSerieNavigator<T>(signal);
-            Signal.OnNewRecord += rec => CalculateAll();
-            Selector = valueSelector;
-            CalculateAll();
+            Name = name;
+            Signal = new TimeSerieNavigator<TIn>(signal);
+            Signal.SeekNearestBefore(warmUpTime);
+            while (Signal.MoveNext())
+                this.Update(Signal.Current);
+             
+            signal.OnNewRecord += rec => Update(rec);
         }
 
-        public TimeSerieNavigator<FRecord> GetNavigator() => new TimeSerieNavigator<FRecord>(Filtered);
-
-        public FRecord this[int i] { get => Filtered.GetFromLast(i); }
-
-        public int Count => Filtered.Count;
-
-        public double Peek(double nextSignalSample)
+        /// <summary>
+        /// 
+        /// </summary>
+        public void WarmUp(IEnumerable<TIn> data)
         {
-            var nextFilter = CalculatePeek(nextSignalSample);
-            return nextFilter;
-        }
-
-        public void Shrink(int shrinkSize)
-        {
-            Filtered.Shrink(shrinkSize);
-        }
-
-        protected void CalculateAll()
-        {
-            while (Signal.Next())
+            foreach (var point in data)
             {
-
-                var value = Calculate();
-                var time = Signal.Tick.Time;
-                var rec = new FRecord(time, value);
-                Filtered.AddRecord(rec);
+                this.Update(point);
             }
         }
 
-        protected abstract double Calculate();
-
-        protected abstract double CalculatePeek(double sample);
-
-        protected double GetSignal(int ind) => Selector(Signal.GetFromCursor(ind));
-
-        protected FRecord GetSignalAndTime(int ind)
+        public void Update(TIn input)
         {
-            var rec = Signal.GetFromCursor(ind);
-            return new FRecord(rec.Time, Selector(rec));
+            if (_previousInput != null && input.Time < _previousInput.Time)
+            {
+                // if we receive a time in the past, log and return
+                Log.Error($"This is a forward only indicator: {Name} Input: {input.Time:u} Previous: {_previousInput.Time:u}. It will not be updated with this input.");
+                return;
+            }
+            if (!ReferenceEquals(input, _previousInput))
+            {
+                // compute a new value and update our previous time 
+                if (!(input is TIn))
+                {
+                    throw new ArgumentException($"IndicatorBase.Update() 'input' expected to be of type {typeof(TIn)} but is of type {input.GetType()}");
+                }
+                _previousInput = (TIn)input; 
+                Current = Calculate((TIn)input); 
+                Samples++;
+                // let others know we've produced a new data point
+                Updated?.Invoke(this, Current);
 
+            }
         }
 
-        protected int GetSignalCursor()
+        public TOut Peek(double nextSignalSample)
         {
-            return Signal.Position;
+            return CalculatePeek(nextSignalSample); 
         }
-    }
 
-    public struct FRecord : ITimeRecord
-    {
-        public DateTime Time { get; set; }
-        public double Value { get; set; }
-        public FRecord(DateTime time, double value)
-        {
-            Value = value;
-            Time = time;
-        }
+        protected abstract TOut Calculate(TIn input);
+
+        protected abstract TOut CalculatePeek(double sample);
     }
 }

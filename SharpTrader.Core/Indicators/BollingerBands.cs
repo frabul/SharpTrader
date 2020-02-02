@@ -3,101 +3,70 @@ using System.Linq;
 
 namespace SharpTrader.Indicators
 {
-    public class BollingerBands : Indicator
+    public class BollingerBandsRecord : IBaseData
     {
-        // (Closing price-EMA(previous day)) x multiplier + EMA(previous day)
+        public double Deviation { get; }
+        public double Main { get; }
+        public DateTime Time { get; }
+        public double Top => Main + Deviation;
+        public double Bottom => Main - Deviation;
 
-        TimeSerie<Record> Ticks = new TimeSerie<Record>();
-        TimeSerieNavigator<ITradeBar> Chart;
+        public double Low => Main;
+
+        public double High => Main;
+
+        public double Value => Main;
+
+        public MarketDataKind Kind => MarketDataKind.Tick;
+
+        public BollingerBandsRecord(double mean, double deviation, DateTime time)
+        {
+            this.Main = mean;
+            this.Deviation = deviation;
+            Time = time;
+        }
+    }
+    public class BollingerBands : Indicator<ITradeBar, BollingerBandsRecord>
+    {
         MeanAndVariance MeanAndVariance;
-        TimeSerieNavigator<MeanAndVariance.Record> MeanAndVarianceValues;
-
         public int Period { get; set; }
         public double Deviation { get; set; }
 
-        public override bool IsReady => Ticks.Count >= Period;
+        public override bool IsReady => Samples >= Period;
 
-        public TimeSerieNavigator<Record> GetNavigator()
+        public BollingerBands(string name, int period, double deviation) : base(name)
         {
-            return new TimeSerieNavigator<Record>(Ticks);
-        }
-
-        public BollingerBands(string name, int period, double deviation, TimeSerieNavigator<ITradeBar> data) : base(name)
-        {
-            MeanAndVariance = new MeanAndVariance(period, data);
-            MeanAndVarianceValues = MeanAndVariance.GetNavigator();
+            MeanAndVariance = new MeanAndVariance($"{name} Companion", period);
             Period = period;
             Deviation = deviation;
-
-            Chart = new TimeSerieNavigator<ITradeBar>(data);
-            MeanAndVarianceValues.OnNewRecord += rec => this.Calculate();
-            Calculate();
         }
 
-        private void Calculate()
+
+        public BollingerBands(string name, int period, double deviation, TimeSerieNavigator<ITradeBar> data, DateTime warmUpTime)
+            : base(name, data, warmUpTime)
         {
-            while (MeanAndVarianceValues.Next())
+            MeanAndVariance = new MeanAndVariance($"{name} Companion", period);
+            Period = period;
+            Deviation = deviation;
+        }
+         
+        protected override BollingerBandsRecord Calculate(ITradeBar input)
+        {
+
+            MeanAndVariance.Update(input);
+            if (MeanAndVariance.IsReady)
             {
-                var mav = MeanAndVarianceValues.Tick;
-                this.Ticks.AddRecord(new Record(mav.Mean, Math.Sqrt(mav.Variance) * Deviation, mav.Time));
+                var mav = MeanAndVariance.Current;
+                var res = new BollingerBandsRecord(mav.Mean, Math.Sqrt(mav.Variance) * Deviation, mav.Time);
+                return res;
             }
-        }
-
-        public struct Record : ITimeRecord
-        {
-            public double Deviation { get; }
-            public double Main { get; }
-            public DateTime Time { get; }
-            public double Top => Main + Deviation;
-            public double Bottom => Main - Deviation;
-
-            public Record(double mean, double deviation, DateTime time)
-            {
-                this.Main = mean;
-                this.Deviation = deviation;
-                Time = time;
-            }
-
+            return null;
 
         }
-
-        public void Calculate(int index)
+         
+        protected override BollingerBandsRecord CalculatePeek(double sample)
         {
-
-
-            //int passi = Steps;
-            ////if (AvgOfAvg[index - 1] == null || AvgOfAvg[index - 1] == 0 || AvgOfAvg[index - 1] == double.NaN)
-            //if (true && bands.Main.Count < passi * 2)
-            //{
-            //    double media = 0;
-
-            //    for (int i = 0; i < passi; i++)
-            //    {
-            //        if (bands.Main[index - i] == double.NaN)
-            //        {
-            //            media = bands.Main[index];
-            //            break;
-            //        }
-            //        media += bands.Main[index - i];
-            //    }
-
-            //    AvgOfAvg[index] = media / passi;
-
-
-            //}
-            //else
-            //{
-            //    AvgOfAvg[index] = AvgOfAvg[index - 1] + (bands.Main[index] - bands.Main[index - passi]) / passi;
-            //}
-            //double attualizzazione = (AvgOfAvg[index] - AvgOfAvg[index - 1]) * Steps / 2;
-
-
-            //Bottom[index] = bands.Bottom[index] + attualizzazione;
-            ////
-            //Top[index] = bands.Top[index] + attualizzazione;
-            //Main[index] = bands.Main[index] + attualizzazione;
-
-
+            throw new NotImplementedException();
         }
     }
 
