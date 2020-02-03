@@ -20,6 +20,6 @@ namespace SharpTrader.Indicators
             Time = time;
         }
 
-        
+
     }
 }

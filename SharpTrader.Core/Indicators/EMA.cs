@@ -14,14 +14,14 @@ namespace SharpTrader.Indicators
         private Func<T, double> ValueSelector;
         private IndicatorDataPoint LastOutput;
         public override bool IsReady => Samples >= Period;
-        public EMA(int emaPeriod,  Func<T, double> valueSelector, TimeSerieNavigator<T> signal, DateTime warmUpTime) 
+        public EMA(int emaPeriod, Func<T, double> valueSelector, TimeSerieNavigator<T> signal, DateTime warmUpTime)
             : base("EMA", signal, warmUpTime)
         {
             ValueSelector = valueSelector;
             Period = emaPeriod;
             Alpha = 1d / emaPeriod;
         }
-         
+
         protected override IndicatorDataPoint CalculatePeek(double sample)
         {
             var signal = sample;
@@ -30,8 +30,8 @@ namespace SharpTrader.Indicators
         }
 
         protected override IndicatorDataPoint Calculate(T input)
-        { 
-            if(LastOutput == null)
+        {
+            if (LastOutput == null)
             {
                 LastOutput = new IndicatorDataPoint(input.Time, input.Value);
             }
@@ -42,6 +42,12 @@ namespace SharpTrader.Indicators
                 LastOutput = new IndicatorDataPoint(input.Time, last + Alpha * (signal - last));
             }
             return LastOutput;
+        }
+
+        public override void Reset()
+        {
+            this.LastOutput = null; 
+            base.Reset();
         }
     }
 

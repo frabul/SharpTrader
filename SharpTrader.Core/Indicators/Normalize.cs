@@ -8,7 +8,6 @@ namespace SharpTrader.Indicators
 {
     public class Normalize<T> : Indicator<T, IndicatorDataPoint> where T : IBaseData
     {
-
         RollingWindow<T> Inputs;
         public int Period { get; }
         public Normalize(string name, int period)
@@ -45,6 +44,12 @@ namespace SharpTrader.Indicators
         protected override IndicatorDataPoint CalculatePeek(double sample)
         {
             throw new NotImplementedException();
+        }
+
+        public override void Reset()
+        {
+            this.Inputs.Reset();
+            base.Reset();
         }
     }
 

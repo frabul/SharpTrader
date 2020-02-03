@@ -10,15 +10,15 @@ namespace SharpTrader.Indicators
     {
         public int Period { get; set; }
 
-        private RollingWindow<IBaseData> Inputs; 
+        private RollingWindow<IBaseData> Inputs;
         public override bool IsReady => Inputs.Count > Period;
-        public SweptArea(string name, int period, TimeSerieNavigator<ITradeBar> candles) 
+        public SweptArea(string name, int period, TimeSerieNavigator<ITradeBar> candles)
             : base(name)
         {
             Period = period;
-            Inputs = new RollingWindow<IBaseData>(period); 
+            Inputs = new RollingWindow<IBaseData>(period);
         }
-         
+
         protected override IndicatorDataPoint Calculate(IBaseData input)
         {
             if (Inputs.Count < Period)
@@ -35,12 +35,18 @@ namespace SharpTrader.Indicators
             }
             var area = (max - min) * Period;
             var ret = swept / area;
-            return new IndicatorDataPoint(input.Time ,ret);
+            return new IndicatorDataPoint(input.Time, ret);
         }
 
         protected override IndicatorDataPoint CalculatePeek(double sample)
         {
             throw new NotImplementedException();
+        }
+
+        public override void Reset()
+        {
+            this.Inputs.Reset();
+            base.Reset();
         }
     }
 }

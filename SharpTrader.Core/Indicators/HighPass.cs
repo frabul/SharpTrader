@@ -23,9 +23,11 @@ namespace SharpTrader.Indicators
             alpha = (double)CutoffPeriod / (1 + CutoffPeriod);
         }
 
+       
+
         public HighPass(string name, int highPassPeriod)
             : base(name)
-        { 
+        {
             this.CutoffPeriod = highPassPeriod;
         }
 
@@ -35,7 +37,7 @@ namespace SharpTrader.Indicators
             // HP = (1 - alpha1 / 2)*(1 - alpha1 / 2)*(Close - 2*Close[1] + Close[2]) + 2*(1 - alpha1)*HP[1] - (1 - alpha1)*(1 - alpha1)*HP[2];
             var value = 0d;
             if (LastOutput == null)
-                value = alpha * (0 + input.Value - LastInput.Value);
+                value = alpha * (0 + input.Value);
             else
                 value = alpha * (LastOutput.Value + input.Value - LastInput.Value);
             //b * b * (GetSignal(0) - 2 * GetSignal(1) + GetSignal(2))
@@ -52,6 +54,13 @@ namespace SharpTrader.Indicators
             if (this.IsReady)
                 value = alpha * (LastOutput.Value + sample - LastInput.Value);
             return new IndicatorDataPoint(DateTime.MinValue, value);
+        }
+
+        public override void Reset()
+        {
+            this.LastInput = default;
+            LastOutput = null;
+            base.Reset();
         }
     }
 }

@@ -41,7 +41,7 @@ namespace SharpTrader.Indicators
             Signal.SeekNearestBefore(warmUpTime);
             while (Signal.MoveNext())
                 this.Update(Signal.Current);
-             
+
             signal.OnNewRecord += rec => Update(rec);
         }
 
@@ -71,8 +71,8 @@ namespace SharpTrader.Indicators
                 {
                     throw new ArgumentException($"IndicatorBase.Update() 'input' expected to be of type {typeof(TIn)} but is of type {input.GetType()}");
                 }
-                _previousInput = (TIn)input; 
-                Current = Calculate((TIn)input); 
+                _previousInput = (TIn)input;
+                Current = Calculate((TIn)input);
                 Samples++;
                 // let others know we've produced a new data point
                 Updated?.Invoke(this, Current);
@@ -82,9 +82,13 @@ namespace SharpTrader.Indicators
 
         public TOut Peek(double nextSignalSample)
         {
-            return CalculatePeek(nextSignalSample); 
+            return CalculatePeek(nextSignalSample);
         }
 
+        public virtual void Reset()
+        {
+            this.Samples = 0;
+        }
         protected abstract TOut Calculate(TIn input);
 
         protected abstract TOut CalculatePeek(double sample);

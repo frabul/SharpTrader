@@ -12,11 +12,11 @@ namespace SharpTrader.Indicators
         public double ZMA { get; internal set; }
         public double Variance { get; internal set; }
         internal double MA { get; set; }
-        public double StdDev { get; internal set; } 
+        public double StdDev { get; internal set; }
         public double Low => ZMA;
         public double High => ZMA;
         public double Value => ZMA;
-        public MarketDataKind Kind => MarketDataKind.Tick; 
+        public MarketDataKind Kind => MarketDataKind.Tick;
 
         public ZeroLagMARecord(DateTime time)
         {
@@ -61,10 +61,10 @@ namespace SharpTrader.Indicators
         /// Gets a flag indicating when this indicator is ready and fully initialized
         /// </summary>
         public override bool IsReady => Samples >= Period;
-         
+
 
         protected override ZeroLagMARecord Calculate(ITradeBar input)
-        { 
+        {
             var chartTick = input;
             var valToAdd = input.Value;
 
@@ -83,14 +83,14 @@ namespace SharpTrader.Indicators
             _rollingSum += valToAdd;
             _rollingSum -= valToRemove;
             var ma = _rollingSum / Period;
-             
+
             double slope = 0;
             if (Samples > SlopeSmoothingSteps)
             {
                 slope += ma - Outputs[0].MA;
                 slope += Enumerable
                     .Range(0, SlopeSmoothingSteps - 1)
-                    .Sum(i => Outputs[i].MA - Outputs[i + 1].MA); 
+                    .Sum(i => Outputs[i].MA - Outputs[i + 1].MA);
                 slope /= SlopeSmoothingSteps;
             }
             var zma = ma + slope * (Period - 1) / 2;
@@ -114,6 +114,15 @@ namespace SharpTrader.Indicators
         protected override ZeroLagMARecord CalculatePeek(double sample)
         {
             throw new NotImplementedException();
+        }
+
+        public override void Reset()
+        {
+            this.Outputs.Reset();
+            this.Inputs.Reset();
+            this._rollingSum = 0;
+            this._rollingSumOfSquares = 0;
+            base.Reset();
         }
     }
 }

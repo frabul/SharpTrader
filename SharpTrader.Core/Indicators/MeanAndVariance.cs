@@ -36,6 +36,10 @@ namespace SharpTrader.Indicators
         private double _rollingSumOfSquares;
         public int Period { get; private set; }
         private RollingWindow<ITradeBar> Inputs;
+        /// <summary>
+        /// Gets a flag indicating when this indicator is ready and fully initialized
+        /// </summary>
+        public override bool IsReady => Samples >= Period;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified period.
@@ -56,10 +60,6 @@ namespace SharpTrader.Indicators
             Period = period;
         }
 
-        /// <summary>
-        /// Gets a flag indicating when this indicator is ready and fully initialized
-        /// </summary>
-        public override bool IsReady => Samples >= Period;
 
         protected override MeanAndVarianceRecord Calculate(ITradeBar input)
         {
@@ -87,6 +87,14 @@ namespace SharpTrader.Indicators
         protected override MeanAndVarianceRecord CalculatePeek(double sample)
         {
             throw new NotImplementedException();
+        }
+
+        public override void Reset()
+        {
+            this.Inputs.Reset();
+            this._rollingSum = 0;
+            this._rollingSumOfSquares = 0;
+            base.Reset();
         }
     }
 }

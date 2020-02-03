@@ -68,6 +68,12 @@ namespace SharpTrader.Indicators
         {
             throw new NotImplementedException();
         }
+
+        public override void Reset()
+        {
+            this.MeanAndVariance.Reset(); 
+            base.Reset();
+        }
     }
 
 

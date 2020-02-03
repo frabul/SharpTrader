@@ -45,5 +45,12 @@ namespace SharpTrader.Indicators
         {
             throw new NotImplementedException();
         }
+
+        public override void Reset()
+        {
+            Normalize.Reset();
+            this.LastValue = null; 
+            base.Reset();
+        }
     }
 }

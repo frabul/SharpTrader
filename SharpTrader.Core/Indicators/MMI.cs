@@ -6,25 +6,25 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class MarketMeannessIndex : Indicator<ITradeBar, IndicatorDataPoint>  
+    public class MarketMeannessIndex : Indicator<ITradeBar, IndicatorDataPoint>
     {
         public override bool IsReady => Samples >= Period;
 
-        private RollingWindow <ITradeBar> Inputs;
+        private RollingWindow<ITradeBar> Inputs;
         private int Period;
 
         public MarketMeannessIndex(string name, int period, TimeSerieNavigator<ITradeBar> chart) : base(name)
         {
-            
+
             Period = period;
             Inputs = new RollingWindow<ITradeBar>(period);
         }
- 
+
 
         protected override IndicatorDataPoint Calculate(ITradeBar input)
         {
             Inputs.Add(input);
-            if(Inputs.Count >= Period)
+            if (Inputs.Count >= Period)
             {
                 var m = 0d;
                 int nh = 0, nl = 0;
@@ -46,6 +46,11 @@ namespace SharpTrader.Indicators
         protected override IndicatorDataPoint CalculatePeek(double sample)
         {
             throw new NotImplementedException();
+        }
+        public override void Reset()
+        {
+            this.Inputs.Reset();
+            base.Reset();
         }
     }
 }
