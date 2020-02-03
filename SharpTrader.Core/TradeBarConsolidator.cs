@@ -5,10 +5,12 @@ namespace SharpTrader
     public class TradeBarConsolidator
     {
         public TimeSpan Resolution { get; }
-        private TimeSerie<Candlestick> Candlesticks = new TimeSerie<Candlestick>();
+      
         private Candlestick FormingCandle;
 
         DateTime BaseTime = new DateTime(1970, 1, 1);
+
+        public Action<ITradeBar> OnConsolidated;
         public TradeBarConsolidator(TimeSpan resolution)
         {
             this.Resolution = resolution;
@@ -52,7 +54,7 @@ namespace SharpTrader
             if (topen >= FormingCandle.CloseTime || tclose > FormingCandle.CloseTime)
             {
                 //old candle is ended, the new candle is already part of the next one
-                Candlesticks.AddRecord(FormingCandle);
+                OnConsolidated?.Invoke(FormingCandle);
                 //use new candle as generator
                 var opeTime = GetOpenTime(newCandle.CloseTime, Resolution);
                 FormingCandle = new Candlestick(opeTime, newCandle, Resolution);
@@ -64,7 +66,7 @@ namespace SharpTrader
                 //check if candle is completed and emit it
                 if (tclose == FormingCandle.Time)
                 {
-                    Candlesticks.AddRecord(FormingCandle);
+                    OnConsolidated?.Invoke(FormingCandle);
                     FormingCandle = null;
                 }
             }
