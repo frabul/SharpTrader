@@ -23,6 +23,14 @@ using System.Windows.Threading;
 
 namespace SharpTrader.Plotting
 {
+    public class PlottingHelper
+    {
+        public static void Show(PlotHelper plot)
+        {
+            var vm = TraderBotResultsPlotViewModel.RunWindow(plot);
+            vm.UpdateChart();
+        }
+    }
 
     /// <summary>
     /// N.B. This should be instantiated in the same threa as its window
@@ -326,7 +334,7 @@ namespace SharpTrader.Plotting
             }
 
         }
-
+       
         public static TraderBotResultsPlotViewModel RunWindow(PlotHelper plot)
         {
             TraderBotResultsPlotViewModel vm = null;

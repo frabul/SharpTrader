@@ -75,7 +75,7 @@ namespace SharpTrader
             int duplicates = 0;
             int matchErrors = 0;
             Console.WriteLine($"Checking {histInfo.symbol} history data ");
-            var hist = GetHistoryRaw(histInfo, new DateTime(2019, 01, 01));
+            var hist = GetHistoryRaw(histInfo, new DateTime(2019, 01, 01), DateTime.MaxValue);
             lock (SymbolsDataLocker)
             {
                 var oldTicks = hist.Ticks;
@@ -167,7 +167,7 @@ namespace SharpTrader
                     if (shist != null)
                     {
                         SaveAndClose(finfo);
-                        var shist2 = GetSymbolHistory(finfo, DateTime.MinValue);
+                        var shist2 = GetSymbolHistory(finfo, DateTime.MinValue, DateTime.MaxValue);
                         Debug.Assert(shist2.Ticks.Count == shist.Ticks.Count, "Hist count doesn't match");
                         if (shist2.Ticks.Count != shist.Ticks.Count)
                         {
@@ -271,15 +271,15 @@ namespace SharpTrader
             }
             return result.ToArray();
         }
-        public ISymbolHistory GetSymbolHistory(HistoryInfo info, DateTime startOfData)
+        public ISymbolHistory GetSymbolHistory(HistoryInfo info, DateTime startOfData, DateTime endOfData)
         {
-            var rawHist = GetHistoryRaw(info, startOfData);
+            var rawHist = GetHistoryRaw(info, startOfData, endOfData);
             return new SymbolHistory(rawHist, startOfData);
         }
-        private SymbolHistoryRaw GetHistoryRaw(HistoryInfo info, DateTime startOfData)
+        private SymbolHistoryRaw GetHistoryRaw(HistoryInfo info, DateTime startOfData, DateTime endOfData)
         {
             startOfData = new DateTime(startOfData.Year, startOfData.Month, 1);
-            var endOfLoading = DateTime.MaxValue;
+            List<(DateTime start, DateTime end)> dateRanges = new List<(DateTime start, DateTime end)>();
             lock (SymbolsDataLocker)
             {
                 //check if we already have some records and load them  
@@ -297,11 +297,18 @@ namespace SharpTrader
                         StartOfData = startOfData
                     };
                     SymbolsData.Add(history);
+                    dateRanges.Add((startOfData, endOfData));
                 }
                 else
                 {
-                    endOfLoading = history.StartOfData;
-                    history.StartOfData = startOfData;
+                    if (history.StartOfData > startOfData)
+                    {
+                        dateRanges.Add((startOfData, history.StartOfData));
+                    }
+                    if (endOfData >= history.Ticks[history.Ticks.Count - 1].Time)
+                    {
+                        dateRanges.Add((history.Ticks[history.Ticks.Count - 1].Time, endOfData));
+                    }
                 }
                 //load missing months 
                 var files = GetHistoryFiles(info);
@@ -309,7 +316,9 @@ namespace SharpTrader
                 {
                     if (finfo != null)
                     {
-                        if (info.GetFileMask() == finfo.GetFileMask() && finfo.Date >= startOfData && finfo.Date < endOfLoading)
+                        var rightFile = info.GetFileMask() == finfo.GetFileMask();
+                        var dateInRange = dateRanges.Any(dr => finfo.Date >= dr.start && finfo.Date < dr.end);
+                        if (rightFile && dateInRange)
                         {
                             try
                             {
@@ -317,7 +326,7 @@ namespace SharpTrader
                                 {
                                     SymbolHistoryRaw fdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
                                     Debug.Assert(history.FileName != null);
-                                    AddCandlesToHistData(fdata.Ticks, history);
+                                    AddCandlesToHistData(fdata.Ticks.Where(tick => tick.Time <= endOfData), history);
                                 }
                             }
                             catch
@@ -333,7 +342,7 @@ namespace SharpTrader
         public void AddCandlesticks(string market, string symbol, IEnumerable<ITradeBar> candles)
         {
             var hinfo = new HistoryInfo(market, symbol, candles.First().Timeframe);
-            var sdata = GetHistoryRaw(hinfo, candles.First().OpenTime);
+            var sdata = GetHistoryRaw(hinfo, candles.First().OpenTime, DateTime.MaxValue);
             //add data 
             //Debug.Assert(sdata.Ticks.Count > 0);
             //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
@@ -366,11 +375,11 @@ namespace SharpTrader
                                 index = ~i;
                                 sdata.Ticks.Insert(index, toAdd);
                             }
-                            if (index > 0) 
+                            if (index > 0)
                                 Debug.Assert(sdata.Ticks[index].OpenTime >= sdata.Ticks[index - 1].OpenTime);
                             if (index + 1 < sdata.Ticks.Count)
                                 Debug.Assert(sdata.Ticks[index].OpenTime <= sdata.Ticks[index + 1].OpenTime);
-                           
+
                         }
                         else
                             sdata.Ticks.Add(toAdd);
@@ -578,7 +587,7 @@ namespace SharpTrader
     }
 
 
- 
+
 
 
 }

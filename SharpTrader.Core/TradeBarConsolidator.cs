@@ -29,9 +29,9 @@ namespace SharpTrader
         }
         public void Scan(DateTime timeNow)
         {
-            if (timeNow >= FormingCandle.Time)
+            if (FormingCandle != null && timeNow >= FormingCandle.Time)
             {
-                Candlesticks.AddRecord(FormingCandle);
+                OnConsolidated?.Invoke(FormingCandle);
                 FormingCandle = null;
             }
         }

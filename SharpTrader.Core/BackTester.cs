@@ -43,35 +43,25 @@ namespace SharpTrader
             Logger.Info($"Starting backtest {StartTime} - {EndTime}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            Simulator.StartOfHistoryData = StartTime - HistoryLookBack;
+          
             if (Started)
                 return;
             Started = true;
 
             foreach (var Bot in Bots)
                 Bot.Start(true).Wait();
-
-            bool raiseEvents = false;
+             
             int steps = 1;
             decimal BalancePeak = 0;
 
 
             var startingBal = -1m;
-            while (Simulator.NextTick(raiseEvents) && Simulator.Time < EndTime)
+            while (Simulator.NextTick( ) && Simulator.Time < EndTime)
             {
                 if (startingBal < 0)
-                    startingBal = Simulator.GetEquity(BaseAsset);
-                if (raiseEvents)
-                    foreach (var Bot in Bots)
-                        Bot.OnTickAsync().Wait();
-                raiseEvents = StartTime <= Simulator.Time;
-                if (steps % 240 == 0 && raiseEvents)
-                {
-                    //if (chartVM == null) 
-                    //    chartVM = TraderBotResultsPlotViewModel.RunWindow(bots[0]);  
-                    //chartVM.UpdateChart();
-                    //Console.ReadLine();
-                }
+                    startingBal = Simulator.GetEquity(BaseAsset); 
+                foreach (var Bot in Bots)
+                    Bot.OnTickAsync().Wait(); 
                 steps++;
 
                 var balance = Simulator.GetEquity(BaseAsset);

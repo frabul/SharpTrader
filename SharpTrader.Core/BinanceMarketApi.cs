@@ -1125,7 +1125,7 @@ namespace SharpTrader
             public double Bid { get; private set; }
             public string Market { get; private set; }
             public double Spread { get; set; }
-            public double Volume24H { get; private set; }
+            public double Volume24H { get; private set; } 
 
             public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, HistoricalRateDataBase hist, string market, SymbolInfo symbol)
             {
@@ -1290,7 +1290,7 @@ namespace SharpTrader
 
                 //--- load the history into this 
                 var historyInfo = new HistoryInfo(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
-                ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(historyInfo, historyStartTime);
+                ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(historyInfo, historyStartTime, DateTime.MaxValue);
                 HistoryDb.CloseFile(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
 
                 var history = new TimeSerie<ITradeBar>();

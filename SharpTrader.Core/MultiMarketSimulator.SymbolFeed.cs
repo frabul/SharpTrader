@@ -5,8 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SymbolsTable = System.Collections.Generic.Dictionary<string, SharpTrader.SymbolInfo>;
+
 #pragma warning disable CS1998
 using NLog;
+using Newtonsoft.Json.Linq;
+
 namespace SharpTrader
 {
     public partial class MultiMarketSimulator
@@ -15,6 +18,11 @@ namespace SharpTrader
 
         public class Market : IMarketApi
         {
+            internal class LegacySymbolInfo
+            {
+
+            }
+
             object LockObject = new object();
             //private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
             private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
@@ -49,7 +57,20 @@ namespace SharpTrader
                 MakerFee = makerFee;
                 TakerFee = takerFee;
                 var text = System.IO.File.ReadAllText(dataDir + name + "SymbolsTable.json");
-                SymbolsTable = Newtonsoft.Json.JsonConvert.DeserializeObject<SymbolsTable>(text);
+                JObject table = JObject.Parse(text);
+                SymbolsTable = new SymbolsTable();
+                foreach (var token in table)
+                {
+                    var simInfo = new SymbolInfo()
+                    {
+                        Key = token.Key,
+                        Asset = token.Value["Asset"].ToObject<string>(),
+                        IsMarginTadingAllowed = token.Value["IsMarginTadingAllowed"].ToObject<bool>(),
+                        IsSpotTadingAllowed = token.Value["IsSpotTadingAllowed"].ToObject<bool>(),
+                        QuoteAsset = token.Value["QuoteAsset"].ToObject<string>(),
+                    };
+                    this.SymbolsTable.Add(simInfo.Key, simInfo);
+                }
             }
 
             public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol, DateTime warmup)
@@ -253,7 +274,6 @@ namespace SharpTrader
 
             public void AddNewCandle(SymbolFeed feed, Candlestick tick)
             {
-                Time = tick.CloseTime;
                 feed.Spread = tick.Close * Spread;
                 feed.AddNewData(tick);
             }
@@ -397,11 +417,13 @@ namespace SharpTrader
 
             public SymbolInfo Symbol { get; private set; }
             public double Ask { get; private set; }
+            public DateTime Time { get; internal set; }
             public double Bid { get; private set; }
             public string Market { get; private set; }
             public double Spread { get; set; }
             public ISymbolHistory DataSource { get; set; }
             public IBaseData LastTick { get; private set; }
+
 
             public SymbolFeed(string market, SymbolInfo symbol)
             {
@@ -411,6 +433,7 @@ namespace SharpTrader
 
             public virtual async Task<TimeSerie<ITradeBar>> GetHistoryNavigator(DateTime historyStartTime)
             {
+                //todo fetch history from database
                 TimeSerie<ITradeBar> newNavigator = new TimeSerie<ITradeBar>();
                 //consolidate the currently available data
                 using (var navigator = new TimeSerieNavigator<ITradeBar>(this.DataSource.Ticks))
@@ -424,6 +447,7 @@ namespace SharpTrader
                 }
                 return newNavigator;
             }
+
             List<IBaseData> NewData = new List<IBaseData>(10);
             internal void AddNewData(IBaseData newMarketData)
             {
