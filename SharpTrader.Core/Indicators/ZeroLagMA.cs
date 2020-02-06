@@ -38,6 +38,15 @@ namespace SharpTrader.Indicators
         public int SlopeSmoothingSteps { get; set; } = 3;
         private RollingWindow<ITradeBar> Inputs;
         private RollingWindow<ZeroLagMARecord> Outputs;
+
+        public ZeroLagMA(SymbolInfo symbol, int period ) :
+           base($"ZLMA {symbol.Key} {period}" )
+        { 
+            Period = period;
+            Inputs = new RollingWindow<ITradeBar>(Period);
+            Outputs = new RollingWindow<ZeroLagMARecord>(Period);
+        }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified period.
         /// </summary>  

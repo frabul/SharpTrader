@@ -276,6 +276,17 @@ namespace SharpTrader
             var rawHist = GetHistoryRaw(info, startOfData, endOfData);
             return new SymbolHistory(rawHist, startOfData);
         }
+
+        public ISymbolHistory GetSymbolHistory(HistoryInfo info, DateTime startOfData   )
+        { 
+            return GetSymbolHistory(  info,   startOfData, DateTime.MaxValue);
+        }
+
+        public ISymbolHistory GetSymbolHistory(HistoryInfo info )
+        {
+            return GetSymbolHistory(info, DateTime.MinValue );
+        }
+
         private SymbolHistoryRaw GetHistoryRaw(HistoryInfo info, DateTime startOfData, DateTime endOfData)
         {
             startOfData = new DateTime(startOfData.Year, startOfData.Month, 1);

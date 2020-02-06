@@ -19,15 +19,16 @@ namespace SharpTrader
         }
 
     
-        public override Task OnStartAsync()
+        public override async Task OnStartAsync()
         {
-            Feed = Market.GetSymbolFeedAsync("BCPTETH").Result;
-            var feedNav = Feed.GetNavigatorAsync(TimeSpan.FromMinutes(15)).Result;
-            Indicator = new Indicators.ZeroLagMA(25, feedNav);
-            Drawer.Candles = feedNav;
+            Feed = await Market.GetSymbolFeedAsync("BCPTETH"); 
+            Indicator = new Indicators.ZeroLagMA(Feed.Symbol, 25 );
+            Plot.Candles = await Feed.GetHistoryNavigator(new DateTime(2019,01,01 ));
             var color = new ColorARGB(255, 110, 200, 160);
-            Drawer.PlotLines(Indicator.GetNavigator(), color, e => new[] { e.ZMA, e.ZMA + 1.5 * e.StdDev, e.ZMA - 1.5 * e.StdDev }, false);
-            return Task.CompletedTask;
+            TimeSerie<ZeroLagMARecord> indicatorRecords = new TimeSerie<ZeroLagMARecord>();
+            Indicator.Updated += (s, r) => indicatorRecords.AddRecord(r);
+            Plot.PlotLines(indicatorRecords, color, e => new[] { e.ZMA, e.ZMA + 1.5 * e.StdDev, e.ZMA - 1.5 * e.StdDev }, false);
+          
         }
 
      

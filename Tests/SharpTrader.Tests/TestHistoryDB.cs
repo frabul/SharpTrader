@@ -20,9 +20,9 @@ namespace SharpTrader.Tests
             foreach (var histInfo in HistoryDB.ListAvailableData())
             {
                 var data = HistoryDB.GetSymbolHistory(histInfo, DateTime.MinValue);
-                List<ICandlestick> candles = new List<ICandlestick>();
-                while (data.Ticks.Next())
-                    candles.Add(data.Ticks.Tick); 
+                List<ITradeBar> candles = new List<ITradeBar>();
+                while (data.Ticks.MoveNext())
+                    candles.Add(data.Ticks.Current); 
                 Console.WriteLine($"Validate before shuffle  {histInfo.market} - {histInfo.symbol} - {histInfo.timeframe} ");
                 HistoryDB.ValidateData(histInfo); 
                 Console.WriteLine($"Validate after shuffle {histInfo.market} - {histInfo.symbol} - {histInfo.timeframe}  ");
