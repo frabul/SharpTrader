@@ -45,11 +45,6 @@ namespace SharpTrader.Indicators
             return new MeanAndVarianceRecord(input.Time, mean, variance);
         }
 
-        protected override MeanAndVarianceRecord CalculatePeek(double sample)
-        {
-            throw new NotImplementedException();
-        }
-
         public override void Reset()
         {
             this.Inputs.Reset();

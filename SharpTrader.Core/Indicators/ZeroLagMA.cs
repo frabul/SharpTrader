@@ -119,12 +119,7 @@ namespace SharpTrader.Indicators
             };
             return record;
         }
-
-        protected override ZeroLagMARecord CalculatePeek(double sample)
-        {
-            throw new NotImplementedException();
-        }
-
+ 
         public override void Reset()
         {
             this.Outputs.Reset();

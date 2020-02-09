@@ -46,12 +46,6 @@ namespace SharpTrader.Indicators
             LastOutput = output;
             return output;
         }
-
-        protected override T CalculatePeek(double sample)
-        {
-            throw new NotImplementedException();
-        }
-
         public override void Reset()
         {
             this.Inputs.Reset();

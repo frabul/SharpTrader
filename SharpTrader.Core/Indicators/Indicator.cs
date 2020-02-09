@@ -80,7 +80,7 @@ namespace SharpTrader.Indicators
             }
         }
 
-        public TOut Peek(double nextSignalSample)
+        public double Peek(double nextSignalSample)
         {
             return CalculatePeek(nextSignalSample);
         }
@@ -91,6 +91,9 @@ namespace SharpTrader.Indicators
         }
         protected abstract TOut Calculate(TIn input);
 
-        protected abstract TOut CalculatePeek(double sample);
+        protected virtual double CalculatePeek(double sample)
+        {
+            throw new NotSupportedException($"{ this.GetType().Name} indicator doesn't support peek.");
+        }
     }
 }

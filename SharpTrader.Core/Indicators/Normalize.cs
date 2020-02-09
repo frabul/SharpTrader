@@ -41,17 +41,11 @@ namespace SharpTrader.Indicators
                 throw new Exception("Unexpected error in Normalize indicator");
         }
 
-        protected override IndicatorDataPoint CalculatePeek(double sample)
-        {
-            throw new NotImplementedException();
-        }
-
         public override void Reset()
         {
             this.Inputs.Reset();
             base.Reset();
         }
     }
-
 
 }

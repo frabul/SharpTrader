@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class HighPass<T> : Indicator<T, IndicatorDataPoint> where T : IBaseData
+    public class HighPass<T> : Indicator<T, IBaseData> where T : IBaseData
     {
         public int CutoffPeriod { get; private set; }
         private double alpha;
@@ -31,7 +31,7 @@ namespace SharpTrader.Indicators
             this.CutoffPeriod = highPassPeriod;
         }
 
-        protected override IndicatorDataPoint Calculate(T input)
+        protected override IBaseData Calculate(T input)
         {
             // alpha1 = (Cosine(.707*360 / 48) + Sine (.707*360 / 48) - 1) / Cosine(.707*360 / 48);
             // HP = (1 - alpha1 / 2)*(1 - alpha1 / 2)*(Close - 2*Close[1] + Close[2]) + 2*(1 - alpha1)*HP[1] - (1 - alpha1)*(1 - alpha1)*HP[2];
@@ -48,12 +48,12 @@ namespace SharpTrader.Indicators
             return LastOutput;
         }
 
-        protected override IndicatorDataPoint CalculatePeek(double sample)
+        protected override double CalculatePeek(double sample)
         {
             double value = 0d;
             if (this.IsReady)
                 value = alpha * (LastOutput.Value + sample - LastInput.Value);
-            return new IndicatorDataPoint(DateTime.MinValue, value);
+            return   value ;
         }
 
         public override void Reset()
@@ -62,5 +62,10 @@ namespace SharpTrader.Indicators
             LastOutput = null;
             base.Reset();
         }
+    }
+
+    public class HighPassNormalized<T>
+    {
+
     }
 }

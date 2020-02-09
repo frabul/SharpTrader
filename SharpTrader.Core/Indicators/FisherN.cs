@@ -41,11 +41,6 @@ namespace SharpTrader.Indicators
             return LastValue;
         }
 
-        protected override IndicatorDataPoint CalculatePeek(double sample)
-        {
-            throw new NotImplementedException();
-        }
-
         public override void Reset()
         {
             Normalize.Reset();

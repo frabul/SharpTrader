@@ -82,6 +82,7 @@ namespace SharpTrader
         double Spread { get; }
         double Bid { get; }
         double Ask { get; }
+        DateTime Time { get; }
 
         /// <summary>
         /// Returns market data history ( candlesticks ) from give time
