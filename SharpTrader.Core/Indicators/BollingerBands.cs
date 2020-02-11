@@ -64,7 +64,7 @@ namespace SharpTrader.Indicators
 
         }
          
-        protected override BollingerBandsRecord CalculatePeek(double sample)
+        protected override double CalculatePeek(double sample)
         {
             throw new NotImplementedException();
         }

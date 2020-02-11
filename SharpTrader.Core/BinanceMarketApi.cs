@@ -1121,6 +1121,7 @@ namespace SharpTrader
             private BinanceKline FormingCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
 
             public SymbolInfo Symbol { get; private set; }
+            public DateTime Time { get; private set; }
             public double Ask { get; private set; }
             public double Bid { get; private set; }
             public string Market { get; private set; }
@@ -1211,6 +1212,7 @@ namespace SharpTrader
 
             private void HandlePartialDepthUpdate(BinancePartialData messageData)
             {
+              
                 DepthWatchdog.Restart();
                 var bid = (double)messageData.Bids.FirstOrDefault(b => b.Quantity > 0).Price;
                 var ask = (double)messageData.Asks.FirstOrDefault(a => a.Quantity > 0).Price;
@@ -1222,6 +1224,7 @@ namespace SharpTrader
                     //call on data
                     this.OnData?.Invoke(this, new QuoteTick(Bid, Ask, messageData.EventTime));
                 }
+                this.Time = messageData.EventTime;
             }
 
             private void HandleKlineEvent(BinanceKlineData msg)
@@ -1314,9 +1317,6 @@ namespace SharpTrader
                     Logger.Error("Exeption during SymbolFeed.Dispose: " + ex.Message);
                 }
             }
-
-
-
         }
     }
 

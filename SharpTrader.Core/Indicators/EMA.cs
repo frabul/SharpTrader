@@ -22,11 +22,11 @@ namespace SharpTrader.Indicators
             Alpha = 1d / emaPeriod;
         }
 
-        protected override IndicatorDataPoint CalculatePeek(double sample)
+        protected override double CalculatePeek(double sample)
         {
             var signal = sample;
             var last = LastOutput.Value;
-            return new IndicatorDataPoint(DateTime.MinValue, last + Alpha * (signal - last));
+            return last + Alpha * (signal - last);
         }
 
         protected override IndicatorDataPoint Calculate(T input)

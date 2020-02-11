@@ -39,7 +39,7 @@ namespace SharpTrader.Indicators
 
         }
 
-        protected override IndicatorDataPoint CalculatePeek(double sample)
+        protected override double CalculatePeek(double sample)
         {
             throw new NotImplementedException();
         }
