@@ -63,6 +63,7 @@ namespace SharpTrader
         decimal GetMinNotional(string asset);
 
         void DisposeFeed(ISymbolFeed feed);
+        Task MarketOrderAsync(string key, object entryDirection, decimal amountRemaining);
     }
 
     public class SymbolInfo
