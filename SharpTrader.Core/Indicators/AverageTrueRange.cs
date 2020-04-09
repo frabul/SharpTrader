@@ -11,6 +11,10 @@ namespace SharpTrader.Indicators
         public TrueRange TrueRange { get; }
 
         double RollingSum = 0;
+        public AverageTrueRange(int period) : base("AverageTrueRange")
+        {
+            Period = period;
+        }
 
         public AverageTrueRange(string name, int period, TimeSerieNavigator<ITradeBar> chart, DateTime warmUpTime) :
            base(name, chart, warmUpTime)

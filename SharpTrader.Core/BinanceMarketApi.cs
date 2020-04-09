@@ -879,6 +879,9 @@ namespace SharpTrader
             if (feed == null)
             {
                 var binanceSymbol = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == symbol);
+                var lotSize = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterLotSize) as ExchangeInfoSymbolFilterLotSize;
+                var minNotional = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterMinNotional) as ExchangeInfoSymbolFilterMinNotional;
+                var pricePrecision = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterPrice) as ExchangeInfoSymbolFilterPrice;
                 var symInfo = new SymbolInfo()
                 {
                     Asset = binanceSymbol.baseAsset,
@@ -886,8 +889,12 @@ namespace SharpTrader
                     Key = binanceSymbol.symbol,
                     IsMarginTadingAllowed = binanceSymbol.isMarginTradingAllowed,
                     IsSpotTadingAllowed = binanceSymbol.isSpotTradingAllowed,
-
+                    LotSizeStep = lotSize.StepSize,
+                    MinLotSize = lotSize.MinQty,
+                    MinNotional = minNotional.MinNotional,
+                    PricePrecision = pricePrecision.TickSize
                 };
+
                 feed = new SymbolFeed(Client, CombinedWebSocketClient, HistoryDb, MarketName, symInfo);
                 await feed.Initialize();
                 lock (LockBalances)
@@ -1084,7 +1091,7 @@ namespace SharpTrader
             public T Result { get; }
             public string ErrorInfo { get; internal set; }
             public MarketOperationStatus Status { get; internal set; }
-            public bool Successful => Status == MarketOperationStatus.Completed;
+            public bool IsSuccessful => Status == MarketOperationStatus.Completed;
             public MarketOperation(MarketOperationStatus status)
             {
                 Status = status;
@@ -1126,7 +1133,7 @@ namespace SharpTrader
             public double Bid { get; private set; }
             public string Market { get; private set; }
             public double Spread { get; set; }
-            public double Volume24H { get; private set; } 
+            public double Volume24H { get; private set; }
 
             public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, HistoricalRateDataBase hist, string market, SymbolInfo symbol)
             {
@@ -1212,7 +1219,6 @@ namespace SharpTrader
 
             private void HandlePartialDepthUpdate(BinancePartialData messageData)
             {
-              
                 DepthWatchdog.Restart();
                 var bid = (double)messageData.Bids.FirstOrDefault(b => b.Quantity > 0).Price;
                 var ask = (double)messageData.Asks.FirstOrDefault(a => a.Quantity > 0).Price;
@@ -1316,6 +1322,56 @@ namespace SharpTrader
                 {
                     Logger.Error("Exeption during SymbolFeed.Dispose: " + ex.Message);
                 }
+            }
+
+            decimal NearestRoundHigher(decimal x, decimal precision)
+            {
+                if (precision != 0)
+                {
+                    var resto = x % precision;
+                    x = x - resto + precision;
+                }
+                return x;
+            }
+            decimal NearestRoundLower(decimal x, decimal precision)
+            {
+                if (precision != 0)
+                {
+                    var resto = x % precision;
+                    x = x - resto;
+                }
+                return x;
+            }
+
+            public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal amount, decimal price)
+            {
+
+                price = NearestRoundHigher(price, this.Symbol.PricePrecision);
+                if (amount * price < Symbol.MinNotional)
+                    amount = Symbol.MinNotional / price;
+
+                if (amount < Symbol.MinLotSize)
+                    amount = Symbol.MinLotSize;
+
+                amount = NearestRoundHigher(amount, Symbol.LotSizeStep);
+
+
+                return (price / 1.00000000000m, amount / 1.000000000000m);
+            }
+
+            public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal amount, decimal price)
+            {
+
+                price = NearestRoundLower(price, this.Symbol.PricePrecision);
+                if (amount * price < Symbol.MinNotional)
+                    amount = 0;
+
+                if (amount < Symbol.MinLotSize)
+                    amount = 0;
+
+                amount = NearestRoundLower(amount, Symbol.LotSizeStep);
+                 
+                return (price / 1.00000000000m, amount / 1.000000000000m);
             }
         }
     }
@@ -1512,4 +1568,4 @@ namespace SharpTrader
         public decimal Locked;
         public decimal Total => Free + Locked;
     }
-} 
+}

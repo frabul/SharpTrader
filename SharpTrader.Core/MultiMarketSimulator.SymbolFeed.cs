@@ -400,6 +400,8 @@ namespace SharpTrader
             {
 
             }
+
+
         }
 
         public decimal GetEquity(string baseAsset)
@@ -471,6 +473,15 @@ namespace SharpTrader
                 }
             }
 
+            public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal price, decimal amount)
+            {
+                return (price, amount);
+            }
+
+            public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal price, decimal amount)
+            {
+                return (price, amount);
+            }
         }
 
         class Order : IOrder
@@ -550,7 +561,7 @@ namespace SharpTrader
             public T Result { get; }
             public string ErrorInfo { get; internal set; }
 
-            public bool Successful => Status == MarketOperationStatus.Completed;
+            public bool IsSuccessful => Status == MarketOperationStatus.Completed;
 
             public MarketOperation(MarketOperationStatus status, T res)
             {
