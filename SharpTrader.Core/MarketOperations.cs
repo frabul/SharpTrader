@@ -90,6 +90,7 @@ namespace SharpTrader
         string Market { get; }
         string ClientId { get; }
         DateTime Time { get; }
+        bool IsClosed { get;   }
     }
 
     public class MarginTrade

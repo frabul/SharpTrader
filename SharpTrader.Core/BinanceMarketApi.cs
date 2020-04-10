@@ -1393,6 +1393,8 @@ namespace SharpTrader
         public List<long> ResultingTrades { get; set; } = new List<long>();
         public DateTime Time { get; set; }
 
+        public bool IsClosed => Status >= OrderStatus.Cancelled;
+
         public ApiOrder() { }
 
         public ApiOrder(AcknowledgeCreateOrderResponse binanceOrder)
