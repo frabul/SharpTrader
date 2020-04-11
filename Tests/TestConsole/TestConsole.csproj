@@ -34,9 +34,9 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="LiteDB" Version="4.1.4" />
-    <PackageReference Include="OxyPlot.Core" Version="1.0.0" />
+    <PackageReference Include="OxyPlot.Core" Version="2.0.0" />
     <PackageReference Include="OxyPlot.Wpf" Version="1.0.0" />
-    <PackageReference Include="System.ValueTuple" Version="4.4.0" />
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />

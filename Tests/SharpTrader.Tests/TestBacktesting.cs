@@ -81,9 +81,9 @@ namespace SharpTrader.Tests
     public class TurtleBuyBot : TraderBot
     {
         private ISymbolFeed Feed;
-        private TimeSerieNavigator<ICandlestick> Chart;
-        private Indicators.Max<ICandlestick> Max;
-        private Indicators.Min<ICandlestick> Min;
+        private TimeSerieNavigator<ITradeBar> Chart;
+        private Indicators.Max<ITradeBar> Max;
+        private Indicators.Min<ITradeBar> Min;
         private decimal AmountHold = 0;
         public IMarketApi Market { get; set; }
         public string Symbol { get; private set; }
