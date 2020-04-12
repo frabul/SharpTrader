@@ -11,7 +11,7 @@ namespace SharpTrader.Indicators
         T LastOutput;
         public RollingWindow<T> Inputs { get; }
         public int Period { get; }
-        public override bool IsReady => Samples > Period;
+        public override bool IsReady => SamplesCount > Period;
         public Max(string name, int period)
             : base(name)
         {

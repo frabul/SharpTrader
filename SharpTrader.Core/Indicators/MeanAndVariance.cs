@@ -39,7 +39,7 @@ namespace SharpTrader.Indicators
         /// <summary>
         /// Gets a flag indicating when this indicator is ready and fully initialized
         /// </summary>
-        public override bool IsReady => Samples >= Period;
+        public override bool IsReady => SamplesCount >= Period;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified period.

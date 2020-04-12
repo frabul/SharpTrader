@@ -26,7 +26,8 @@ namespace SharpTrader.Indicators
 
         public virtual double Value => Current.Value;
 
-        public virtual int Samples { get; private set; }
+        public virtual int SamplesCount { get; private set; }
+
         public Indicator(string name)
         {
             Log = NLog.LogManager.GetLogger(name);
@@ -73,7 +74,7 @@ namespace SharpTrader.Indicators
                 }
                 _previousInput = (TIn)input;
                 Current = Calculate((TIn)input);
-                Samples++;
+                SamplesCount++;
                 // let others know we've produced a new data point
                 Updated?.Invoke(this, Current);
 
@@ -87,7 +88,7 @@ namespace SharpTrader.Indicators
 
         public virtual void Reset()
         {
-            this.Samples = 0;
+            this.SamplesCount = 0;
         }
         protected abstract TOut Calculate(TIn input);
 

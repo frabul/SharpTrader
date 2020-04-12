@@ -32,7 +32,7 @@ namespace SharpTrader.Indicators
         public int Period { get; set; }
         public double Deviation { get; set; }
 
-        public override bool IsReady => Samples >= Period;
+        public override bool IsReady => SamplesCount >= Period;
 
         public BollingerBands(string name, int period, double deviation) : base(name)
         {

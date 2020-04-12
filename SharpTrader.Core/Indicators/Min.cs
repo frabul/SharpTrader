@@ -24,7 +24,7 @@ namespace SharpTrader.Indicators
         }
 
 
-        public override bool IsReady => Samples >= Period;
+        public override bool IsReady => SamplesCount >= Period;
 
 
 

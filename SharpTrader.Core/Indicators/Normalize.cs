@@ -17,7 +17,7 @@ namespace SharpTrader.Indicators
             Inputs = new RollingWindow<T>(period);
         }
 
-        public override bool IsReady => Samples >= Period;
+        public override bool IsReady => SamplesCount >= Period;
 
         protected override IndicatorDataPoint Calculate(T input)
         {

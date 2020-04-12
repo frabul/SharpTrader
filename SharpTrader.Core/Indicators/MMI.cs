@@ -8,7 +8,7 @@ namespace SharpTrader.Indicators
 {
     public class MarketMeannessIndex : Indicator<ITradeBar, IndicatorDataPoint>
     {
-        public override bool IsReady => Samples >= Period;
+        public override bool IsReady => SamplesCount >= Period;
 
         private RollingWindow<ITradeBar> Inputs;
         private int Period;

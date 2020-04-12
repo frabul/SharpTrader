@@ -1307,7 +1307,7 @@ namespace SharpTrader
                     history.AddRecord(symbolHistory.Ticks.Current, true);
 
                 return history;
-            }
+            } 
 
             public void Dispose()
             {

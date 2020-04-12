@@ -69,7 +69,7 @@ namespace SharpTrader.Indicators
         /// <summary>
         /// Gets a flag indicating when this indicator is ready and fully initialized
         /// </summary>
-        public override bool IsReady => Samples >= Period;
+        public override bool IsReady => SamplesCount >= Period;
 
 
         protected override ZeroLagMARecord Calculate(ITradeBar input)
@@ -94,7 +94,7 @@ namespace SharpTrader.Indicators
             var ma = _rollingSum / Period;
 
             double slope = 0;
-            if (Samples > SlopeSmoothingSteps)
+            if (SamplesCount > SlopeSmoothingSteps)
             {
                 slope += ma - Outputs[0].MA;
                 slope += Enumerable

@@ -9,7 +9,7 @@ namespace SharpTrader.Indicators
     public class TrueRange : Indicator<ITradeBar, IndicatorDataPoint>
     {
         private ITradeBar LastSample;
-        public override bool IsReady => Samples > 1;
+        public override bool IsReady => SamplesCount > 1;
         public TrueRange(string name) : base(name) { }
         public TrueRange(string name, TimeSerieNavigator<ITradeBar> chart, DateTime warmUpTime) :
             base(name, chart, warmUpTime)

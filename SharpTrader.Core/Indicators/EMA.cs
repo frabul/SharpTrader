@@ -13,7 +13,7 @@ namespace SharpTrader.Indicators
         private double Alpha;
         private Func<T, double> ValueSelector;
         private IndicatorDataPoint LastOutput;
-        public override bool IsReady => Samples >= Period;
+        public override bool IsReady => SamplesCount >= Period;
         public EMA(int emaPeriod, Func<T, double> valueSelector, TimeSerieNavigator<T> signal, DateTime warmUpTime)
             : base("EMA", signal, warmUpTime)
         {

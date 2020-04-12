@@ -14,7 +14,7 @@ namespace SharpTrader.Indicators
         private IndicatorDataPoint LastOutput;
         private T LastInput;
 
-        public override bool IsReady => Samples > CutoffPeriod / 2;
+        public override bool IsReady => SamplesCount > CutoffPeriod / 2;
 
         public HighPass(string name, int cutOffPeriod, TimeSerieNavigator<T> signal, DateTime warmUpTime)
             : base(name, signal, warmUpTime)
@@ -29,6 +29,7 @@ namespace SharpTrader.Indicators
             : base(name)
         {
             this.CutoffPeriod = highPassPeriod;
+            alpha = (double)CutoffPeriod / (1 + CutoffPeriod);
         }
 
         protected override IBaseData Calculate(T input)
@@ -37,7 +38,7 @@ namespace SharpTrader.Indicators
             // HP = (1 - alpha1 / 2)*(1 - alpha1 / 2)*(Close - 2*Close[1] + Close[2]) + 2*(1 - alpha1)*HP[1] - (1 - alpha1)*(1 - alpha1)*HP[2];
             var value = 0d;
             if (LastOutput == null)
-                value = alpha * (0 + input.Value);
+                value = 0;
             else
                 value = alpha * (LastOutput.Value + input.Value - LastInput.Value);
             //b * b * (GetSignal(0) - 2 * GetSignal(1) + GetSignal(2))

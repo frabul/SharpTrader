@@ -14,7 +14,7 @@ namespace SharpTrader.Indicators
         //private List<double> MidValues = new List<double>();
         IndicatorDataPoint LastValue;
         double LastMidValue;
-        public override bool IsReady => Samples > Period;
+        public override bool IsReady => SamplesCount > Period;
 
         public FisherN(string name, int period) : base(name)
         {
