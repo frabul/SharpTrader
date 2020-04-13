@@ -9,9 +9,15 @@ namespace SharpTrader
 {
     public abstract class TraderBot
     {
+        private List<PlotHelper> _Plots = new List<PlotHelper>();
         private volatile bool _started;
+        public IReadOnlyList<PlotHelper> Plots => _Plots;
 
-        public PlotHelper Plot { get; } = new PlotHelper();
+        public void AddPlot(PlotHelper plot)
+        {
+            if (!_Plots.Contains(plot))
+                _Plots.Add(plot);
+        }
         public bool BackTesting { get; private set; }
         public bool Active { get; set; }
         public bool Started { get { Thread.MemoryBarrier(); return _started; } private set => _started = value; }

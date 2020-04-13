@@ -39,6 +39,10 @@ namespace SharpTrader
 
         public MultiMarketSimulator(string dataDirectory, HistoricalRateDataBase historyDb, DateTime simulationStartTime, DateTime endTime)
         {
+            //let's make the start and end times a multiple of Resolution timespan
+            //var startTimeTicks = simulationStartTime.Ticks - simulationStartTime.Ticks % Resolution.Ticks;
+            //var endTimeTicks = endTime.Ticks - endTime.Ticks % Resolution.Ticks;
+
             this.Time = simulationStartTime;
             StartTime = simulationStartTime;
             EndTime = endTime;
