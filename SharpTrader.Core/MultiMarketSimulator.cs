@@ -41,8 +41,7 @@ namespace SharpTrader
         {
             //let's make the start and end times a multiple of Resolution timespan
             //var startTimeTicks = simulationStartTime.Ticks - simulationStartTime.Ticks % Resolution.Ticks;
-            //var endTimeTicks = endTime.Ticks - endTime.Ticks % Resolution.Ticks;
-
+            //var endTimeTicks = endTime.Ticks - endTime.Ticks % Resolution.Ticks; 
             this.Time = simulationStartTime;
             StartTime = simulationStartTime;
             EndTime = endTime;
@@ -77,6 +76,7 @@ namespace SharpTrader
         }
 
         int NoMoreDataCount = 0;
+
         public bool NextTick()
         {
             //calculate next tick time
@@ -137,8 +137,7 @@ namespace SharpTrader
         {
             _Markets.Where(m => m.MarketName == market).First().AddBalance(asset, amount);
         }
-
-
+         
         public class Configuration
         {
             public MarketConfiguration[] Markets { get; set; }
