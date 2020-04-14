@@ -81,12 +81,12 @@ namespace SharpTrader
                 }
             }
 
-            public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal price, decimal amount)
+            public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal amount, decimal price  )
             {
                 return (price, amount);
             }
 
-            public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal price, decimal amount)
+            public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal amount, decimal price)
             {
                 return (price, amount);
             }
