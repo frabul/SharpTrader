@@ -980,10 +980,8 @@ namespace SharpTrader
                     var quoteBal = _Balances[symbolInfo.quoteAsset];
                     var assetBal = _Balances[symbolInfo.baseAsset];
                 }
-
-                //todo update balance
-                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, newOrd);
-
+                 
+                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, newOrd); 
             }
             catch (Exception ex)
             {

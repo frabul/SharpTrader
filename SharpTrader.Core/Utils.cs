@@ -6,6 +6,46 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
+    public class AssetSum
+    {
+        public string Asset { get; set; }
+        public decimal Amount { get; set; }
+
+        public AssetSum(string asset, decimal budget)
+        {
+            Asset = asset;
+            Amount = budget;
+        }
+
+        public static decimal Convert(AssetSum amount, string targetAsset, IEnumerable<ISymbolFeed> feeds  )
+        {
+            if (amount.Asset == targetAsset)
+                return amount.Amount;
+            var feed = feeds.FirstOrDefault();
+            if (feed == null)
+                throw new ArgumentException("No feed provieded for the conversion");
+            if (feed.Symbol.Asset == targetAsset && feed.Symbol.QuoteAsset == amount.Asset)
+                return amount.Amount / (decimal)feed.Ask;
+            else if (feed.Symbol.QuoteAsset == targetAsset && feed.Symbol.Asset == amount.Asset)
+                return amount.Amount * (decimal)feed.Bid;
+            else
+                throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair"); 
+        }
+        public static decimal Convert(AssetSum amount, string targetAsset, ISymbolFeed feed)
+        {
+            if (amount.Asset == targetAsset)
+                return amount.Amount; 
+            if (feed == null)
+                throw new ArgumentException("No feed provieded for the conversion");
+            if (feed.Symbol.Asset == targetAsset && feed.Symbol.QuoteAsset == amount.Asset)
+                return amount.Amount / (decimal)feed.Ask;
+            else if (feed.Symbol.QuoteAsset == targetAsset && feed.Symbol.Asset == amount.Asset)
+                return amount.Amount * (decimal)feed.Bid;
+            else
+                throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair");
+        }
+    }
+
     public static class Extensions
     {
         public static readonly DateTime BaseUnixTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -39,6 +79,10 @@ namespace SharpTrader
             return x.Time.CompareTo(y.Time);
         }
     }
+ 
+ 
+
+
     public class CandlestickTimeComparer : IComparer<ITradeBar>
     {
         public int Compare(ITradeBar x, ITradeBar y)

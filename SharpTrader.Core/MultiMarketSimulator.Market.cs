@@ -107,9 +107,7 @@ namespace SharpTrader
                 else
                 {
                     return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null) { ErrorInfo = res.error };
-                }
-
-
+                } 
             }
 
             private (bool result, string error) RegisterOrder(Order order)
