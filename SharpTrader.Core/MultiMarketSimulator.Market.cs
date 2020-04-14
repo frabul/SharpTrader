@@ -95,6 +95,12 @@ namespace SharpTrader
 
             public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
             {
+                if (amount <= 0)
+                    return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null)
+                    {
+                        ErrorInfo = "Order amount is zero or negative"
+                    };
+
                 var order = new Order(this.MarketName, symbol, Time, type, OrderType.Limit, amount, (double)rate, clientOrderId);
 
                 var res = RegisterOrder(order);
@@ -107,7 +113,7 @@ namespace SharpTrader
                 else
                 {
                     return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null) { ErrorInfo = res.error };
-                } 
+                }
             }
 
             private (bool result, string error) RegisterOrder(Order order)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -74,8 +75,7 @@ namespace SharpTrader
                     LastTick = NewData[NewData.Count - 1];
                     foreach (var data in NewData)
                     {
-                        OnData?.Invoke(this, data);
-
+                        OnData?.Invoke(this, data); 
                     }
                     NewData.Clear();
                 }
@@ -83,11 +83,19 @@ namespace SharpTrader
 
             public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal amount, decimal price  )
             {
+                Debug.Assert(amount > 0);
+                Debug.Assert(price > 0);
+                if (amount * price < 0.001m)
+                    amount = 0.001m;
                 return (price, amount);
             }
 
             public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal amount, decimal price)
             {
+                Debug.Assert(amount > 0);
+                Debug.Assert(price > 0);
+                if (amount * price < 0.001m)
+                    amount = 0.001m / price;
                 return (price, amount);
             }
         }
