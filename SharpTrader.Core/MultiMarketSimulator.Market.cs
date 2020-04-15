@@ -283,6 +283,10 @@ namespace SharpTrader
                 public decimal Free;
                 public decimal Locked;
                 public decimal Total => Free + Locked;
+                public override string ToString()
+                {
+                    return $"{{Free: {Free}, Locked: {Locked}}}";
+                }
             }
 
             public Task<IMarketOperation<decimal>> GetEquity(string asset)

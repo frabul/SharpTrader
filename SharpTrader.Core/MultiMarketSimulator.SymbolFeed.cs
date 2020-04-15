@@ -23,9 +23,7 @@ namespace SharpTrader
             public event Action<ISymbolFeed, IBaseData> OnData;
 
             private TimeSpan Resolution = TimeSpan.FromSeconds(60);
-
-            private bool onTickPending = false;
-
+             
             public SymbolInfo Symbol { get; private set; }
             public double Ask { get; private set; }
             public DateTime Time { get; internal set; }
@@ -34,7 +32,6 @@ namespace SharpTrader
             public double Spread { get; set; }
             public ISymbolHistory DataSource { get; set; }
             public IBaseData LastTick { get; private set; }
-
 
             public SymbolFeed(string market, SymbolInfo symbol)
             {
@@ -180,6 +177,11 @@ namespace SharpTrader
             public string ClientOrderId => Order.ClientId;
 
             public string OrderId => Order.Id;
+
+            public override string ToString()
+            {
+                return $"Trade{{ Id: {Id}, Symbol:{Symbol}, Direction:{Direction}, Time:{Time} }}";
+            }
         }
 
         class MarketOperation<T> : IMarketOperation<T>

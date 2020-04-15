@@ -84,7 +84,7 @@ namespace SharpTrader
 
             //update market time
             this.Time = nextTick;
-            bool dataAdded = false;
+            bool moreData = false;
             //add new data to all symbol feeds that have it    
             foreach (var market in _Markets)
             {
@@ -100,15 +100,15 @@ namespace SharpTrader
                         {
                             dataSource.Ticks.MoveNext();
                             var candle = dataSource.Ticks.Current is Candlestick c ? c : new Candlestick(dataSource.Ticks.Current);
-                            market.AddNewCandle(feed as SymbolFeed, candle);// new Candlestick(data.Ticks.Tick)); //use less memory
-                            dataAdded = true;
+                            market.AddNewCandle(feed as SymbolFeed, candle);// new Candlestick(data.Ticks.Tick)); //use less memory 
                         }
+                        moreData |= dataSource.Ticks.Position < dataSource.Ticks.Count - 1;
                     }
 
                 }
             }
 
-            if (!dataAdded)
+            if (!moreData)
                 NoMoreDataCount++;
             else
                 NoMoreDataCount = 0;
