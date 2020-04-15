@@ -100,11 +100,10 @@ namespace SharpTrader
                         {
                             dataSource.Ticks.MoveNext();
                             var candle = dataSource.Ticks.Current is Candlestick c ? c : new Candlestick(dataSource.Ticks.Current);
-                            market.AddNewCandle(feed as SymbolFeed, candle);// new Candlestick(data.Ticks.Tick)); //use less memory 
+                            market.AddNewCandle(feed as SymbolFeed, candle);// new Candlestick(data.Ticks.Tick)); //use less memory   
                         }
                         moreData |= dataSource.Ticks.Position < dataSource.Ticks.Count - 1;
-                    }
-
+                    } 
                 }
             }
 
