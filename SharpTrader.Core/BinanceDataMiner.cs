@@ -126,7 +126,7 @@ namespace SharpTrader.Utils
                 HistoryDB.AddCandlesticks(MarketName, symbol, candlesDownloaded);
                 var histInfo = new HistoryInfo(MarketName, symbol, TimeSpan.FromSeconds(60));
                 HistoryDB.ValidateData(histInfo);
-                histInfo.timeframe = candlesDownloaded.First().Timeframe;
+                histInfo.Timeframe = candlesDownloaded.First().Timeframe;
                 HistoryDB.SaveAndClose(histInfo);
                 Console.WriteLine($"{symbol} history downloaded");
             }
