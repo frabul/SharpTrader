@@ -11,18 +11,20 @@ namespace SharpTrader
 {
     public class HistoryInfo
     {
-        public string symbol;
-        public string market;
-        public TimeSpan timeframe;
+        public string symbol { get; private set; }
+        public string market { get; private set; }
+        public TimeSpan timeframe { get; private set; }
+        string mask;
         public HistoryInfo(string market, string symbol, TimeSpan frame)
         {
             this.market = market;
             this.symbol = symbol;
             this.timeframe = frame;
+            mask = $"{this.market}_{this.symbol}_{(int)this.timeframe.TotalMilliseconds}";
         }
         internal string GetFileMask()
         {
-            return $"{this.market}_{this.symbol}_{(int)this.timeframe.TotalMilliseconds}";
+            return mask;
         }
     }
     public class HistoryFileInfo : HistoryInfo
@@ -287,47 +289,58 @@ namespace SharpTrader
             return GetSymbolHistory(info, DateTime.MinValue );
         }
 
-        private SymbolHistoryRaw GetHistoryRaw(HistoryInfo info, DateTime startOfData, DateTime endOfData)
+        class DateRange
+        {
+            public DateTime start;
+            public DateTime end;
+
+            public DateRange(DateTime start, DateTime end)
+            {
+                this.start = start;
+                this.end = end;
+            }
+        }
+        private SymbolHistoryRaw GetHistoryRaw(HistoryInfo historyInfo, DateTime startOfData, DateTime endOfData)
         {
             startOfData = new DateTime(startOfData.Year, startOfData.Month, 1);
-            List<(DateTime start, DateTime end)> dateRanges = new List<(DateTime start, DateTime end)>();
+            List<DateRange> dateRanges = new List<DateRange>();
             lock (SymbolsDataLocker)
             {
                 //check if we already have some records and load them  
-                SymbolHistoryRawExt history = SymbolsData.FirstOrDefault(sd => sd.Equals(info));
+                SymbolHistoryRawExt history = SymbolsData.FirstOrDefault(sd => sd.Equals(historyInfo));
                 if (history == null)
                 {
                     history = new SymbolHistoryRawExt
                     {
                         Ticks = new List<Candlestick>(),
-                        FileName = info.GetFileMask(),
-                        Market = info.market,
+                        FileName = historyInfo.GetFileMask(),
+                        Market = historyInfo.market,
                         Spread = 0,
-                        Symbol = info.symbol,
-                        Timeframe = info.timeframe,
+                        Symbol = historyInfo.symbol,
+                        Timeframe = historyInfo.timeframe,
                         StartOfData = startOfData
                     };
                     SymbolsData.Add(history);
-                    dateRanges.Add((startOfData, endOfData));
+                    dateRanges.Add(new DateRange(startOfData, endOfData));
                 }
                 else
                 {
                     if (history.StartOfData > startOfData)
                     {
-                        dateRanges.Add((startOfData, history.StartOfData));
+                        dateRanges.Add(new DateRange(startOfData, history.StartOfData));
                     }
                     if (endOfData >= history.Ticks[history.Ticks.Count - 1].Time)
                     {
-                        dateRanges.Add((history.Ticks[history.Ticks.Count - 1].Time, endOfData));
+                        dateRanges.Add(new DateRange(history.Ticks[history.Ticks.Count - 1].Time, endOfData));
                     }
                 }
                 //load missing months 
-                var files = GetHistoryFiles(info);
+                var files = GetHistoryFiles(historyInfo);
                 foreach (var finfo in files)
                 {
                     if (finfo != null)
                     {
-                        var rightFile = info.GetFileMask() == finfo.GetFileMask();
+                        var rightFile = historyInfo.GetFileMask() == finfo.GetFileMask();
                         var dateInRange = dateRanges.Any(dr => finfo.Date >= dr.start && finfo.Date < dr.end);
                         if (rightFile && dateInRange)
                         {
@@ -398,12 +411,23 @@ namespace SharpTrader
                 }
             }
         }
+
+        Dictionary<string, HistoryFileInfo[]> CachedHistoryFilesPerinfoMask = new Dictionary<string, HistoryFileInfo[]>();
+        string[] AllFilesInDir;
         private HistoryFileInfo[] GetHistoryFiles(HistoryInfo info)
         {
             string fileNameMask = info.GetFileMask();
-            var allFilesInDir = Directory.GetFiles(BaseDirectory, "*.bin");
-            return allFilesInDir.Select(fp => GetFileInfo(fp)).Where(fi => fi != null && fi.GetFileMask() == info.GetFileMask()).ToArray();
+            if (!CachedHistoryFilesPerinfoMask.ContainsKey(fileNameMask))
+            {
+                if(AllFilesInDir == null)
+                    AllFilesInDir = Directory.GetFiles(BaseDirectory, "*.bin");
+                var files = AllFilesInDir.Select(fp => GetFileInfo(fp)).Where(fi => fi != null && fi.GetFileMask() == info.GetFileMask()).ToArray();
+                CachedHistoryFilesPerinfoMask[fileNameMask] = files;
+                return files;
+            }
+            return CachedHistoryFilesPerinfoMask[fileNameMask]; 
         }
+        
         private HistoryInfo GetFileInfoV1(string fileName)
         {
             fileName = Path.GetFileName(fileName);
