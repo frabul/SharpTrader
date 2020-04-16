@@ -399,8 +399,8 @@ namespace SharpTrader.Plotting
         public ChartBarVol(ITradeBar c)
             : base(c.Time.ToAxisDouble(), c.Open, c.High, c.Low, c.Close)
         {
-            this.BuyVolume = c.Close > c.Open ? c.Volume : 0;
-            this.SellVolume = c.Close > c.Open ? 0 : c.Volume;
+            this.BuyVolume = c.Close > c.Open ? c.QuoteAssetVolume : 0;
+            this.SellVolume = c.Close > c.Open ? 0 : c.QuoteAssetVolume;
             Time = c.Time;
         }
     }

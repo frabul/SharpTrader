@@ -8,7 +8,7 @@ namespace SharpTrader
         DateTime CloseTime { get; }
         double Open { get; }
         double Close { get; }
-        double Volume { get; }
+        double QuoteAssetVolume { get; }
         TimeSpan Timeframe { get; }
     }
 

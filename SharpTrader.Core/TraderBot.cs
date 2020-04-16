@@ -18,6 +18,7 @@ namespace SharpTrader
             if (!_Plots.Contains(plot))
                 _Plots.Add(plot);
         }
+
         public bool BackTesting { get; private set; }
         public bool Active { get; set; }
         public bool Started { get { Thread.MemoryBarrier(); return _started; } private set => _started = value; }

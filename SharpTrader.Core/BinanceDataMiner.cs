@@ -168,7 +168,7 @@ namespace SharpTrader.Utils
                             Close = (double)c.Close,
                             OpenTime = c.OpenTime,
                             CloseTime = c.OpenTime.AddSeconds(60), //+ c.CloseTime.AddMilliseconds(1),
-                            Volume = (double)c.QuoteAssetVolume
+                            QuoteAssetVolume = (double)c.QuoteAssetVolume
                         }).ToList();
 
                     allCandles.AddRange(batch);

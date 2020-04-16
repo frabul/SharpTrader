@@ -19,7 +19,7 @@
 
         protected override double CalculatePeek(double sample)
         {
-            return BaseIndicator.Peek(sample) / LastInput.Value; 
+            return BaseIndicator.Peek(sample) / sample; 
         }
 
         public override void Reset()

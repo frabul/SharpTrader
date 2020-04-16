@@ -21,7 +21,10 @@ namespace SharpTrader.Indicators
             Period = emaPeriod;
             Alpha = 1d / emaPeriod;
         }
-
+        public EMA(string name, int period) : base(name)
+        {
+            Period = period;
+        }
         protected override double CalculatePeek(double sample)
         {
             var signal = sample;
@@ -36,8 +39,8 @@ namespace SharpTrader.Indicators
                 LastOutput = new IndicatorDataPoint(input.Time, input.Value);
             }
             else
-            {
-                var signal = ValueSelector(input);
+            { 
+                var signal = ValueSelector != null ? ValueSelector(input) : input.Value;
                 var last = LastOutput.Value;
                 LastOutput = new IndicatorDataPoint(input.Time, last + Alpha * (signal - last));
             }
@@ -46,7 +49,7 @@ namespace SharpTrader.Indicators
 
         public override void Reset()
         {
-            this.LastOutput = null; 
+            this.LastOutput = null;
             base.Reset();
         }
     }

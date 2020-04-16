@@ -28,7 +28,7 @@ namespace SharpTrader
         public virtual double Close { get; set; }
 
         [ProtoMember(7)]
-        public virtual double Volume { get; set; }
+        public virtual double QuoteAssetVolume { get; set; }
 
         [ProtoIgnore]
         public TimeSpan Timeframe => CloseTime - OpenTime;
@@ -51,7 +51,7 @@ namespace SharpTrader
             Close = toCopy.Close;
             High = toCopy.High;
             Low = toCopy.Low;
-            Volume = toCopy.Volume;
+            QuoteAssetVolume = toCopy.QuoteAssetVolume;
             OpenTime = openTime;
             CloseTime = openTime + duration;
         }
@@ -62,7 +62,7 @@ namespace SharpTrader
             Close = toCopy.Close;
             High = toCopy.High;
             Low = toCopy.Low;
-            Volume = toCopy.Volume;
+            QuoteAssetVolume = toCopy.QuoteAssetVolume;
             OpenTime = toCopy.OpenTime;
             CloseTime = toCopy.CloseTime;
         }
@@ -75,7 +75,7 @@ namespace SharpTrader
                 Close = this.Close,
                 High = this.High,
                 Low = this.Low,
-                Volume = this.Volume,
+                QuoteAssetVolume = this.QuoteAssetVolume,
                 OpenTime = this.OpenTime,
                 CloseTime = this.CloseTime,
             };
@@ -88,7 +88,7 @@ namespace SharpTrader
             if (this.Low > c.Low)
                 this.Low = c.Low;
             this.Close = c.Close;
-            this.Volume += c.Volume;
+            this.QuoteAssetVolume += c.QuoteAssetVolume;
         }
         public override bool Equals(object obj)
         {
@@ -104,7 +104,7 @@ namespace SharpTrader
                 c.OpenTime == this.OpenTime &&
                 c.Time == this.Time &&
                 c.Timeframe == this.Timeframe &&
-                c.Volume == this.Volume;
+                c.QuoteAssetVolume == this.QuoteAssetVolume;
             return equal;
         }
         public override int GetHashCode()

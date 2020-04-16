@@ -1245,7 +1245,7 @@ namespace SharpTrader
                         OpenTime = FormingCandle.StartTime,
                         Low = (double)FormingCandle.Low,
                         Open = (double)FormingCandle.Open,
-                        Volume = (double)FormingCandle.QuoteVolume
+                        QuoteAssetVolume = (double)FormingCandle.QuoteVolume
                     };
                     this.OnData?.Invoke(this, candle);
                     FormingCandle = null;
@@ -1263,7 +1263,7 @@ namespace SharpTrader
                         OpenTime = msg.Kline.StartTime,
                         Low = (double)msg.Kline.Low,
                         Open = (double)msg.Kline.Open,
-                        Volume = (double)msg.Kline.QuoteVolume
+                        QuoteAssetVolume = (double)msg.Kline.QuoteVolume
                     };
 
                     this.OnData?.Invoke(this, candle);
