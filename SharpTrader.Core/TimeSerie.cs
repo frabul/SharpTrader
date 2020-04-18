@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpTrader.Indicators;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,6 +10,7 @@ namespace SharpTrader
 
     public class TimeSerie<T> : TimeSerieNavigator<T> where T : ITimeRecord
     {
+
 
         /// <summary>
         /// the smallest difference in seconds
@@ -26,9 +28,13 @@ namespace SharpTrader
 
         }
 
+        public TimeSerie(IEnumerable<T> records) : base(records)
+        {
+        }
+
         public void AddRecord(T historyRecord, bool scatteredOrder = false)
         {
-             
+
             if (scatteredOrder)
             {
                 int index = Records.BinarySearch(historyRecord.Time);
@@ -37,7 +43,7 @@ namespace SharpTrader
                 else
                 {
                     Records.Add(historyRecord);
-                } 
+                }
             }
             else
             {
@@ -66,7 +72,7 @@ namespace SharpTrader
 
         internal void Shrink(int recordsCount)
         {
-            Records.Shrink(recordsCount); 
+            Records.Shrink(recordsCount);
         }
     }
 }

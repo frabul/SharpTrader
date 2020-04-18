@@ -82,6 +82,11 @@ namespace SharpTrader
         {
             return Key;
         }
+
+        public static implicit operator string(  SymbolInfo obj)
+        {
+            return obj.Key;
+        }
     }
 
     public interface ISymbolFeed

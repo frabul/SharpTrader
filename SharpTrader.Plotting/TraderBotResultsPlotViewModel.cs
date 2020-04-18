@@ -269,7 +269,8 @@ namespace SharpTrader.Plotting
             if (lastTick != null)
             {
                 var Xmax = Candles.Items[Candles.Items.Count - 1].X;
-                var Xmin = Candles.Items[Candles.Items.Count - 288].X;
+                int index = Math.Min(288, Candles.Items.Count);
+                var Xmin = Candles.Items[Candles.Items.Count-index].X;
                 PlotViewModel.Axes[0].Minimum = Xmin;
                 PlotViewModel.Axes[0].Maximum = Xmax;
                 PlotViewModel.Axes[0].Reset();
@@ -352,10 +353,16 @@ namespace SharpTrader.Plotting
                 // When the window closes, shut down the dispatcher
                 Window.Closed += (s, e) =>
            Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
-                Window.DataContext = vm;
-                Window.Show();
-                // Start the Dispatcher Processing
-                System.Windows.Threading.Dispatcher.Run();
+                try
+                {
+                    Window.DataContext = vm;
+                    Window.Show();
+                    // Start the Dispatcher Processing
+                    System.Windows.Threading.Dispatcher.Run();
+                }
+                catch (Exception ex){
+                }
+             
             }));
 
 

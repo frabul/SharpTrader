@@ -19,12 +19,14 @@ namespace SharpTrader.Indicators
         {
             ValueSelector = valueSelector;
             Period = emaPeriod;
-            Alpha = 1d / emaPeriod;
+            Alpha = 1d / Period;
         }
         public EMA(string name, int period) : base(name)
         {
             Period = period;
+            Alpha = 1d / Period;
         }
+
         protected override double CalculatePeek(double sample)
         {
             var signal = sample;

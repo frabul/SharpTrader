@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,7 +20,7 @@ namespace SharpTrader.Indicators
         public Min(string name, int period)
             : base(name)
         {
-            Inputs = new RollingWindow<T>(period + 1);
+            Inputs = new RollingWindow<T>(period);
             Period = period;
         }
 
@@ -30,16 +31,15 @@ namespace SharpTrader.Indicators
 
         protected override T Calculate(T input)
         {
-            var sampleOut = Inputs.Count >= Period ? Inputs[Period - 1].Value : double.MaxValue;
-            Inputs.Add(input);
+            Inputs.Add(input); 
             T output;
-
+            var oneRemoved = Inputs.Samples > Inputs.Size;
             if (Inputs.Count < 2)
                 output = input;
-            else if (sampleOut > LastOutput.Value)
+            else if (!oneRemoved || Inputs.MostRecentlyRemoved.Value > LastOutput.Value)
                 //if the sample that's going out of range is NOT the current min then we only need to check if the new sample is lower than current min
                 output = input.Value < LastOutput.Value ? input : LastOutput;
-            else if (input.Value < sampleOut)
+            else if (input.Value <= Inputs.MostRecentlyRemoved.Value)
                 //the current minimum is going out of range, but signalIn is lower than min then signalIn IS the new min
                 output = input;
             else
@@ -53,6 +53,7 @@ namespace SharpTrader.Indicators
                         output = rec;
                 }
             }
+            Debug.Assert(output.Time >= input.Time - TimeSpan.FromMinutes(Period + 1));
             LastOutput = output;
             return output;
         }

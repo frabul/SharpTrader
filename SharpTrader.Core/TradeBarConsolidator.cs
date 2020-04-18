@@ -23,7 +23,7 @@ namespace SharpTrader
             {
                 OnTradeBar(data as ITradeBar);
             }
-            else if (data.Kind == MarketDataKind.TradeBar)
+            else if (data.Kind == MarketDataKind.QuoteTick)
             {
                 throw new NotImplementedException();
             }

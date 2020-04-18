@@ -11,7 +11,7 @@ namespace SharpTrader.Indicators
         T LastOutput;
         public RollingWindow<T> Inputs { get; }
         public int Period { get; }
-        public override bool IsReady => SamplesCount > Period;
+        public override bool IsReady => Inputs.IsReady;
         public Max(string name, int period)
             : base(name)
         {
@@ -22,11 +22,15 @@ namespace SharpTrader.Indicators
         protected override T Calculate(T input)
         {
             T output;
-            var sampleOut = Inputs[Period - 1];
+            T sampleOut = default(T);
+
             Inputs.Add(input);
+            if (Inputs.IsReady)
+                sampleOut = Inputs[Period - 1];
+
             if (Inputs.Count < 2)
                 output = input;
-            else if (sampleOut.Value < LastOutput.Value)
+            else if (sampleOut == null || sampleOut.Value < LastOutput.Value)
                 //if the sample that's going out of range is NOT the current max then we only need to check if the new sample is higher than current max
                 output = input.Value > LastOutput.Value ? input : LastOutput;
             else if (input.Value > sampleOut.Value)
@@ -44,6 +48,8 @@ namespace SharpTrader.Indicators
                 }
             }
             LastOutput = output;
+          
+                
             return output;
         }
         public override void Reset()
