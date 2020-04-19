@@ -13,13 +13,17 @@ namespace SharpTrader
         public string Title { get; set; }
         public List<(DateTime Time, double Value)> Points { get; set; } = new List<(DateTime Time, double Value)>();
         public List<Line> Lines { get; set; } = new List<Line>();
-        public List<Line> LinesOnDedicatedAxis = new List<Line>();
 
         public List<double> HorizontalLines { get; set; } = new List<double>();
         public List<double> VerticalLines { get; set; } = new List<double>();
         public TimeSerieNavigator<ITradeBar> Candles { get; set; } = new TimeSerieNavigator<ITradeBar>();
         List<ITrade> TradesToAdd { get; } = new List<ITrade>();
 
+        public PlotHelper(string title)
+        {
+            this.Title = title;
+
+        }
         public void PlotTrade(ITrade newTrade)
         {
             lock (Locker)
@@ -38,7 +42,7 @@ namespace SharpTrader
                             Console.WriteLine("price 0");
                         var color = arrival.Y * (1 - 0.002) > start.Y ?
                             new ColorARGB(255, 10, 10, 255) : new ColorARGB(255, 255, 10, 10);
-                        this.Lines.Add(new Line() { Color = color, Points = new List<Point>() { start, arrival } });
+                        this.Lines.Add(new Line(new List<Point>() { start, arrival }, color));
                     }
                     TradesToAdd.Clear();
                 }
@@ -46,30 +50,23 @@ namespace SharpTrader
 
             //if it is sell trade add lines from the last not signaled trades to this  
         }
-        public void PlotLine(IEnumerable<(DateTime time, double value)> values, ColorARGB color, bool dedicatedAxis = false)
+        public void PlotLine(IEnumerable<(DateTime time, double value)> values, ColorARGB color, string axixId = null)
         {
-            var chartLine = new Line() { Color = color };
-
-            if (!dedicatedAxis)
-                Lines.Add(chartLine);
-            else
-                LinesOnDedicatedAxis.Add(chartLine);
-
-            foreach (var val in values)
-                chartLine.Points.Add(new Point(val.time, (double)val.value));
+            var points = values.Select(v => new Point(v.time, v.value));
+            var chartLine = new Line(points, color, axixId) { Color = color };
+            Lines.Add(chartLine);
         }
 
 
         public void PlotLine<T>(TimeSerieNavigator<T> timeSerie,
                                 ColorARGB color,
-                                Func<T, double> valuesSelector, bool dedicatedAxis = false) where T : ITimeRecord
+                                Func<T, double> valuesSelector, string axixId = null) where T : ITimeRecord
         {
             var myNavigator = new TimeSerieNavigator<T>(timeSerie);
-            var chartLine = new Line() { Color = color };
-            if (!dedicatedAxis)
-                Lines.Add(chartLine);
-            else
-                LinesOnDedicatedAxis.Add(chartLine);
+            var chartLine = new Line(new List<Point>(), color, axixId);
+
+            Lines.Add(chartLine);
+
 
             while (myNavigator.MoveNext())
             {
@@ -89,32 +86,22 @@ namespace SharpTrader
         }
 
 
-        public void PlotLines<T>(TimeSerieNavigator<T> timeSerie,
-                                 ColorARGB color,
-                                 Func<T, double[]> valuesSelector, bool dedicatedAxis = false) where T : ITimeRecord
+        public void PlotLines<T>(IEnumerable<T> values,
+                                 ColorARGB[] color,
+                                 Func<T, double[]> valuesSelector, string axixId = null) where T : ITimeRecord
         {
-            var myNavigator = new TimeSerieNavigator<T>(timeSerie);
-            List<Line> lines = new List<Line>();
-            var firstTickValues = valuesSelector(myNavigator.Last);
-            foreach (var val in firstTickValues)
-                lines.Add(new Line() { Color = color });
-            LinesOnDedicatedAxis.AddRange(lines);
+            var firstTickValues = valuesSelector(values.First());
+            List<Point>[] lines = new List<Point>[firstTickValues.Length];
 
-            void AddAllValues(T obj)
+            foreach (var val in values)
             {
-                while (myNavigator.MoveNext())
-                {
-                    var values = valuesSelector(myNavigator.Current);
-                    for (int i = 0; i < values.Length; i++)
-                    {
-                        lock (lines[i])
-                            lines[i].Points.Add(new Point(myNavigator.Current.Time, values[i]));
-                    }
-                }
+                var components = valuesSelector(val);
+                for (int i = 0; i < components.Length; i++)
+                    lines[i].Add(new Point(val.Time, components[i]));
             }
-            AddAllValues(default(T));
 
-            myNavigator.OnNewRecord += AddAllValues;
+            for (int i = 0; i < lines.Length; i++)
+                Lines.Add(new Line(lines[i], color[i], axixId));
         }
 
         public void PlotOperation(ITrade buy, ITrade sell, bool isLong = true)
@@ -128,21 +115,29 @@ namespace SharpTrader
             else
                 color = buy.Price < sell.Price ?
                                 ARGBColors.Blue : new ColorARGB(255, 10, 255, 10);
-            this.Lines.Add(new Line() { Color = color, Points = new List<Point>() { p1, p2 } });
+            this.Lines.Add(new Line(new Point[] { p1, p2 }, color));
         }
 
         public void PlotVerticalLine(DateTime time)
         {
             var p1 = new Point(time, (double)0);
-            var p2 = new Point(time, (double)1); 
-            this.Lines.Add(new Line() { Color = ARGBColors.Blue, Points = new List<Point>() { p1, p2 } });
+            var p2 = new Point(time, (double)1);
+            this.Lines.Add(new Line(new[] { p1, p2 }, ARGBColors.Blue, null));
         }
     }
 
     public class Line
     {
-        public List<Point> Points = new List<Point>();
+        public List<Point> Points;
         public ColorARGB Color;
+        public string AxisId;
+
+        public Line(IEnumerable<Point> points, ColorARGB color, string axisId = null)
+        {
+            Points = points.ToList();
+            Color = color;
+            AxisId = axisId;
+        }
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -173,7 +168,7 @@ namespace SharpTrader
             var g = (byte)(color >> 8);
             var b = (byte)(color >> 0);
             return new ColorARGB(a, r, g, b);
-        } 
+        }
     }
 
     public static class ARGBColors

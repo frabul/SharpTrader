@@ -21,19 +21,18 @@ namespace SharpTrader.Indicators
 
         protected override T Calculate(T input)
         {
-            T output;
-            T sampleOut = default(T);
-
             Inputs.Add(input);
-            if (Inputs.IsReady)
-                sampleOut = Inputs[Period - 1];
+            T output;
+
+
+            var oneRemoved = Inputs.Samples > Inputs.Size; 
 
             if (Inputs.Count < 2)
                 output = input;
-            else if (sampleOut == null || sampleOut.Value < LastOutput.Value)
+            else if (!oneRemoved || Inputs.MostRecentlyRemoved.Value < LastOutput.Value)
                 //if the sample that's going out of range is NOT the current max then we only need to check if the new sample is higher than current max
                 output = input.Value > LastOutput.Value ? input : LastOutput;
-            else if (input.Value > sampleOut.Value)
+            else if (input.Value >= Inputs.MostRecentlyRemoved.Value)
                 //the MAX is going out of range, but signalIn is higher than old max then signalIn IS the new MAX
                 output = input;
             else
