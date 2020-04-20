@@ -31,7 +31,7 @@ namespace SharpTrader.Indicators
 
         protected override T Calculate(T input)
         {
-            Inputs.Add(input); 
+            Inputs.Add(input);
             T output;
             var oneRemoved = Inputs.Samples > Inputs.Size;
             if (Inputs.Count < 2)
@@ -44,9 +44,8 @@ namespace SharpTrader.Indicators
                 output = input;
             else
             {
-                //min is going out of window so we need to search again
                 output = Inputs[0];
-                for (int i = 1; i < Inputs.Count; i++)
+                for (int i = 0; i < Inputs.Count; i++)
                 {
                     var rec = Inputs[i];
                     if (rec.Value < output.Value)

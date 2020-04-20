@@ -255,7 +255,10 @@ namespace SharpTrader.Indicators
                 _listLock.ExitWriteLock();
             }
         }
-
+        public T[] GetRawSamples()
+        {
+            return _list.ToArray();
+        }
         /// <summary>
         ///     Clears this window of all data
         /// </summary>
