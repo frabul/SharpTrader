@@ -348,14 +348,14 @@ namespace SharpTrader.Plotting
                 vm = new Plotting.TraderBotResultsPlotViewModel(plot);
                 // Create our context, and install it:
                 SynchronizationContext.SetSynchronizationContext(
-            new DispatcherSynchronizationContext(
-                Dispatcher.CurrentDispatcher));
+                    new DispatcherSynchronizationContext(
+                        Dispatcher.CurrentDispatcher));
 
                 Window = new TraderBotResultsPlot();
 
                 // When the window closes, shut down the dispatcher
                 Window.Closed += (s, e) =>
-           Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
+                    Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
                 try
                 {
                     Window.DataContext = vm;

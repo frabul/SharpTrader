@@ -19,7 +19,7 @@ namespace SharpTrader
         public string BaseAsset { get; set; }
         public List<(DateTime time, decimal bal)> EquityHistory { get; set; } = new List<(DateTime time, decimal bal)>();
         public decimal FinalBalance { get; set; }
-        public decimal MaxDrowDown { get; private set; } 
+        public decimal MaxDrowDown { get; private set; }
         /// <summary>
         /// How much history should be loaded back from the simulation start time
         /// </summary>
@@ -43,25 +43,25 @@ namespace SharpTrader
             Logger.Info($"Starting backtest {StartTime} - {EndTime}");
             Stopwatch sw = new Stopwatch();
             sw.Start();
-          
+
             if (Started)
                 return;
             Started = true;
 
             foreach (var Bot in Bots)
                 Bot.Start(true).Wait();
-             
+
             int steps = 1;
             decimal BalancePeak = 0;
 
 
             var startingBal = -1m;
-            while (Simulator.NextTick( ) && Simulator.Time < EndTime)
+            while (Simulator.NextTick() && Simulator.Time < EndTime)
             {
                 if (startingBal < 0)
-                    startingBal = Simulator.GetEquity(BaseAsset); 
+                    startingBal = Simulator.GetEquity(BaseAsset);
                 foreach (var Bot in Bots)
-                    Bot.OnTickAsync().Wait(); 
+                    Bot.OnTickAsync().Wait();
                 steps++;
 
                 var balance = Simulator.GetEquity(BaseAsset);
@@ -69,7 +69,7 @@ namespace SharpTrader
                 BalancePeak = balance > BalancePeak ? balance : BalancePeak;
                 if (BalancePeak - balance > MaxDrowDown)
                 {
-                    MaxDrowDown = BalancePeak - balance; 
+                    MaxDrowDown = BalancePeak - balance;
                 }
             }
 
@@ -79,10 +79,10 @@ namespace SharpTrader
                                                 tr =>
                                                 {
                                                     if (tr.Symbol.EndsWith(tr.CommissionAsset))
-                                                        return tr.Commission;  
+                                                        return tr.Commission;
                                                     else
                                                         return tr.Commission * tr.Price;
-                                                } ) ;
+                                                });
             var lostInFee = feeList.Sum();
             //get profit
             var profit = totalBal - startingBal;
@@ -114,7 +114,7 @@ namespace SharpTrader
 
         private OptimizationSpace BaseSpace;
 
-        public void Start( string sessionName = "unnamed" )
+        public void Start(string sessionName = "unnamed")
         {
             Logger = NLog.LogManager.GetLogger("Optimizer");
             Logger.Info($"Starting optimization session: {sessionName}");

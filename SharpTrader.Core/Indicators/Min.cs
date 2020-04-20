@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public class Min<T> : Indicator<T, T> where T : IBaseData
+    public class Min : Indicator<IBaseData, IBaseData>  
     {
-        private T LastOutput;
-        private RollingWindow<T> Inputs;
+        private IBaseData LastOutput;
+        private RollingWindow<IBaseData> Inputs;
 
         public int Period { get; }
 
@@ -20,7 +20,7 @@ namespace SharpTrader.Indicators
         public Min(string name, int period)
             : base(name)
         {
-            Inputs = new RollingWindow<T>(period);
+            Inputs = new RollingWindow<IBaseData>(period);
             Period = period;
         }
 
@@ -29,30 +29,32 @@ namespace SharpTrader.Indicators
 
 
 
-        protected override T Calculate(T input)
+        protected override IBaseData Calculate(IBaseData input)
         {
             Inputs.Add(input);
-            T output;
+            IBaseData output;
             var oneRemoved = Inputs.Samples > Inputs.Size;
             if (Inputs.Count < 2)
                 output = input;
-            else if (!oneRemoved || Inputs.MostRecentlyRemoved.Value > LastOutput.Value)
+            else if (!oneRemoved || Inputs.MostRecentlyRemoved.Low > LastOutput.Low)
                 //if the sample that's going out of range is NOT the current min then we only need to check if the new sample is lower than current min
-                output = input.Value < LastOutput.Value ? input : LastOutput;
-            else if (input.Value <= Inputs.MostRecentlyRemoved.Value)
+                output = input.Low < LastOutput.Low ? input : LastOutput;
+            else if (input.Low <= Inputs.MostRecentlyRemoved.Low)
                 //the current minimum is going out of range, but signalIn is lower than min then signalIn IS the new min
                 output = input;
             else
             {
-                output = Inputs[0];
-                for (int i = 0; i < Inputs.Count; i++)
+                //min is going out of window so we need to search again
+                var inputs = Inputs.GetRawSamples();
+                output = inputs[0];
+                foreach (var rec in inputs)
                 {
-                    var rec = Inputs[i];
-                    if (rec.Value < output.Value)
+                    if (rec.Low < output.Low)
                         output = rec;
-                }
+                } 
             }
             Debug.Assert(output.Time >= input.Time - TimeSpan.FromMinutes(Period + 1));
+            output = new IndicatorDataPoint(input.Time, output.Low);
             LastOutput = output;
             return output;
         }
