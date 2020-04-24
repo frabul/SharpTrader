@@ -53,7 +53,7 @@ namespace SharpTrader.Indicators
                         output = rec;
                 } 
             }
-            Debug.Assert(output.Time >= input.Time - TimeSpan.FromMinutes(Period + 1));
+             
             output = new IndicatorDataPoint(input.Time, output.Low);
             LastOutput = output;
             return output;

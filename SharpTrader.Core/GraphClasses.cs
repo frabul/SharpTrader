@@ -50,9 +50,9 @@ namespace SharpTrader
 
             //if it is sell trade add lines from the last not signaled trades to this  
         }
-        public void PlotLine(IEnumerable<(DateTime time, double value)> values, ColorARGB color, string axixId = null)
+        public void PlotLine(IEnumerable<IBaseData> values, ColorARGB color, string axixId = null)
         {
-            var points = values.Select(v => new Point(v.time, v.value));
+            var points = values.Select(v => new Point(v.Time, v.Value));
             var chartLine = new Line(points, color, axixId) { Color = color };
             Lines.Add(chartLine);
         }
