@@ -1282,6 +1282,8 @@ namespace SharpTrader
 
             public async Task<TimeSerie<ITradeBar>> GetHistoryNavigator(TimeSpan resolution, DateTime historyStartTime)
             {
+                if (historyStartTime > this.Time)
+                    throw new InvalidOperationException("Requested future quotes");
                 if (resolution != TimeSpan.FromMinutes(1))
                     throw new NotSupportedException("Binance symbol history only supports resolution 1 minute");
                 historyStartTime -= TimeSpan.FromMinutes(1);

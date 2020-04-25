@@ -128,7 +128,7 @@ namespace SharpTrader
             {
                 var histInfo = new HistoryInfo(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
                 feed.DataSource = this.HistoryDb.GetSymbolHistory(histInfo, StartTime, EndTime);
-                this.HistoryDb.CloseFile(histInfo);
+                //this.HistoryDb.CloseFile(histInfo);
             }
         }
 

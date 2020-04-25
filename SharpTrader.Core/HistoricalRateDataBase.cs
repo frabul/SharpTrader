@@ -13,7 +13,7 @@ namespace SharpTrader
     {
         public string symbol { get; private set; }
         public string market { get; private set; }
-        public TimeSpan Timeframe { get => _TimeFrame;   set { _TimeFrame = value; SetMask(); } }
+        public TimeSpan Timeframe { get => _TimeFrame; set { _TimeFrame = value; SetMask(); } }
         string mask;
         private TimeSpan _TimeFrame;
         private void SetMask()
@@ -160,7 +160,8 @@ namespace SharpTrader
                                 Symbol = finfo.symbol,
                                 Ticks = sdata.Ticks,
                                 Timeframe = finfo.Timeframe,
-                                StartOfData = DateTime.MinValue
+                                StartOfData = DateTime.MinValue,
+                                EndOfData = DateTime.MaxValue, 
                             };
                             SymbolsData.Add(history);
                             shist = history;
@@ -323,7 +324,9 @@ namespace SharpTrader
                         Spread = 0,
                         Symbol = historyInfo.symbol,
                         Timeframe = historyInfo.Timeframe,
-                        StartOfData = startOfData
+                        StartOfData = startOfData,
+                        EndOfData = endOfData,
+
                     };
                     SymbolsData.Add(history);
                     dateRanges.Add(new DateRange(startOfData, endOfData));
@@ -334,9 +337,9 @@ namespace SharpTrader
                     {
                         dateRanges.Add(new DateRange(startOfData, history.StartOfData));
                     }
-                    if (endOfData >= history.Ticks[history.Ticks.Count - 1].Time)
+                    if (endOfData > history.EndOfData)
                     {
-                        dateRanges.Add(new DateRange(history.Ticks[history.Ticks.Count - 1].Time, endOfData));
+                        dateRanges.Add(new DateRange(history.EndOfData, endOfData));
                     }
                 }
                 //load missing months 
@@ -548,6 +551,7 @@ namespace SharpTrader
         {
             [ProtoIgnore]
             public DateTime StartOfData { get; set; }
+            public DateTime EndOfData { get; set; }
             internal bool HistoryInfoEquals(HistoryInfo histInfo)
             {
                 return this.Market == histInfo.market && this.Symbol == histInfo.symbol && this.Timeframe == histInfo.Timeframe;
