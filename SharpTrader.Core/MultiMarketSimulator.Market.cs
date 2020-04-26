@@ -96,6 +96,8 @@ namespace SharpTrader
             public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
             {
                 if (amount <= 0)
+                    throw new InvalidOperationException("Amount should be > 0");
+                if (amount <= 0)
                     return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null)
                     {
                         ErrorInfo = "Order amount is zero or negative"
@@ -145,8 +147,11 @@ namespace SharpTrader
 
             public async Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null)
             {
+                if (amount <= 0)
+                    throw new InvalidOperationException("Amount should be > 0");
                 lock (LockObject)
                 {
+                   
                     var feed = SymbolsFeeds[symbol];
                     var price = type == TradeDirection.Buy ? feed.Ask : feed.Bid;
                     var order = new Order(this.MarketName, symbol, Time, type, OrderType.Market, amount, price, clientOrderId);
