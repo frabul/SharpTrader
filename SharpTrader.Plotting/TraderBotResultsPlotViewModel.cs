@@ -325,7 +325,7 @@ namespace SharpTrader.Plotting
                             break;
                     }
                     zooms[line.YAxisKey] = zoom;
-                } 
+                }
             }
             foreach (var axis in PlotViewModel.Axes)
             {
@@ -393,26 +393,27 @@ namespace SharpTrader.Plotting
         {
             return DateTimeAxis.ToDouble(dt);
         }
+
     }
 
     public class ChartBar : HighLowItem
-    {
-        public DateTime Time { get; set; }
+    { 
         public ChartBar(ITradeBar c)
-            : base(c.Time.ToAxisDouble(), c.High, c.Low, c.Open, c.Close)
+            : base(0, c.High, c.Low, c.Open, c.Close)
         {
-            Time = c.Time;
+            var time = c.CloseTime - TimeSpan.FromSeconds(c.Timeframe.TotalSeconds / 2);
+            this.X = time.ToAxisDouble();
         }
     }
     public class ChartBarVol : OhlcvItem
     {
-        public DateTime Time { get; set; }
+        
         public ChartBarVol(ITradeBar c)
             : base(c.Time.ToAxisDouble(), c.Open, c.High, c.Low, c.Close)
         {
             this.BuyVolume = c.Close > c.Open ? c.QuoteAssetVolume : 0;
-            this.SellVolume = c.Close > c.Open ? 0 : c.QuoteAssetVolume;
-            Time = c.Time;
+            this.SellVolume = c.Close > c.Open ? 0 : c.QuoteAssetVolume; 
+            this.X = c.OpenTime.ToAxisDouble();
         }
     }
 }

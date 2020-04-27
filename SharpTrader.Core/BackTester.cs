@@ -106,52 +106,40 @@ namespace SharpTrader
     }
 
     class OptimizerSession
-    {
-        public int SpaceSize { get; set; }
+    { 
         public int Lastexecuted { get; set; }
     }
 
     public class Optimizer
     {
         string SessionFile => $"OptimizerSession_{SessionName}.json";
+        string SpaceFile => $"OptimizerSession_{SessionName}_space.json";
         public string SessionName { get; private set; }
         OptimizerSession Session;
         public Func<IMarketsManager, object, TraderBot> BotFactory { get; set; }
         public Func<MultiMarketSimulator> MarketFactory { get; set; }
         public DateTime StartTime { get; set; }
-        public DateTime EndTime { get; set; }
-
-
+        public DateTime EndTime { get; set; } 
         public string BaseAsset { get; set; }
         private NLog.Logger Logger;
 
         private OptimizationSpace2 BaseSpace;
 
-        public Optimizer(OptimizationSpace2 optimizationSpace)
-        {
-            BaseSpace = optimizationSpace;
-        }
-
-        public void Start(string sessionName = "unnamed")
+        public Optimizer(string sessionName)
         {
             SessionName = sessionName;
-
-            BaseSpace.Initialize();
-            Session = new OptimizerSession()
-            {
-                Lastexecuted = -1,
-                SpaceSize = BaseSpace.Configurations.Count
-            };
-            if (File.Exists(SessionFile))
-            {
-                var text = File.ReadAllText(SessionFile);
-                var loaded = JsonConvert.DeserializeObject<OptimizerSession>(text);
-                if (loaded.SpaceSize == Session.SpaceSize)
-                    Session.Lastexecuted = loaded.Lastexecuted;
-            }
-
-            Logger = NLog.LogManager.GetLogger($"Optimizer_{sessionName}");
-            Logger.Info($"Starting optimization session: {sessionName}");
+            //load session
+            var sessionJson = File.ReadAllText(SessionFile);
+            Session = JsonConvert.DeserializeObject<OptimizerSession>(sessionJson);
+            //load space
+            var spaceJson = File.ReadAllText(SpaceFile);
+            BaseSpace =   OptimizationSpace2.FromJson(spaceJson); 
+        }
+   
+        public void Start( )
+        { 
+            Logger = NLog.LogManager.GetLogger($"Optimizer_{SessionName}");
+            Logger.Info($"Starting optimization session: {SessionName}");
 
             for (int i = Session.Lastexecuted + 1; i < BaseSpace.Configurations.Count; i++)
             {

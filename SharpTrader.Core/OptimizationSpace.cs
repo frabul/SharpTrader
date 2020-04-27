@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
@@ -81,7 +83,7 @@ namespace SharpTrader
 
     }
 
-    class ParamsSet
+    public class ParamsSet
     {
         public ParamsSet(string prop, object[] pars)
         {
@@ -96,9 +98,9 @@ namespace SharpTrader
 
 
     public class OptimizationSpace2
-    { 
+    {
         private List<ParamsSet> ParamsSets = new List<ParamsSet>();
-        private List<object> Configs = new List<object>(); 
+        private List<object> Configs = new List<object>();
         private Type ConfigType;
 
         public IReadOnlyList<object> Configurations => Configs;
@@ -106,7 +108,6 @@ namespace SharpTrader
         {
             ConfigType = configType;
         }
-
 
         public void Optimize(string property, params object[] values)
         {
@@ -139,14 +140,50 @@ namespace SharpTrader
                 var config = Activator.CreateInstance(ConfigType);
                 for (int i = 0; i < ParamsSets.Count; i++)
                 {
-                    var property = ParamsSets[i].prop;
-                    var val = ParamsSets[i].pars[permutation[i]];
+                    var property = ConfigType.GetProperty(ParamsSets[i].prop);
+                    var val = ConvertType(ParamsSets[i].pars[permutation[i]], property.PropertyType) ;
 
-                    ConfigType.GetProperty(property).SetValue(config, val);
+                    property.SetValue(config, val);
                 }
                 Configs.Add(config);
             }
         }
+        private object ConvertType(object obj, Type target) {
+            if (target == typeof(TimeSpan))
+                return TimeSpan.Parse(obj as string);
+            else
+                return Convert.ChangeType(obj, target);
+        }
+        public string ToJson()
+        {
+            SerializationInfo info = new SerializationInfo()
+            {
+                ConfigType = this.ConfigType.AssemblyQualifiedName,
+                ParamsSets = this.ParamsSets
+            };
+            JsonSerializerSettings settings = new JsonSerializerSettings()
+            {
+                TypeNameHandling = TypeNameHandling.All,
+                Formatting = Formatting.Indented,
 
+            };
+            return  JsonConvert.SerializeObject(info, settings);
+        }
+
+        public static OptimizationSpace2 FromJson(string json)
+        { 
+            SerializationInfo info = Newtonsoft.Json.JsonConvert.DeserializeObject<SerializationInfo>(json);
+            var type = Type.GetType(info.ConfigType, true);
+            var obj = new OptimizationSpace2(type);
+            obj.ParamsSets = info.ParamsSets;
+            obj.Initialize();
+            return obj;
+        }
+
+        public class SerializationInfo
+        {
+            public List<ParamsSet> ParamsSets { get; set; }
+            public string ConfigType { get; set; }
+        }
     }
 }
