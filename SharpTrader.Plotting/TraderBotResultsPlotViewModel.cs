@@ -157,15 +157,13 @@ namespace SharpTrader.Plotting
             //create exes
             CreateAxes();
 
-            //---
-            ITradeBar lastTick = null;
+            //--- 
             if (Candles.Items.Count > 0)
             {
                 PlotViewModel.Series.Add(Candles);
                 PlotViewModel.Series.Add(Volumes);
                 //draw volumes
-                //PlotViewModel.Series.Add(Volumes);
-                lastTick = Drawer.Candles.Current;
+                //PlotViewModel.Series.Add(Volumes); 
             }
 
             //-----------------  HORIZONTAL LINES -------------- 
@@ -211,13 +209,7 @@ namespace SharpTrader.Plotting
                     line.Points.Select(dot => new DataPoint(dot.X.ToAxisDouble(), dot.Y)));
                 PlotViewModel.Series.Add(lineserie);
                 this.Lines.Add(lineserie);
-
-                if (lastTick == null)
-                    lastTick = new Candlestick()
-                    {
-                        OpenTime = line.Points[line.Points.Count - 2].X,
-                        CloseTime = line.Points[line.Points.Count - 1].X,
-                    };
+ 
             }
 
             //-------plot points ---------------
@@ -228,13 +220,11 @@ namespace SharpTrader.Plotting
             PlotViewModel.Series.Add(pointsSerie);
 
             //---------- ADJUST X to show 100 candles
-            if (lastTick != null)
-            {
-
+          
                 PlotViewModel.Axes[0].Minimum = Drawer.InitialView.start.ToAxisDouble();
                 PlotViewModel.Axes[0].Maximum = Drawer.InitialView.end.ToAxisDouble();
                 PlotViewModel.Axes[0].Reset();
-            }
+        
 
             //--------- ADJUST Y
             AdjustYAxisZoom();
