@@ -31,7 +31,14 @@ namespace SharpTrader.Plotting
             vm.UpdateChart();
         }
     }
-
+    public class LineSeriesEx : LineSeries
+    {
+        public bool IgnoreForZoom  {get; set;}
+        public LineSeriesEx(bool ignoreForZoom)
+        {
+            IgnoreForZoom = ignoreForZoom;
+        }
+    }
     /// <summary>
     /// N.B. This should be instantiated in the same threa as its window
     /// </summary>
@@ -48,24 +55,23 @@ namespace SharpTrader.Plotting
         public bool Continue { get; set; }
         public string Symbol { get; set; }
 
-        public Dispatcher Dispatcher { get; set; }
-
+        public Dispatcher Dispatcher => Window.Dispatcher;
+        public Window Window { get; set; }
         private DateTimeAxis XAxis => (DateTimeAxis)PlotViewModel.Axes[0];
         private LinearAxis Candles_Yaxis => (LinearAxis)PlotViewModel.Axes[1];
 
-        private LinearAxis Volume_Yaxis => (LinearAxis)PlotViewModel.Axes[2];
+        private LinearAxis Volume_Yaxis { get; set; }
 
         public bool IsAlive => !(this.Dispatcher.HasShutdownStarted || this.Dispatcher.HasShutdownFinished);
 
         public Axis[] AllAxes { get; private set; }
-        public List<LineSeries> Lines { get; private set; } = new List<LineSeries>();
+        public List<LineSeriesEx> Lines { get; private set; } = new List<LineSeriesEx>();
 
         public TraderBotResultsPlotViewModel(PlotHelper drawer)
         {
-            Dispatcher = Dispatcher.CurrentDispatcher;
+
             Drawer = drawer;
             this.PlotViewModel = new PlotModel { Title = Drawer.Title };
-
 
 
             CreateAxes();
@@ -103,12 +109,13 @@ namespace SharpTrader.Plotting
                 StringFormat = "yyyy/MM/dd HH:mm",
                 Key = "Axis_X"
             });
-
-            //--- caldes y axis ---
+            //--- caldes y axis --- 
             PlotViewModel.Axes.Add(new LinearAxis() { Key = "Candles", Position = AxisPosition.Left });
 
-            //--- volume axis ---- 
-            PlotViewModel.Axes.Add(new LinearAxis() { Key = "Volumes", Position = AxisPosition.Right, });
+            //--- volume axis ----  add it only if we really use it
+            this.Volume_Yaxis = new LinearAxis() { Key = "Volumes", Position = AxisPosition.Right, };
+            if (Drawer.Candles.Count > 0)
+                PlotViewModel.Axes.Add(Volume_Yaxis);
 
             //foreach line if there is no axis with given name add a new axis
             foreach (var line in Drawer.Lines.Where(l => l.AxisId != null))
@@ -130,6 +137,7 @@ namespace SharpTrader.Plotting
                 PlotViewModel.Axes[i].EndPosition = start + portion;
             }
         }
+
         public void UpdateChart()
         {
             if (Thread.CurrentThread != Dispatcher.Thread)
@@ -148,8 +156,6 @@ namespace SharpTrader.Plotting
 
             //create exes
             CreateAxes();
-
-
 
             //---
             ITradeBar lastTick = null;
@@ -173,7 +179,7 @@ namespace SharpTrader.Plotting
             {
                 //if (level < range.High + range.Length && level > range.Low - range.Length)
                 {
-                    LineSeries line = new LineSeries()
+                    LineSeriesEx line = new LineSeriesEx(false)
                     {
                         MarkerStrokeThickness = 1,
                         LineStyle = LineStyle.Solid,
@@ -189,9 +195,10 @@ namespace SharpTrader.Plotting
 
             //----------------- lines ----------------------
             this.Lines.Clear();
-            foreach (var line in Drawer.Lines)
+            foreach (var line in Drawer.Lines.Concat(Drawer.VerticalLines))
             {
-                LineSeries lineserie = new LineSeries()
+                var ingnoreZoom = Drawer.VerticalLines.Contains(line);
+                LineSeriesEx lineserie = new LineSeriesEx(ingnoreZoom)
                 {
                     MarkerStrokeThickness = 2,
                     LineStyle = LineStyle.Solid,
@@ -223,11 +230,9 @@ namespace SharpTrader.Plotting
             //---------- ADJUST X to show 100 candles
             if (lastTick != null)
             {
-                var Xmax = Candles.Items[Candles.Items.Count - 1].X;
-                int index = Math.Min(288, Candles.Items.Count);
-                var Xmin = Candles.Items[Candles.Items.Count - index].X;
-                PlotViewModel.Axes[0].Minimum = Xmin;
-                PlotViewModel.Axes[0].Maximum = Xmax;
+
+                PlotViewModel.Axes[0].Minimum = Drawer.InitialView.start.ToAxisDouble();
+                PlotViewModel.Axes[0].Maximum = Drawer.InitialView.end.ToAxisDouble();
                 PlotViewModel.Axes[0].Reset();
             }
 
@@ -256,6 +261,7 @@ namespace SharpTrader.Plotting
                 AdjustYAxisZoom();
             }
         }
+
         public void ShowWholeChart()
         {
             if (Thread.CurrentThread != Dispatcher.Thread)
@@ -303,12 +309,13 @@ namespace SharpTrader.Plotting
                 this.Candles_Yaxis.Zoom(ymin - margin, ymax + margin);
                 this.Volume_Yaxis.Zoom(0, volMax);
             }
+             
 
             //adjust other lines
             //reset zoom of all exes 
             foreach (var line in this.Lines)
             {
-                if (line.YAxisKey != this.Candles_Yaxis.Key)
+                if (!line.IgnoreForZoom)
                 {
                     (double min, double max) zoom = (double.MaxValue, double.MinValue);
                     if (zooms.ContainsKey(line.YAxisKey))
@@ -341,25 +348,27 @@ namespace SharpTrader.Plotting
 
         public static TraderBotResultsPlotViewModel RunWindow(PlotHelper plot)
         {
+            bool ok = false;
             TraderBotResultsPlotViewModel vm = null;
-            TraderBotResultsPlot Window = null;
             Thread newWindowThread = new Thread(new ThreadStart(() =>
             {
-                vm = new Plotting.TraderBotResultsPlotViewModel(plot);
+
                 // Create our context, and install it:
                 SynchronizationContext.SetSynchronizationContext(
                     new DispatcherSynchronizationContext(
                         Dispatcher.CurrentDispatcher));
 
-                Window = new TraderBotResultsPlot();
-
+                TraderBotResultsPlot Window = new TraderBotResultsPlot();
+                vm = new Plotting.TraderBotResultsPlotViewModel(plot);
+                vm.Window = Window;
                 // When the window closes, shut down the dispatcher
                 Window.Closed += (s, e) =>
                     Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
+                Window.Loaded += (s, e) => ok = true;
                 try
                 {
                     Window.DataContext = vm;
-                    Window.Show();
+                    Dispatcher.CurrentDispatcher.BeginInvoke(new Action(() => Window.Show()));
                     // Start the Dispatcher Processing
                     System.Windows.Threading.Dispatcher.Run();
                 }
@@ -375,10 +384,8 @@ namespace SharpTrader.Plotting
             newWindowThread.IsBackground = true;
             // Start the thread
             newWindowThread.Start();
-            while (Window == null)
+            while (!ok)
                 Thread.Sleep(100);
-
-            Thread.Sleep(600);
             return vm;
         }
     }
@@ -397,7 +404,7 @@ namespace SharpTrader.Plotting
     }
 
     public class ChartBar : HighLowItem
-    { 
+    {
         public ChartBar(ITradeBar c)
             : base(0, c.High, c.Low, c.Open, c.Close)
         {
@@ -407,12 +414,12 @@ namespace SharpTrader.Plotting
     }
     public class ChartBarVol : OhlcvItem
     {
-        
+
         public ChartBarVol(ITradeBar c)
             : base(c.Time.ToAxisDouble(), c.Open, c.High, c.Low, c.Close)
         {
             this.BuyVolume = c.Close > c.Open ? c.QuoteAssetVolume : 0;
-            this.SellVolume = c.Close > c.Open ? 0 : c.QuoteAssetVolume; 
+            this.SellVolume = c.Close > c.Open ? 0 : c.QuoteAssetVolume;
             this.X = c.OpenTime.ToAxisDouble();
         }
     }

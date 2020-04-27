@@ -13,12 +13,11 @@ namespace SharpTrader
         public string Title { get; set; }
         public List<(DateTime Time, double Value)> Points { get; set; } = new List<(DateTime Time, double Value)>();
         public List<Line> Lines { get; set; } = new List<Line>();
-
         public List<double> HorizontalLines { get; set; } = new List<double>();
-        public List<double> VerticalLines { get; set; } = new List<double>();
+        public List<Line> VerticalLines { get; set; } = new List<Line>();
         public TimeSerieNavigator<ITradeBar> Candles { get; set; } = new TimeSerieNavigator<ITradeBar>();
         List<ITrade> TradesToAdd { get; } = new List<ITrade>();
-
+        public (DateTime start, DateTime end) InitialView { get; set; }
         public PlotHelper(string title)
         {
             this.Title = title;
@@ -56,8 +55,6 @@ namespace SharpTrader
             var chartLine = new Line(points, color, axixId) { Color = color };
             Lines.Add(chartLine);
         }
-
-
         public void PlotLine<T>(TimeSerieNavigator<T> timeSerie,
                                 ColorARGB color,
                                 Func<T, double> valuesSelector, string axixId = null) where T : ITimeRecord
@@ -118,11 +115,11 @@ namespace SharpTrader
             this.Lines.Add(new Line(new Point[] { p1, p2 }, color));
         }
 
-        public void PlotVerticalLine(DateTime time)
+        public void PlotVerticalLine(DateTime time, ColorARGB color)
         {
-            var p1 = new Point(time, (double)0);
+            var p1 = new Point(time, (double)-1);
             var p2 = new Point(time, (double)1);
-            this.Lines.Add(new Line(new[] { p1, p2 }, ARGBColors.Blue, null));
+            this.VerticalLines.Add(new Line(new[] { p1, p2 }, color, null));
         }
     }
 

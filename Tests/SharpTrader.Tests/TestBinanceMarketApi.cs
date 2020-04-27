@@ -13,33 +13,7 @@ namespace SharpTrader.Tests
     {
         public static void Test()
         {
-            string apiKey = "1y4h4Pi7MvxG5MKZm1FrbAFXRG3sc8kGwuSDeQpxj3imMJn6XXWKebBzIYxNbcsn";
-            string secretKey = "1QNCYC26iNzFwYlKGFfo7iAAkZGmcPkGknH2956jYqPPJk8sOb2RTwaVCDDEqbzb";
-            //Initialise the general client client with config
-            var client = new BinanceClient(new ClientConfiguration()
-            {
-                ApiKey = apiKey,
-                SecretKey = secretKey,
-            });
-            var wscli = new DisposableBinanceWebSocketClient(client);
-            var UserDataSocket = wscli.ConnectToUserDataWebSocket(new UserDataWebSocketMessages()
-            {
-                AccountUpdateMessageHandler = d => System.Console.WriteLine("asd"),
-                OrderUpdateMessageHandler = d => System.Console.WriteLine("asd"),
-                TradeUpdateMessageHandler = d => System.Console.WriteLine("asd"),
-            }).Result;
-
-
-            BinanceMarketApi api2 =
-                new BinanceMarketApi(
-                    "1y4h4Pi7MvxG5MKZm1FrbAFXRG3sc8kGwuSDeQpxj3imMJn6XXWKebBzIYxNbcsn",
-                    "1QNCYC26iNzFwYlKGFfo7iAAkZGmcPkGknH2956jYqPPJk8sOb2RTwaVCDDEqbzb",
-                     new HistoricalRateDataBase(".\\Data\\"));
-            var bal = api2.GetEquity("ETH");
-            var prec = api2.GetSymbolPrecision("ETHBTC");
-
-            var feed = api2.GetSymbolFeedAsync("ADAETH").Result;
-            feed.OnTick += Feed_OnTick;
+            
         }
 
         private static void Feed_OnTick(ISymbolFeed obj)

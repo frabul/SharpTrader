@@ -23,7 +23,7 @@ namespace SharpTrader.Tests
             var symbols = api.GetSymbols().ToArray();
             Stopwatch sw = new Stopwatch();
 
-            List<string> remaining = new List<string>(symbols.Select(s => s.Symbol));
+            List<string> remaining = new List<string>(symbols.Select(s => s.Key));
             var subscriber = new asd();
             foreach (var sym in symbols)
             {
@@ -40,7 +40,7 @@ namespace SharpTrader.Tests
                 //        sw.Restart();
                 //    }
                 //});
-                cli.SubscribeKlineStream(sym.Symbol, KlineInterval.OneMinute, subscriber.Handle);
+                cli.SubscribeKlineStream(sym.Key, KlineInterval.OneMinute, subscriber.Handle);
             }
 
             while (true)
@@ -52,7 +52,7 @@ namespace SharpTrader.Tests
                     foreach (var sym in remaining)
                         Console.Write(sym + ",");
                     Console.WriteLine();
-                    remaining = new List<string>(symbols.Select(s => s.Symbol));
+                    remaining = new List<string>(symbols.Select(s => s.Key));
                     sw.Reset();
                     cli.Unsubscribe<BinanceKlineData>(subscriber.Handle);
                 }

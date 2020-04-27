@@ -23,7 +23,7 @@ namespace SharpTrader
         /// <summary>
         /// How much history should be loaded back from the simulation start time
         /// </summary>
-        public TimeSpan HistoryLookBack { get; private set; } = TimeSpan.FromDays(10);
+        public TimeSpan HistoryLookBack { get; private set; } = TimeSpan.Zero;
         public NLog.Logger Logger { get; set; }
 
         public BackTester(  MultiMarketSimulator simulator, TraderBot bot)
@@ -102,6 +102,8 @@ namespace SharpTrader
             //    var vm = TraderBotResultsPlotViewModel.RunWindow(bot);
             //    vm.UpdateChart();
             //} 
+             
+            
         }
     }
 
