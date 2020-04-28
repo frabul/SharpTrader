@@ -1,8 +1,9 @@
-﻿using Newtonsoft.Json;
+﻿using Newtonsoft.Json.Linq;
+using SharpTrader.AlgoFramework;
+using SharpTrader.Indicators;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,12 +12,33 @@ namespace SharpTrader
 {
     public class BackTester
     {
-        private MultiMarketSimulator Simulator;
-        private TraderBot[] Bots { get; set; } 
+        public class Configuration
+        {
+            public string SessionName = "Backetester";
+            public string DataDir { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
+            public string HistoryDb { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
+            public bool PlottingEnabled = false;
+            public bool PlotResults = true;
+            public string AlgoClass;
+            public DateTime StartTime { get; set; }
+            public DateTime EndTime { get; set; }
+
+            public AssetSum StartingBalance { get; set; } = new AssetSum("BTC", 100);
+            public string Market = "Binance";
+
+            public JObject AlgoConfig = new JObject();
+        }
+
+        private Configuration Config { get; }
+
+        private MultiMarketSimulator MarketSimulator;
+        private object algoConfig;
+
+        public TradingAlgo Algo { get; private set; }
         public bool Started { get; private set; }
-        public DateTime StartTime { get; set; }
-        public DateTime EndTime { get; set; }
-        public string BaseAsset { get; set; }
+        public DateTime StartTime => Config.StartTime;
+        public DateTime EndTime => Config.EndTime;
+        public string BaseAsset => Config.StartingBalance.Asset;
         public List<(DateTime time, decimal bal)> EquityHistory { get; set; } = new List<(DateTime time, decimal bal)>();
         public decimal FinalBalance { get; set; }
         public decimal MaxDrowDown { get; private set; }
@@ -25,51 +47,78 @@ namespace SharpTrader
         /// </summary>
         public TimeSpan HistoryLookBack { get; private set; } = TimeSpan.Zero;
         public NLog.Logger Logger { get; set; }
+        public Action<PlotHelper> ShowPlotCallback { get; set; }
 
-        public BackTester(  MultiMarketSimulator simulator, TraderBot bot)
+        public BackTester(Configuration config)
         {
+            Config = config;
 
-            Simulator = simulator;
-            Bots = new[] { bot };
-        }
+            if (Logger == null)
+                Logger = NLog.LogManager.GetLogger("BackTester_" + Config.SessionName);
 
-        public BackTester(MultiMarketSimulator simulator, TraderBot[] bots)
-        {
-            Simulator = simulator;
-            Bots = bots;
+            var HistoryDB = new HistoricalRateDataBase(Config.HistoryDb);
+            this.MarketSimulator = new MultiMarketSimulator(Config.DataDir, HistoryDB, Config.StartTime, Config.EndTime);
+            MarketSimulator.Deposit(Config.Market, Config.StartingBalance.Asset, Config.StartingBalance.Amount);
+
+            var algoClass = Type.GetType(Config.AlgoClass);
+            if (algoClass == null)
+                throw new Exception($"Algorith class {Config.AlgoClass} not found.");
+
+            var ctors = algoClass.GetConstructors();
+            var myctor = ctors.FirstOrDefault(ct =>
+                                                {
+                                                    var pars = ct.GetParameters();
+                                                    return pars.Length == 2 && pars[0].ParameterType == typeof(IMarketApi);
+                                                });
+            if (myctor == null)
+                throw new Exception("Unable to find a constructor with 2 parameters (ImarketApi, config)");
+            var configClass = myctor.GetParameters()[1].ParameterType;
+            algoConfig = null;
+            try
+            {
+                algoConfig = config.AlgoConfig.ToObject(configClass);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Unable to translate from provided algo config to ${configClass.FullName }: ${ex.Message}");
+            }
+
+            this.Algo = myctor.Invoke(new[] { MarketSimulator.GetMarketApi(config.Market), algoConfig }) as TradingAlgo;
+            this.Algo.IsPlottingEnabled = Config.PlottingEnabled;
+            this.Algo.ShowPlotCallback = this.ShowPlotCallback;
+            if (this.Algo == null)
+                throw new Exception("Wrong algo class");
         }
 
         public void Start()
         {
-            if (Logger == null)
-                Logger = NLog.LogManager.GetLogger("BackTester");
-
+            if (Started)
+                return;
             Logger.Info($"Starting backtest {StartTime} - {EndTime}");
+            Logger.Info($"Backtesting {Algo.ToString()}, configuration:\n" + JObject.FromObject(algoConfig).ToString());
+
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
-            if (Started)
-                return;
             Started = true;
 
-            foreach (var Bot in Bots)
-                Bot.Start(true).Wait();
+            this.Algo.Start(true).Wait();
 
             int steps = 1;
             decimal BalancePeak = 0;
 
 
             var startingBal = -1m;
-            while (Simulator.NextTick() && Simulator.Time < EndTime)
+            while (MarketSimulator.NextTick() && MarketSimulator.Time < EndTime)
             {
                 if (startingBal < 0)
-                    startingBal = Simulator.GetEquity(BaseAsset);
-                foreach (var Bot in Bots)
-                    Bot.OnTickAsync().Wait();
+                    startingBal = MarketSimulator.GetEquity(BaseAsset);
+
+                Algo.OnTickAsync().Wait();
                 steps++;
 
-                var balance = Simulator.GetEquity(BaseAsset);
-                EquityHistory.Add((Simulator.Time, balance));
+                var balance = MarketSimulator.GetEquity(BaseAsset);
+                EquityHistory.Add((MarketSimulator.Time, balance));
                 BalancePeak = balance > BalancePeak ? balance : BalancePeak;
                 if (BalancePeak - balance > MaxDrowDown)
                 {
@@ -77,9 +126,9 @@ namespace SharpTrader
                 }
             }
 
-            var totalBal = Simulator.GetEquity(BaseAsset);
+            var totalBal = MarketSimulator.GetEquity(BaseAsset);
             //get the total fee paid calculated on commission asset
-            var feeList = Simulator.Trades.Select(
+            var feeList = MarketSimulator.Trades.Select(
                                                 tr =>
                                                 {
                                                     if (tr.Symbol.EndsWith(tr.CommissionAsset))
@@ -90,86 +139,26 @@ namespace SharpTrader
             var lostInFee = feeList.Sum();
             //get profit
             var profit = totalBal - startingBal;
-            var totalBuys = Simulator.Trades.Where(tr => tr.Direction == TradeDirection.Buy).Count();
+            var totalBuys = MarketSimulator.Trades.Where(tr => tr.Direction == TradeDirection.Buy).Count();
             sw.Stop();
             Logger.Info($"Test terminated in {sw.ElapsedMilliseconds} ms.");
-            Logger.Info($"Balance: {totalBal} - Trades:{Simulator.Trades.Count()} - Lost in fee:{lostInFee}");
+            Logger.Info($"Balance: {totalBal} - Trades:{MarketSimulator.Trades.Count()} - Lost in fee:{lostInFee}");
             if (totalBuys > 0)
                 Logger.Info($"Profit/buy: {(totalBal - startingBal) / totalBuys:F8} - MaxDrawDown:{MaxDrowDown} - Profit/MDD:{profit / MaxDrowDown}");
 
-            //foreach (var bot in theBots)
-            //{
-            //    var vm = TraderBotResultsPlotViewModel.RunWindow(bot);
-            //    vm.UpdateChart();
-            //} 
-             
-            
-        }
-    }
+            foreach (var p in Algo.Plots)
+                ShowPlotCallback?.Invoke(p);
 
-    class OptimizerSession
-    { 
-        public int Lastexecuted { get; set; }
-    }
-
-    public class Optimizer
-    {
-        string SessionFile => $"OptimizerSession_{SessionName}.json";
-        string SpaceFile => $"OptimizerSession_{SessionName}_space.json";
-        public string SessionName { get; private set; }
-        OptimizerSession Session;
-        public Func<IMarketsManager, object, TraderBot> BotFactory { get; set; }
-        public Func<MultiMarketSimulator> MarketFactory { get; set; }
-        public DateTime StartTime { get; set; }
-        public DateTime EndTime { get; set; } 
-        public string BaseAsset { get; set; }
-        private NLog.Logger Logger;
-
-        private OptimizationSpace2 BaseSpace;
-
-        public Optimizer(string sessionName)
-        {
-            SessionName = sessionName;
-            //load session
-            var sessionJson = File.ReadAllText(SessionFile);
-            Session = JsonConvert.DeserializeObject<OptimizerSession>(sessionJson);
-            //load space
-            var spaceJson = File.ReadAllText(SpaceFile);
-            BaseSpace =   OptimizationSpace2.FromJson(spaceJson); 
-        }
-   
-        public void Start( )
-        { 
-            Logger = NLog.LogManager.GetLogger($"Optimizer_{SessionName}");
-            Logger.Info($"Starting optimization session: {SessionName}");
-
-            for (int i = Session.Lastexecuted + 1; i < BaseSpace.Configurations.Count; i++)
+            if (Config.PlotResults)
             {
-                RunOne(BaseSpace.Configurations[i]);
-                Session.Lastexecuted = i;
-                File.WriteAllText(SessionFile, JsonConvert.SerializeObject(Session));
+                PlotHelper plot = new PlotHelper("Equity");
+                var points = EquityHistory.Select(e => new IndicatorDataPoint(e.time, (double)e.bal));
+                plot.PlotLine(points, ARGBColors.Purple);
+                plot.InitialView = (Config.StartTime, Config.EndTime);
+                ShowPlotCallback?.Invoke(plot);
             }
-
-            //Parallel.ForEach(paramSets, new ParallelOptions { MaxDegreeOfParallelism = 2 }, act);
-        }
-
-        void RunOne(object config)
-        {
-            var sim = MarketFactory();
-            var bot = BotFactory(sim, config);
-            var startingEquity = sim.GetEquity(BaseAsset);
-            var backTester = new BackTester(sim, bot)
-            {
-                StartTime = StartTime,
-                EndTime = EndTime,
-                BaseAsset = BaseAsset,
-                Logger = this.Logger,
-            };
-            var obj = JsonConvert.SerializeObject(config, Formatting.Indented);
-            Logger.Info($"--------------- {bot.ToString()} -------------------\n" + obj + "\n");
-
-            backTester.Start();
-            //collect info  
         }
     }
+
+
 }

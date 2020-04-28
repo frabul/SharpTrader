@@ -1,0 +1,19 @@
+{
+  "Market": "Binance",
+  "SessionName": "Backetester",
+  "DataDir": "D:\\ProgettiBck\\SharpTraderBots\\Bin\\Data\\",
+  "HistoryDb": "D:\\ProgettiBck\\SharpTraderBots\\Bin\\Data\\",
+  "": "D:\\ProgettiBck\\SharpTraderBots\\Bin\\Data\\",
+  "PlottingEnabled": false,
+  "PlotResults": true,
+  "AlgoClass": "SharpTrader.Algos.SurgeCatcherAlgo, SharpTrader.Bots",
+  "StartTime": "2020.01.01.00:00:00",
+  "EndTime": "2020.01.15.00:00:00",
+  "StartingBalance": {
+    "Asset": "BTC",
+    "Amount": 100
+  },
+  "AlgoConfig": {
+
+  }
+}

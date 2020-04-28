@@ -27,7 +27,44 @@ namespace SharpTrader.Plotting
     {
         public static void Show(PlotHelper plot)
         {
-            var vm = TraderBotResultsPlotViewModel.RunWindow(plot);
+            bool ok = false;
+            TraderBotResultsPlotViewModel vm = null;
+            Thread newWindowThread = new Thread(new ThreadStart(() =>
+            {
+
+                // Create our context, and install it:
+                SynchronizationContext.SetSynchronizationContext(
+                    new DispatcherSynchronizationContext(
+                        Dispatcher.CurrentDispatcher));
+
+                TraderBotResultsPlot Window = new TraderBotResultsPlot();
+                vm = new Plotting.TraderBotResultsPlotViewModel(plot);
+                vm.Window = Window;
+                // When the window closes, shut down the dispatcher
+                Window.Closed += (s, e) =>
+                    Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
+                Window.Loaded += (s, e) => ok = true;
+                try
+                {
+                    Window.DataContext = vm;
+                    Dispatcher.CurrentDispatcher.BeginInvoke(new Action(() => Window.Show()));
+                    // Start the Dispatcher Processing
+                    System.Windows.Threading.Dispatcher.Run();
+                }
+                catch (Exception ex)
+                {
+                }
+
+            }));
+
+
+            newWindowThread.SetApartmentState(ApartmentState.STA);
+            // Make the thread a background thread
+            newWindowThread.IsBackground = true;
+            // Start the thread
+            newWindowThread.Start();
+            while (!ok)
+                Thread.Sleep(100);
             vm.UpdateChart();
         }
     }
@@ -336,48 +373,7 @@ namespace SharpTrader.Plotting
 
         }
 
-        public static TraderBotResultsPlotViewModel RunWindow(PlotHelper plot)
-        {
-            bool ok = false;
-            TraderBotResultsPlotViewModel vm = null;
-            Thread newWindowThread = new Thread(new ThreadStart(() =>
-            {
-
-                // Create our context, and install it:
-                SynchronizationContext.SetSynchronizationContext(
-                    new DispatcherSynchronizationContext(
-                        Dispatcher.CurrentDispatcher));
-
-                TraderBotResultsPlot Window = new TraderBotResultsPlot();
-                vm = new Plotting.TraderBotResultsPlotViewModel(plot);
-                vm.Window = Window;
-                // When the window closes, shut down the dispatcher
-                Window.Closed += (s, e) =>
-                    Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
-                Window.Loaded += (s, e) => ok = true;
-                try
-                {
-                    Window.DataContext = vm;
-                    Dispatcher.CurrentDispatcher.BeginInvoke(new Action(() => Window.Show()));
-                    // Start the Dispatcher Processing
-                    System.Windows.Threading.Dispatcher.Run();
-                }
-                catch (Exception ex)
-                {
-                }
-
-            }));
-
-
-            newWindowThread.SetApartmentState(ApartmentState.STA);
-            // Make the thread a background thread
-            newWindowThread.IsBackground = true;
-            // Start the thread
-            newWindowThread.Start();
-            while (!ok)
-                Thread.Sleep(100);
-            return vm;
-        }
+         
     }
 
     static class Extensions
