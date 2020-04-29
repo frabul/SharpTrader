@@ -8,6 +8,7 @@ using SymbolsTable = System.Collections.Generic.Dictionary<string, SharpTrader.S
 #pragma warning disable CS1998
 using NLog;
 using Newtonsoft.Json.Linq;
+using System.IO;
 
 namespace SharpTrader
 {
@@ -53,7 +54,7 @@ namespace SharpTrader
                 MarketName = name;
                 MakerFee = makerFee;
                 TakerFee = takerFee;
-                var text = System.IO.File.ReadAllText(dataDir + name + "SymbolsTable.json");
+                var text = System.IO.File.ReadAllText(Path.Combine(dataDir , name + "SymbolsTable.json"));
                 JObject table = JObject.Parse(text);
                 SymbolsTable = new SymbolsTable();
                 foreach (var token in table)

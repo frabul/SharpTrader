@@ -47,7 +47,7 @@ namespace SharpTrader
             EndTime = endTime;
 
             HistoryDb = historyDb;
-            var text = File.ReadAllText(dataDirectory + ConfigFile);
+            var text = File.ReadAllText(Path.Combine(dataDirectory, ConfigFile));
             Config = Newtonsoft.Json.JsonConvert.DeserializeObject<Configuration>(text);
 
             this._Markets = new Market[Config.Markets.Length];
@@ -103,7 +103,7 @@ namespace SharpTrader
                             market.AddNewCandle(feed as SymbolFeed, candle);// new Candlestick(data.Ticks.Tick)); //use less memory   
                         }
                         moreData |= dataSource.Ticks.Position < dataSource.Ticks.Count - 1;
-                    } 
+                    }
                 }
             }
 
@@ -136,7 +136,7 @@ namespace SharpTrader
         {
             _Markets.Where(m => m.MarketName == market).First().AddBalance(asset, amount);
         }
-         
+
         public class Configuration
         {
             public MarketConfiguration[] Markets { get; set; }

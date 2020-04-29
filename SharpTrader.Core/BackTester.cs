@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using SharpTrader.AlgoFramework;
 using SharpTrader.Indicators;
 using System;
@@ -76,7 +77,7 @@ namespace SharpTrader
             algoConfig = null;
             try
             {
-                algoConfig = config.AlgoConfig.ToObject(configClass);
+                algoConfig = JsonConvert.DeserializeObject(  config.AlgoConfig.ToString(), configClass);
             }
             catch (Exception ex)
             {
@@ -85,7 +86,7 @@ namespace SharpTrader
 
             this.Algo = myctor.Invoke(new[] { MarketSimulator.GetMarketApi(config.Market), algoConfig }) as TradingAlgo;
             this.Algo.IsPlottingEnabled = Config.PlottingEnabled;
-            this.Algo.ShowPlotCallback = this.ShowPlotCallback;
+            this.Algo.ShowPlotCallback = (pl) => this?.ShowPlotCallback(pl);
             if (this.Algo == null)
                 throw new Exception("Wrong algo class");
         }
