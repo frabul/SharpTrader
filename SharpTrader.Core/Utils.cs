@@ -6,18 +6,18 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-    public class AssetSum
+    public class AssetAmount
     {
         public string Asset { get; set; }
         public decimal Amount { get; set; }
 
-        public AssetSum(string asset, decimal budget)
+        public AssetAmount(string asset, decimal budget)
         {
             Asset = asset;
             Amount = budget;
         }
 
-        public static decimal Convert(AssetSum amount, string targetAsset, IEnumerable<ISymbolFeed> feeds  )
+        public static decimal Convert(AssetAmount amount, string targetAsset, IEnumerable<ISymbolFeed> feeds  )
         {
             if (amount.Asset == targetAsset)
                 return amount.Amount;
@@ -31,7 +31,7 @@ namespace SharpTrader
             else
                 throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair"); 
         }
-        public static decimal Convert(AssetSum amount, string targetAsset, ISymbolFeed feed)
+        public static decimal Convert(AssetAmount amount, string targetAsset, ISymbolFeed feed)
         {
             if (amount.Asset == targetAsset)
                 return amount.Amount; 

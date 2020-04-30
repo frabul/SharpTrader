@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,12 +20,12 @@ namespace SharpTrader
         /// <summary>
         /// Put a market order
         /// </summary> 
-        Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null);
+        Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null);
 
         /// <summary>
         /// Puts a limit order on the market
         /// </summary> 
-        Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null);
+        Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null);
 
         /// <summary>
         /// Gets the feed for the given symbol
@@ -44,17 +45,17 @@ namespace SharpTrader
 
         IEnumerable<ITrade> Trades { get; }
 
-        Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId);
+        Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId);
 
-        Task<IMarketOperation<IOrder>> OrderSynchAsync(string id);
+        Task<IRequest<IOrder>> OrderSynchAsync(string id);
 
-        Task<IMarketOperation> OrderCancelAsync(string id);
+        Task<IRequest> OrderCancelAsync(string id);
 
         decimal GetFreeBalance(string asset);
 
         decimal GetTotalBalance(string asset);
 
-        Task<IMarketOperation<decimal>> GetEquity(string asset);
+        Task<IRequest<decimal>> GetEquity(string asset);
 
         (decimal min, decimal step) GetMinTradable(string tradeSymbol);
 
@@ -63,6 +64,8 @@ namespace SharpTrader
         decimal GetMinNotional(string asset);
 
         void DisposeFeed(ISymbolFeed feed);
+        ITrade GetTradeById(JToken tradeId);
+        IOrder GetOrderById(string asString);
     }
 
     public class SymbolInfo
@@ -71,7 +74,7 @@ namespace SharpTrader
         public string Asset { get; set; }
         public string QuoteAsset { get; set; }
         public bool IsMarginTadingAllowed { get; set; }
-        public bool IsSpotTadingAllowed { get; set; } 
+        public bool IsSpotTadingAllowed { get; set; }
         public decimal MinLotSize { get; set; }
         public decimal LotSizeStep { get; set; }
         public decimal MinNotional { get; set; }
@@ -83,7 +86,7 @@ namespace SharpTrader
             return Key;
         }
 
-        public static implicit operator string(  SymbolInfo obj)
+        public static implicit operator string(SymbolInfo obj)
         {
             return obj.Key;
         }
@@ -116,19 +119,19 @@ namespace SharpTrader
         (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal oderAmout, decimal exitPrice);
     }
 
-    public interface IMarketOperation<T> : IMarketOperation
+    public interface IRequest<T> : IRequest
     {
         T Result { get; }
     }
 
-    public interface IMarketOperation
+    public interface IRequest
     {
-        MarketOperationStatus Status { get; }
+        RequestStatus Status { get; }
         string ErrorInfo { get; }
         bool IsSuccessful { get; }
     }
 
-    public enum MarketOperationStatus
+    public enum RequestStatus
     {
         Completed,
         Failed,

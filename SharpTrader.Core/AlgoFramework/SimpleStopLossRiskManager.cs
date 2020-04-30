@@ -1,4 +1,5 @@
-﻿using SharpTrader.Indicators;
+﻿using LiteDB;
+using SharpTrader.Indicators;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,7 +10,11 @@ namespace SharpTrader.AlgoFramework
     {
         public class MySymbolData
         {
+            //todo warmup indicators
+            [BsonIgnore]
             public Min BaseLevel { get; set; }
+
+            [BsonIgnore]
             public RollingWindow<IBaseData> BaseLevelRecords { get; set; } = new RollingWindow<IBaseData>(60 * 24 * 8);
 
             public void Reset()
@@ -20,7 +25,7 @@ namespace SharpTrader.AlgoFramework
 
         class MyOperationData
         {
-            public IOrder LastExit { get; set; } 
+            public IOrder LastExit { get; set; }
             public double StopLossDelta { get; set; }
             public double HighestPrice { get; set; }
 
@@ -29,7 +34,15 @@ namespace SharpTrader.AlgoFramework
         public double RiskRewardRatio { get; set; } = 1;
         public TimeSpan BaseLevelTimespan { get; set; } = TimeSpan.Zero;
         public bool TrailingStopLoss { get; set; } = false;
-         
+
+
+        public override void RegisterSerializationMappers(BsonMapper mapper)
+        {
+            BsonMapper defaultMapper = new BsonMapper();
+            mapper.RegisterType<MyOperationData>(o => defaultMapper.Serialize(o), bson => mapper.Deserialize<MyOperationData>(bson));
+            mapper.RegisterType<MySymbolData>(o => defaultMapper.Serialize(o), bson => mapper.Deserialize<MySymbolData>(bson));
+        }
+
 
         private MySymbolData GetData(SymbolData symData)
         {
@@ -76,10 +89,6 @@ namespace SharpTrader.AlgoFramework
 
         public override async Task Update(TimeSlice slice)
         {
-            if (Algo.Time >= new DateTime(2020, 01, 05, 11, 05, 00))
-            {
-
-            }
             foreach (var op in Algo.ActiveOperations.Where(o => o.IsStarted() && !o.IsClosed && !o.IsClosing))
             {
                 if (op.AmountRemaining <= 0)
@@ -87,7 +96,7 @@ namespace SharpTrader.AlgoFramework
 
                 var mySymData = GetData(Algo.SymbolsData[op.Symbol]);
                 var opData = GetData(op);
-                
+
                 //---
                 if (!op.RiskManaged)
                 {
@@ -145,12 +154,12 @@ namespace SharpTrader.AlgoFramework
                     {
                         foreach (var op in symData.ActiveOperations)
                         {
-                            if(op.AmountInvested > 0)
+                            if (op.AmountInvested > 0)
                             {
                                 var opData = GetData(op);
                                 if (rec.High > opData.HighestPrice)
                                     opData.HighestPrice = rec.High;
-                            } 
+                            }
                         }
 
                         mySymData.BaseLevel.Update((ITradeBar)rec);
@@ -174,6 +183,11 @@ namespace SharpTrader.AlgoFramework
         public SimpleStopLossRiskManager(decimal stopLoss)
         {
             StopLoss = stopLoss;
+        }
+
+        public override void RegisterSerializationMappers(BsonMapper mapper)
+        {
+            mapper.RegisterType<RMData>(o => mapper.Serialize(o), bson => mapper.Deserialize<RMData>(bson));
         }
         protected override Task OnInitialize()
         {

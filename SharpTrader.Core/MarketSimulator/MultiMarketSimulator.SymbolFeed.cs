@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-#pragma warning disable CS1998
+ 
 
 namespace SharpTrader
 {
@@ -100,110 +100,23 @@ namespace SharpTrader
             }
         }
 
-        class Order : IOrder
+        class MarketRequest<T> : IRequest<T>
         {
-            private static int idCounter = 0;
-            public string Symbol { get; private set; }
-            public string Market { get; private set; }
-            public decimal Price { get; private set; }
-            public decimal Amount { get; private set; }
-            public string Id { get; private set; }
-            public string ClientId { get; private set; }
-
-            public OrderStatus Status { get; internal set; } = OrderStatus.Pending;
-
-            public TradeDirection TradeType { get; private set; }
-
-            public OrderType Type { get; private set; }
-
-            public decimal Filled { get; set; }
-
-            public DateTime Time { get; set; }
-
-            public bool IsClosed => this.Status >= OrderStatus.Cancelled;
-
-            public Order(string market, string symbol, DateTime time, TradeDirection tradeSide, OrderType orderType, decimal amount, double rate, string clientId)
-            {
-                Id = (idCounter++).ToString();
-                ClientId = clientId;
-                Symbol = symbol;
-                Market = market;
-                TradeType = tradeSide;
-                Type = orderType;
-                Amount = amount;
-                Price = (decimal)rate;
-                Time = time;
-            }
-            public override string ToString()
-            {
-                return $"Order{{ Id: {this.Id}, ClientId: {this.ClientId} }}";
-            }
-        }
-
-        class Trade : ITrade
-        {
-            private static long IdCounter = 0;
-            public Trade(string market, string symbol, DateTime time, TradeDirection type, double price, decimal amount, Order order)
-            {
-                Market = market;
-                Symbol = symbol;
-                Time = time;
-                Direction = type;
-                Price = (decimal)price;
-                Amount = amount;
-                Order = order;
-                Id = (IdCounter++).ToString();
-            }
-            public string Id { get; private set; }
-            public decimal Amount { get; private set; }
-
-            public DateTime Time { get; private set; }
-
-            /// <summary>
-            /// Commission paid
-            /// </summary>
-            public decimal Commission { get; set; }
-            /// <summary>
-            /// Asset used to pay the commission
-            /// </summary>
-            public string CommissionAsset { get; set; }
-            public string Market { get; private set; }
-
-            public decimal Price { get; private set; }
-
-            public string Symbol { get; private set; }
-
-            public TradeDirection Direction { get; private set; }
-
-            public Order Order { get; private set; }
-
-            public string ClientOrderId => Order.ClientId;
-
-            public string OrderId => Order.Id;
-
-            public override string ToString()
-            {
-                return $"Trade{{ Id: {Id}, Symbol:{Symbol}, Direction:{Direction}, Time:{Time} }}";
-            }
-        }
-
-        class MarketOperation<T> : IMarketOperation<T>
-        {
-            public MarketOperationStatus Status { get; internal set; }
+            public RequestStatus Status { get; internal set; }
             public T Result { get; }
             public string ErrorInfo { get; internal set; }
 
-            public bool IsSuccessful => Status == MarketOperationStatus.Completed;
+            public bool IsSuccessful => Status == RequestStatus.Completed;
 
-            public MarketOperation(MarketOperationStatus status, T res)
+            public MarketRequest(RequestStatus status, T res)
             {
                 Status = status;
                 Result = res;
             }
 
-            public static IMarketOperation<T> Completed(T val)
+            public static IRequest<T> Completed(T val)
             {
-                return new MarketOperation<T>(MarketOperationStatus.Completed, val);
+                return new MarketRequest<T>(RequestStatus.Completed, val);
             }
         }
 

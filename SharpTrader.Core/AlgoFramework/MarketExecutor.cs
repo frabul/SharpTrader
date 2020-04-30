@@ -1,4 +1,6 @@
-﻿using System;
+﻿using LiteDB;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Threading.Tasks;
 
 namespace SharpTrader.AlgoFramework
@@ -16,6 +18,15 @@ namespace SharpTrader.AlgoFramework
         } 
         public abstract Task CancelAllOrders(Operation op); 
         public abstract Task CancelEntryOrders();
-        internal abstract decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset);
+        
+        public abstract decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset);
+
+        public virtual JToken SerializeOperationData(object executorData) { throw new NotImplementedException(); }
+        public virtual object DeserializeOperationData(JToken jToken) { throw new NotImplementedException(); }
+
+        public virtual JToken SerializeSymbolData(object executorData) { throw new NotImplementedException(); }
+        public virtual object DeserializeSymbolData(JToken jToken) { throw new NotImplementedException(); }
+
+        public abstract void RegisterSerializationMappers(BsonMapper mapper);
     }
 }

@@ -24,7 +24,7 @@ namespace SharpTrader
             public DateTime StartTime { get; set; }
             public DateTime EndTime { get; set; }
 
-            public AssetSum StartingBalance { get; set; } = new AssetSum("BTC", 100);
+            public AssetAmount StartingBalance { get; set; } = new AssetAmount("BTC", 100);
             public string Market = "Binance";
 
             public JObject AlgoConfig = new JObject();

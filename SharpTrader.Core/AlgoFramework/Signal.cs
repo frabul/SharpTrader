@@ -1,10 +1,14 @@
-﻿using System;
+﻿using LiteDB;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Dynamic;
 
 namespace SharpTrader.AlgoFramework
 {
     public class Signal
     {
+        public event Action<Signal> OnModify; 
+
         public Signal(SymbolInfo symbol, SignalKind kind, DateTime creationTime)
         {
             Symbol = symbol;
@@ -12,16 +16,22 @@ namespace SharpTrader.AlgoFramework
             CreationTime = creationTime;
         }
 
-        public event Action<Signal> OnModify;
+        /// <summary>
+        /// Constructor dedicated to serialization
+        /// </summary>
+        public Signal( )
+        {
+
+        }
+
         /// <summary>
         /// The operation managing this signal ( if any )
         /// </summary>
-        public Operation Operation { get; set; }
-        public SymbolInfo Symbol { get; set; }
+        [BsonIgnore] public Operation Operation { get; set; }
 
+        public SymbolInfo Symbol { get; set; }
         public SignalKind Kind { get; set; }
-        public DateTime CreationTime { get; set; } 
-        public dynamic AdditionalInfo { get; } = new ExpandoObject();
+        public DateTime CreationTime { get; set; }
         public decimal PriceTarget { get; set; }
 
         /// <summary>
@@ -33,12 +43,12 @@ namespace SharpTrader.AlgoFramework
         /// <summary>
         /// Any operation 
         /// </summary>
-        public DateTime EntryExpiry { get; set; }
+        public DateTime EntryExpiry { get; private set; }
 
         /// <summary>
         /// Every operation based on this signal is meant to be closed after this time
         /// </summary>
-        public DateTime ExpireDate { get; set; }
+        public DateTime ExpireDate { get; private set; }
 
         public void ModifyConditions(decimal entry, DateTime entryExpiry, decimal target, DateTime targetExpiry)
         {

@@ -7,12 +7,8 @@ using System.Threading.Tasks;
 namespace SharpTrader
 { 
     public class TimeSerieTransform<TIn,TOut> : TimeSerie<TOut> where TIn : ITimeRecord where TOut : IBaseData
-    {
-        public event Action OnNewSample;
-         
-        private Func<TIn, TOut> TransformFunction;
-          
-
+    { 
+        private Func<TIn, TOut> TransformFunction; 
         public TimeSerieTransform(TimeSerieNavigator<TIn> backSerie, Func<TIn, TOut> selector) :
             base()
         {

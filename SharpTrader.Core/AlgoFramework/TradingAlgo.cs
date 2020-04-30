@@ -1,46 +1,38 @@
-﻿using System;
+﻿using LiteDB;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace SharpTrader.AlgoFramework
 {
-    public class SymbolData
-    {
-        /// <summary>
-        /// Feed is automatcly initialized by the algo for the symbols requested by the symbols selector module
-        /// </summary>
-        public ISymbolFeed Feed { get; set; }
-
-        public List<Operation> ActiveOperations { get; set; } = new List<Operation>();
-        public List<Operation> ClosedOperations { get; set; } = new List<Operation>();
-
-        /// <summary>
-        /// This property can be used by sentry module to store its data
-        /// </summary>
-        public object SentryData { get; set; }
-        public object OperationsManagerData { get; set; }
-        public object AllocatorData { get; set; }
-        public SymbolInfo Symbol => Feed.Symbol;
-
-        public object RiskManagerData { get; set; }
-    }
-
     public abstract class TradingAlgo : TraderBot
-    { 
+    {
+        public class Configuration
+        {
+            public string DataDir { get; set; } = Path.Combine(".", "Data");
+            public string Name { get; set; } = "Unnamed";
+            public bool SaveData { get; set; } = false;
+        }
         //todo the main components should be allowed to be set only during Initialize 
         private Dictionary<string, SymbolData> _SymbolsData = new Dictionary<string, SymbolData>();
         private TimeSlice WorkingSlice = new TimeSlice();
         private TimeSlice OldSlice = new TimeSlice();
         private List<Operation> _ActiveOperations = new List<Operation>();
         private NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        private Configuration Config;
+        private LiteDatabase Db;
 
+
+        public string Name => Config.Name;
+        public string MyDataDir => Path.Combine(Config.DataDir, Config.Name);
         public Action<PlotHelper> ShowPlotCallback { get; set; }
         public IReadOnlyDictionary<string, SymbolData> SymbolsData => _SymbolsData;
-
         public IReadOnlyList<Operation> ActiveOperations => _ActiveOperations;
-
         public SymbolsSelector SymbolsFilter { get; set; }
         public Sentry Sentry { get; set; }
         public FundsAllocator Allocator { get; set; }
@@ -48,21 +40,33 @@ namespace SharpTrader.AlgoFramework
         public RiskManager RiskManager { get; set; }
         public IMarketApi Market { get; }
         public DateTime LastUpdate { get; set; }
-
         public DateTime Time => Market.Time;
         public DateTime NextUpdateTime { get; private set; } = DateTime.MinValue;
         public TimeSpan Resolution { get; set; } = TimeSpan.FromMinutes(1);
         public bool IsTradingStopped { get; private set; } = false;
-        public object Name { get; set; }
         public bool IsPlottingEnabled { get; set; } = false;
 
-        public TradingAlgo(IMarketApi marketApi)
+
+        public TradingAlgo(IMarketApi marketApi, Configuration config)
         {
+            Config = config;
             Market = marketApi;
             Market.OnNewTrade += Market_OnNewTrade;
+
         }
 
-        public abstract Task Initialize();
+        public async Task Initialize()
+        {
+            //load saved state
+            if (Config.SaveData)
+                ReloadSavedState();
+
+            //call on initialize
+            await this.OnInitialize();
+        }
+
+
+        protected abstract Task OnInitialize();
 
         public abstract Task OnUpdate(TimeSlice slice);
 
@@ -83,7 +87,9 @@ namespace SharpTrader.AlgoFramework
         private void AddNewOperation(Operation op)
         {
             this._ActiveOperations.Add(op);
-            _SymbolsData[op.Symbol.Key].ActiveOperations.Add(op);
+            var symData = GetSymbolData(op.Symbol);
+            symData.ActiveOperations.Add(op);
+            this.Db?.GetCollection<Operation>("ActiveOperations").Upsert(op);
         }
 
         public async Task Update(TimeSlice slice)
@@ -111,6 +117,7 @@ namespace SharpTrader.AlgoFramework
                 foreach (var sym in changes.RemovedSymbols)
                 {
                     SymbolData symbolData = _SymbolsData[sym.Key];
+                    symbolData.Feed.OnData -= Feed_OnData;
                     this.ReleaseFeed(symbolData.Feed);
                     symbolData.Feed = null;
                 }
@@ -118,12 +125,7 @@ namespace SharpTrader.AlgoFramework
                 //add feeds for added symbols
                 foreach (var sym in changes.AddedSymbols)
                 {
-                    SymbolData symbolData;
-                    if (!_SymbolsData.TryGetValue(sym.Key, out symbolData))
-                    {
-                        symbolData = new SymbolData();
-                        _SymbolsData.Add(sym.Key, symbolData);
-                    }
+                    SymbolData symbolData = GetSymbolData(sym);
 
                     symbolData.Feed = await this.GetSymbolFeed(sym.Key);
                     symbolData.Feed.OnData -= Feed_OnData;
@@ -158,6 +160,7 @@ namespace SharpTrader.AlgoFramework
             if (Allocator != null)
                 Allocator.Update(slice);
 
+            this.Db?.BeginTrans();
             //close operations that have been in close queue for enough time
             for (int i = 0; i < this.ActiveOperations.Count; i++)
             {
@@ -168,11 +171,18 @@ namespace SharpTrader.AlgoFramework
                     //move closed operations
                     this.SymbolsData[op.Symbol.Key].ActiveOperations.Remove(op);
                     this._ActiveOperations.RemoveAt(i--);
+
+                    //update database
+                    this.Db?.GetCollection("ActiveOperations").Delete(op.Id);
+                    this.Db?.GetCollection<Operation>("ClosedOperations").Upsert(op);
+
+
                     //if there wasn't any transaction for the operation then we just forget it
                     if (op.AmountInvested > 0)
                         this.SymbolsData[op.Symbol.Key].ClosedOperations.Add(op);
                 }
             }
+            this.Db?.Commit();
 
             //add new operations that have been created 
             foreach (var op in slice.NewOperations)
@@ -185,6 +195,23 @@ namespace SharpTrader.AlgoFramework
             //manage risk
             if (RiskManager != null)
                 await RiskManager.Update(slice);
+        }
+
+        public Task Stop()
+        {
+            throw new NotImplementedException();
+        }
+
+        private SymbolData GetSymbolData(SymbolInfo sym)
+        {
+            SymbolData symbolData;
+            if (!_SymbolsData.TryGetValue(sym.Key, out symbolData))
+            {
+                symbolData = new SymbolData(sym);
+                _SymbolsData.Add(sym.Key, symbolData);
+            }
+
+            return symbolData;
         }
 
         public void ShowPlot(PlotHelper plot)
@@ -214,16 +241,10 @@ namespace SharpTrader.AlgoFramework
                 WorkingSlice.Add(SymbolsData[trade.Symbol].Symbol, trade);
         }
 
-        public Task Stop()
-        {
-            throw new NotImplementedException();
-        }
-
         public Task<ISymbolFeed> GetSymbolFeed(string symbolKey)
         {
             return Market.GetSymbolFeedAsync(symbolKey);
         }
-
         public override Task OnTickAsync()
         {
             if (Time >= NextUpdateTime)
@@ -244,23 +265,94 @@ namespace SharpTrader.AlgoFramework
             else
                 return Task.CompletedTask;
         }
-
         public void ReleaseFeed(ISymbolFeed feed)
         {
             Market.DisposeFeed(feed);
         }
-
         public void ResumeEntries()
         {
             IsTradingStopped = false;
         }
-
         public Task StopEntries()
         {
             IsTradingStopped = true;
             //close all entry orders
             return this.Executor.CancelEntryOrders();
         }
+        public void LoadState()
+        {
+
+        }
+
+        public void SaveState()
+        {
+
+
+
+        }
+
+        public void ReloadSavedState()
+        {
+            var dbPath = Path.Combine(MyDataDir, "MyData.db");
+            if (!Directory.Exists(MyDataDir))
+                Directory.CreateDirectory(MyDataDir);
+            this.Db = new LiteDatabase(dbPath);
+
+            BsonMapper mapper = BsonMapper.Global;
+            BsonMapper defaultMapper = new BsonMapper();
+
+            //register symbol info mapper
+            mapper.RegisterType<SymbolInfo>(o => defaultMapper.Serialize(o.Key), bson => Market.GetSymbols().FirstOrDefault(s => s.Key == bson.AsString));
+         
+
+            //---- add mapper for operations
+            BsonValue SerializeOp(Operation op)
+            {
+                var document = defaultMapper.ToDocument(op);
+                document["AllTrades"] = new BsonArray(op.AllTrades.Select(tr =>  new BsonValue(tr.Id)));
+                return document;
+            }
+            Operation DeserializeOp(BsonValue bson)
+            {
+                var op = defaultMapper.Deserialize<Operation>(bson);
+                var allTrades = mapper.Deserialize<ITrade[]>(bson["AllTrades"]);
+                foreach (var trade in allTrades)
+                    op.AddTrade(trade);
+                return op;
+            }
+            mapper.RegisterType<Operation>(SerializeOp, DeserializeOp);
+
+
+            //todo register mapper for custom components
+            this.Executor?.RegisterSerializationMappers(mapper);
+            this.RiskManager?.RegisterSerializationMappers(mapper);
+            this.Sentry?.RegisterSerializationMappers(mapper);
+
+
+            //rebuild symbols data
+            foreach (var symData in Db.GetCollection<SymbolData>("SymbolsData").FindAll())
+                _SymbolsData[symData.Id] = symData;
+            var closedOperations = Db.GetCollection<Operation>("ClosedOperations").FindAll().ToArray();
+            //rebuild operations 
+            //closed operations are not loaded in current session behind
+            var activeOperations = Db.GetCollection<Operation>("ActiveOperations");
+            foreach (var op in activeOperations.FindAll().ToArray())
+            {
+                var symData = GetSymbolData(op.Symbol);
+                symData.ActiveOperations.Add(op);
+            }
+        }
+
+        public void SaveDataBase()
+        {
+            //todo Signals need to be saved and all of theirs reference need to be stored byref
+            foreach (var symData in SymbolsData.Values)
+                Db.GetCollection<SymbolData>("SymbolsData").Upsert(symData);
+            Db.Checkpoint();
+
+        }
+
+
     }
 
 }

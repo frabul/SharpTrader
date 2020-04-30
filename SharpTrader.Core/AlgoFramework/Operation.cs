@@ -1,7 +1,10 @@
-﻿using System;
+﻿using LiteDB;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Text;
 
 namespace SharpTrader.AlgoFramework
@@ -12,42 +15,47 @@ namespace SharpTrader.AlgoFramework
         SellThenBuy,
     }
 
+    public interface IJObjectConvertible
+    {
+        JObject ToJobject(TradingAlgo algo);
+    }
+
     public class Operation
     {
-        //todo prevedere la possibile chiusura di una operazione passando i fondi ad un'altra 
-        private int OrdersCount = 0;
-        private Signal _Signal;
-
-        private HashSet<ITrade> _Entries = new HashSet<ITrade>();
-        private HashSet<ITrade> _Exits = new HashSet<ITrade>();
-
         public event Action<Operation, ITrade> OnNewTrade;
         public event Action<Operation> OnClosing;
         public event Action<Operation> OnClosed;
         public event Action<Operation> OnResumed;
+
+        //todo prevedere la possibile chiusura di una operazione passando i fondi ad un'altra 
+
+        private Signal _Signal;
+        private HashSet<ITrade> _Entries = new HashSet<ITrade>();
+        private HashSet<ITrade> _Exits = new HashSet<ITrade>();
+
         /// <summary>
-        /// All trades associated with thos operation
-        /// </summary>
+        /// All trades associated with this operation
+        /// </summary> 
         public IEnumerable<ITrade> AllTrades => _Entries.Concat(Exits);
         /// <summary>
         /// Trades that were meant as entries
         /// </summary>
-        public IEnumerable<ITrade> Entries => _Entries;
+        [BsonIgnore] public IEnumerable<ITrade> Entries => _Entries;
         /// <summary>
         /// Trades that were meant as exits
         /// </summary>
-        public IEnumerable<ITrade> Exits => _Exits;
+        [BsonIgnore] public IEnumerable<ITrade> Exits => _Exits;
 
+        public int OrdersCount { get; private set; } = 0;
         /// <summary>
         /// Unique identifier for this operation
-        /// </summary>
+        /// </summary> 
         public string Id { get; private set; }
-        public DateTime CreationTime { get; private set; }
 
-        public object ExecutorData { get; set; }
+        [BsonIgnore] public DateTime CreationTime => Signal.CreationTime;
 
         /// <summary>
-        /// Insight associated with the operation
+        /// Signal associated with the operation
         /// </summary>
         public Signal Signal
         {
@@ -60,8 +68,7 @@ namespace SharpTrader.AlgoFramework
                 _Signal.OnModify += (s) => Resume();
             }
         }
-
-        public AssetSum AmountTarget { get; private set; }
+        public AssetAmount AmountTarget { get; private set; }
         public decimal AverageEntryPrice { get; private set; }
         public decimal AverageExitPrice { get; private set; }
         public decimal AmountInvested { get; private set; }
@@ -70,6 +77,73 @@ namespace SharpTrader.AlgoFramework
         public decimal QuoteAmountLiquidated { get; private set; }
         public decimal AmountRemaining { get; private set; }
         public decimal QuoteAmountRemaining { get; private set; }
+        public OperationType Type { get; private set; }
+        [BsonIgnore] public SymbolInfo Symbol => Signal.Symbol;
+        public bool RiskManaged { get; internal set; }
+        public object ExecutorData { get; set; }
+        public object RiskManagerData { get; internal set; }
+        public TradeDirection EntryTradeDirection { get; internal set; }
+        public TradeDirection ExitTradeDirection { get; internal set; }
+        public bool IsClosed { get; private set; }
+        public bool IsClosing { get; private set; }
+        public DateTime CloseDeadTime { get; private set; } = DateTime.MaxValue;
+        public DateTime LastInvestmentTime { get; private set; }
+
+
+        [BsonCtor]
+        public Operation(string id)
+        {
+            this.Id = id;
+        }
+
+        public Operation(string _id, Signal signal, AssetAmount amountTarget, OperationType type)
+        {
+            this.Id = _id;
+            this.Signal = signal;
+            this.AmountTarget = amountTarget;
+            this.Type = type;
+            SetTradesDirections();
+
+        }
+
+        public Operation(JObject me)
+        {
+            //this.OrdersCount = me["OrdersCount"].ToObject<int>();
+            //this.Algo = algo;
+            //this.Id = me["Id"].ToObject<string>();
+            ////this.Signal = Algo.Sentry.DeserializeSignal(me["Signal"]);
+            //this.AmountTarget = me["AmountTarget"].ToObject<AssetAmount>();
+            //this.Type = me["Type"].ToObject<OperationType>();
+            //SetTradesDirections();
+
+            //this.CloseDeadTime = me["CloseDeadTime"].ToObject<DateTime>();
+            //this.IsClosed = me["IsClosed"].ToObject<bool>();
+            //this.IsClosed = me["IsClosed"].ToObject<bool>();
+            //this.RiskManaged = me["RiskManaged"].ToObject<bool>();
+
+            //this.RiskManagerData = Algo.RiskManager.DeserializeOperationData(me["RiskManagerData"]);
+            //this.ExecutorData = Algo.Executor.DeserializeOperationData(me["ExecutorData"]);
+
+            ////deserialize trades
+            //foreach (var tradeId in me["AllTrades"].ToArray())
+            //    this.AddTrade(Algo.Market.GetTradeById(tradeId));
+        }
+
+        private void SetTradesDirections()
+        {
+            if (this.Type == OperationType.BuyThenSell)
+            {
+                EntryTradeDirection = TradeDirection.Buy;
+                ExitTradeDirection = TradeDirection.Sell;
+            }
+            else if (Type == OperationType.SellThenBuy)
+            {
+                EntryTradeDirection = TradeDirection.Sell;
+                ExitTradeDirection = TradeDirection.Buy;
+            }
+            else
+                throw new NotSupportedException("Only supports buyThenSell and SellThenBuy operations");
+        }
 
         public virtual string GetNewOrderId()
         {
@@ -83,54 +157,14 @@ namespace SharpTrader.AlgoFramework
             return trade.ClientOrderId.StartsWith(this.Id + "-");
         }
 
-        internal bool IsEntryExpired(DateTime time)
+        public bool IsEntryExpired(DateTime time)
         {
             return time >= this.Signal.EntryExpiry;
         }
 
-        internal bool IsExitExpired(DateTime time)
+        public bool IsExitExpired(DateTime time)
         {
             return time >= this.Signal.ExpireDate;
-        }
-
-        public OperationType Type { get; internal set; }
-        public bool EntryFulfilled { get; internal set; }
-        public SymbolInfo Symbol => Signal.Symbol;
-
-        public bool RiskManaged { get; internal set; }
-        public object RiskManagerData { get; internal set; }
-        public TradeDirection EntryTradeDirection { get; internal set; }
-        public TradeDirection ExitTradeDirection { get; internal set; }
-        public bool IsClosed { get; private set; }
-        public bool IsClosing { get; private set; }
-        public DateTime CloseDeadTime { get; private set; } = DateTime.MaxValue;
-        public DateTime LastInvestmentTime { get; private set; }
-
-        public Operation(string id)
-        {
-            Id = id;
-        }
-
-        public Operation(string id, Signal signal, AssetSum assetSum, OperationType operType)
-        {
-            this.Id = id;
-            this.Signal = signal;
-            this.AmountTarget = assetSum;
-            this.Type = operType;
-            this.CreationTime = signal.CreationTime;
-            if (this.Type == OperationType.BuyThenSell)
-            {
-                EntryTradeDirection = TradeDirection.Buy;
-                ExitTradeDirection = TradeDirection.Sell;
-            }
-            else if (Type == OperationType.SellThenBuy)
-            {
-                EntryTradeDirection = TradeDirection.Sell;
-                ExitTradeDirection = TradeDirection.Buy;
-            }
-            else
-                throw new NotSupportedException("Only supports buyThenSell and SellThenBuy operations");
-
         }
 
         public void UpdateInfo()
@@ -218,5 +252,22 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
+        public JObject ToJObject()
+        {
+            JObject me = new JObject();
+            //me["OrdersCount"] = this.OrdersCount;
+            //me["AllTrades"] = new JArray(this.AllTrades.Select(tr => tr.Id));
+            //me["Id"] = this.Id;
+            //me["Type"] = JToken.FromObject(this.Type);
+            //me["AmountTarget"] = JObject.FromObject(this.AmountTarget);
+            ////me["Signal"] = Algo.Sentry.GetSerializationData(this.Signal);
+            //me["CloseDeadTime"] = JToken.FromObject(this.CloseDeadTime);
+            //me["IsClosed"] = this.IsClosed;
+            //me["IsClosing"] = this.IsClosing;
+            //me["RiskManaged"] = this.RiskManaged;
+            //me["RiskManagerData"] = Algo.RiskManager.GetSerializationData(this.RiskManagerData);
+            //me["ExecutorData"] = Algo.Executor.SerializeOperationData(this.ExecutorData);
+            return me;
+        }
     }
 }

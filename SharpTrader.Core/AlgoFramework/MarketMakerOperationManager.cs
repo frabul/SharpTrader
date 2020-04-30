@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LiteDB;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Dynamic;
@@ -21,6 +22,11 @@ namespace SharpTrader.AlgoFramework
             EntryDistantThreshold = entryDistantThreshold;
             EntryNearThreshold = entryNearThreshold;
         }
+
+        public override void RegisterSerializationMappers(BsonMapper mapper)
+        {
+             
+        } 
 
         public decimal EntryDistantThreshold { get; private set; }
 
@@ -364,8 +370,8 @@ namespace SharpTrader.AlgoFramework
 
                 if (entryNear && !Algo.IsTradingStopped)
                 {
-                    var originalAmount = AssetSum.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
-                    var stillToBuy = AssetSum.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed) - op.AmountInvested;
+                    var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
+                    var stillToBuy = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed) - op.AmountInvested;
                     if (stillToBuy / originalAmount > 0.2m)
                     {
                         var adjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(stillToBuy, op.Signal.PriceEntry);
@@ -547,7 +553,7 @@ namespace SharpTrader.AlgoFramework
             op.ScheduleClose(Algo.Time + delay);
         }
 
-        internal override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
+        public override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
         {
             decimal total = 0;
             foreach (var op in Algo.SymbolsData[symbol.Key].ActiveOperations)
@@ -578,8 +584,10 @@ namespace SharpTrader.AlgoFramework
             private IOrder currentExitOrder;
             private IOrder currentEntryOrder;
 
-            public HashSet<string> AllEntries = new HashSet<string>();
-            public HashSet<string> AllExits = new HashSet<string>();
+            public HashSet<string> AllEntries { get; set; } = new HashSet<string>();
+            public HashSet<string> AllExits { get; set; } = new HashSet<string>();
+            [BsonIgnore] public List<IOrder> LiquidationOrders { get; set; } = new List<IOrder>();
+            [BsonIgnore]
             public IOrder CurrentEntryOrder
             {
                 get => currentEntryOrder;
@@ -590,6 +598,8 @@ namespace SharpTrader.AlgoFramework
                     currentEntryOrder = value;
                 }
             }
+
+            [BsonIgnore]
             public IOrder CurrentExitOrder
             {
                 get => currentExitOrder;
@@ -601,14 +611,10 @@ namespace SharpTrader.AlgoFramework
 
                 }
             }
-            internal DeferredTask OperationManager;
-            internal DeferredTask EntryManager;
-            internal DeferredTask ExitManager;
-            //public List<DeferredTask> ScheduledTasks { get; internal set; } = new List<DeferredTask>();
 
-            public List<IOrder> LiquidationOrders = new List<IOrder>();
-
-
+            [BsonIgnore] internal DeferredTask OperationManager;
+            [BsonIgnore] internal DeferredTask EntryManager;
+            [BsonIgnore] internal DeferredTask ExitManager; 
         }
 
         internal delegate Task<bool> DeferredTaskDelegate(DeferredTask self);

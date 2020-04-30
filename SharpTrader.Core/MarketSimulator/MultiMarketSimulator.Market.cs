@@ -94,12 +94,12 @@ namespace SharpTrader
                 return Task.FromResult<ISymbolFeed>(feed);
             }
 
-            public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
+            public async Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
             {
                 if (amount <= 0)
                     throw new InvalidOperationException("Amount should be > 0");
                 if (amount <= 0)
-                    return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null)
+                    return new MarketRequest<IOrder>(RequestStatus.Failed, null)
                     {
                         ErrorInfo = "Order amount is zero or negative"
                     };
@@ -111,11 +111,11 @@ namespace SharpTrader
                 {
                     lock (LockObject)
                         this.PendingOrders.Add(order);
-                    return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
+                    return new MarketRequest<IOrder>(RequestStatus.Completed, order) { };
                 }
                 else
                 {
-                    return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null) { ErrorInfo = res.error };
+                    return new MarketRequest<IOrder>(RequestStatus.Failed, null) { ErrorInfo = res.error };
                 }
             }
 
@@ -146,7 +146,7 @@ namespace SharpTrader
 
             }
 
-            public async Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null)
+            public async Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null)
             {
                 if (amount <= 0)
                     throw new InvalidOperationException("Amount should be > 0");
@@ -159,7 +159,7 @@ namespace SharpTrader
 
                     var (result, error) = RegisterOrder(order);
                     if (!result)
-                        return new MarketOperation<IOrder>(MarketOperationStatus.Failed, null) { ErrorInfo = error };
+                        return new MarketRequest<IOrder>(RequestStatus.Failed, null) { ErrorInfo = error };
 
                     var trade = new Trade(
                         this.MarketName, symbol, this.Time,
@@ -167,7 +167,7 @@ namespace SharpTrader
 
                     RegisterTrade(feed, trade, isTaker: true);
                     this.ClosedOrders.Add(order);
-                    return new MarketOperation<IOrder>(MarketOperationStatus.Completed, order) { };
+                    return new MarketRequest<IOrder>(RequestStatus.Completed, order) { };
                 }
             }
 
@@ -295,7 +295,7 @@ namespace SharpTrader
                 }
             }
 
-            public Task<IMarketOperation<decimal>> GetEquity(string asset)
+            public Task<IRequest<decimal>> GetEquity(string asset)
             {
                 decimal val = 0;
                 foreach (var kv in _Balances)
@@ -318,7 +318,7 @@ namespace SharpTrader
                         }
                     }
                 }
-                return Task.FromResult<IMarketOperation<decimal>>(MarketOperation<decimal>.Completed(val));
+                return Task.FromResult<IRequest<decimal>>(MarketRequest<decimal>.Completed(val));
             }
 
             public (decimal min, decimal step) GetMinTradable(string tradeSymbol)
@@ -326,7 +326,7 @@ namespace SharpTrader
                 return (0.00000001m, 0.00000001m);
             }
 
-            public async Task<IMarketOperation> OrderCancelAsync(string id)
+            public async Task<IRequest> OrderCancelAsync(string id)
             {
                 lock (LockObject)
                 {
@@ -361,7 +361,7 @@ namespace SharpTrader
                     }
                 }
 
-                return new MarketOperation<object>(MarketOperationStatus.Completed, null);
+                return new MarketRequest<object>(RequestStatus.Completed, null);
             }
 
 
@@ -382,23 +382,23 @@ namespace SharpTrader
                 _Balances[asset].Free += amount;
             }
 
-            public async Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
+            public async Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
             {
                 IEnumerable<ITrade> trades;
                 if (fromId != null)
                     trades = Trades.Where(t => t.Symbol == symbol && (long.Parse(t.Id) > long.Parse(fromId)));
                 else
                     trades = Trades.Where(t => t.Symbol == symbol);
-                return new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, trades);
+                return new MarketRequest<IEnumerable<ITrade>>(RequestStatus.Completed, trades);
             }
 
-            public async Task<IMarketOperation<IOrder>> OrderSynchAsync(string id)
+            public async Task<IRequest<IOrder>> OrderSynchAsync(string id)
             {
                 var ord = ClosedOrders.Concat(OpenOrders).Where(o => o.Id == id).FirstOrDefault();
                 if (ord != null)
-                    return new MarketOperation<IOrder>(MarketOperationStatus.Completed, ord);
+                    return new MarketRequest<IOrder>(RequestStatus.Completed, ord);
                 else
-                    return new MarketOperation<IOrder>(MarketOperationStatus.Failed, ord);
+                    return new MarketRequest<IOrder>(RequestStatus.Failed, ord);
             }
 
             public IEnumerable<SymbolInfo> GetSymbols()
@@ -411,7 +411,15 @@ namespace SharpTrader
 
             }
 
+            public ITrade GetTradeById(JToken tradeId)
+            {
+                throw new NotImplementedException();
+            }
 
+            public IOrder GetOrderById(string asString)
+            {
+                throw new NotImplementedException();
+            }
         }
     }
 }

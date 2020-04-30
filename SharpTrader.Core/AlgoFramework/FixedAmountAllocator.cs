@@ -13,7 +13,7 @@ namespace SharpTrader.AlgoFramework
         public bool ProportinalToProfit = true;
         public decimal TargetProfit { get; set; } = 0.05m;
         public int MaxActiveOperationsPerSymbol { get; set; } = 1;
-        public FixedAmountAllocator(AssetSum amount, decimal maxInvestedPerSymbol, decimal maxInvested)
+        public FixedAmountAllocator(AssetAmount amount, decimal maxInvestedPerSymbol, decimal maxInvested)
         {
             MaxInvested = maxInvested;
             MaxInvestedPerSymbol = maxInvestedPerSymbol;
@@ -22,7 +22,7 @@ namespace SharpTrader.AlgoFramework
 
         public decimal MaxInvested { get; set; }
         public decimal MaxInvestedPerSymbol { get; set; }
-        public AssetSum Amount { get; set; }
+        public AssetAmount Amount { get; set; }
 
         public override void Update(TimeSlice slice)
         {
@@ -75,7 +75,7 @@ namespace SharpTrader.AlgoFramework
                         {
                             //create operations
                             var operType = signal.Kind == SignalKind.Buy ? OperationType.BuyThenSell : OperationType.SellThenBuy;
-                            var newOper = new Operation(TotalOperations.ToString(), signal, new AssetSum(Amount.Asset, budget), operType);
+                            var newOper = new Operation( TotalOperations.ToString(), signal, new AssetAmount(Amount.Asset, budget), operType);
                             newOper.OnNewTrade += (o, t) => { (symData.AllocatorData as MySymbolData).LastInvestmentTime = t.Time; };
                             slice.Add(newOper);
 

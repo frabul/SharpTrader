@@ -1,4 +1,7 @@
-﻿using System.Threading.Tasks;
+﻿using LiteDB;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Threading.Tasks;
 
 namespace SharpTrader.AlgoFramework
 {
@@ -17,5 +20,18 @@ namespace SharpTrader.AlgoFramework
             Algo = algo;
             return OnInitialize();
         }
-    } 
+
+        public virtual BsonDocument GetSerializationData(Signal signal)
+        {
+            return BsonMapper.Global.ToDocument<Signal>(signal);
+        }
+
+        public virtual Signal DeserializeSignal(BsonDocument doc)
+        {
+
+            return BsonMapper.Global.Deserialize<Signal>(doc);
+        }
+
+        public abstract void RegisterSerializationMappers(BsonMapper mapper);
+    }
 }

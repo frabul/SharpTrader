@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LiteDB;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,7 +15,11 @@ namespace SharpTrader.AlgoFramework
         {
             return Task.CompletedTask;
         }
+        public override void RegisterSerializationMappers(BsonMapper mapper)
+        {
+            mapper.RegisterType<MyOperationData>(o => new BsonValue(), bson => null);
 
+        }
         public override Task CancelEntryOrders()
         {
             return Task.CompletedTask;
@@ -39,7 +44,7 @@ namespace SharpTrader.AlgoFramework
             return Task.CompletedTask;
         }
 
-        internal override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
+        public override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
         {
             return 0m;
         }
@@ -84,11 +89,11 @@ namespace SharpTrader.AlgoFramework
                 }
 
                 //check if entry needed
-                if (!operation.EntryFulfilled && Algo.Time < operation.Signal.ExpireDate)
+                if (operation.AmountInvested <= 0 && Algo.Time < operation.Signal.ExpireDate)
                 {
                     var gotEntry = operation.Type == OperationType.BuyThenSell ?
                                      (decimal)symData.Feed.Ask <= operation.Signal.PriceEntry :
-                                     (decimal)symData.Feed.Bid >= operation.Signal.PriceEntry; 
+                                     (decimal)symData.Feed.Bid >= operation.Signal.PriceEntry;
                     //todo  check if the last entry order was effectively executed
                     //check if we have already sent an order
                     if (execData.LastEntryOrder != null)
@@ -98,7 +103,7 @@ namespace SharpTrader.AlgoFramework
                         {
                             //TODO check requirements for order: price precision, minimum amount, min notional, available money
                             var ticket = await Algo.Market.MarketOrderAsync(symbol.Key, execData.EntryDirection, amount, operation.GetNewOrderId());
-                            if (ticket.Status == MarketOperationStatus.Completed)
+                            if (ticket.Status == RequestStatus.Completed)
                             {
                                 //Market order was executed - we should expect the trade on next update 
                                 execData.LastEntryOrder = ticket.Result;
@@ -124,7 +129,7 @@ namespace SharpTrader.AlgoFramework
                         var amount = operation.AmountRemaining;
                         //TODO check requirements for order: price precision, minimum amount, min notional, available money
                         var ticket = await Algo.Market.MarketOrderAsync(symbol.Key, execData.ExitDirection, amount, operation.GetNewOrderId());
-                        if (ticket.Status == MarketOperationStatus.Completed)
+                        if (ticket.Status == RequestStatus.Completed)
                         {
                             //Market order was executed - we should expect the trade on next update 
                             execData.LastExitOrder = ticket.Result;
@@ -137,9 +142,7 @@ namespace SharpTrader.AlgoFramework
                 }
             }
         }
-
-
-
+         
         class MyOperationData
         {
             public IOrder LastEntryOrder;

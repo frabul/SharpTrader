@@ -7,6 +7,7 @@ using BinanceExchange.API.Models.Response.Error;
 using BinanceExchange.API.Models.WebSocket;
 using BinanceExchange.API.Websockets;
 using LiteDB;
+using Newtonsoft.Json.Linq;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -20,43 +21,21 @@ using be = BinanceExchange.API;
 
 namespace SharpTrader
 {
-    public class QuoteTick : IBaseData
-    {
-        public double Bid { get; }
-        public double Ask { get; }
-        public DateTime Time { get; }
-
-        public double Value => Bid;
-
-        public MarketDataKind Kind => MarketDataKind.QuoteTick;
-
-        public double Low => Bid;
-
-        public double High => Bid;
-
-        public QuoteTick(double bid, double ask, DateTime eventTime)
-        {
-            this.Bid = bid;
-            this.Ask = ask;
-            this.Time = eventTime;
-        }
-    }
-
-    public class BinanceMarketApi : IMarketApi
+    public partial class BinanceMarketApi : IMarketApi
     {
         public event Action<IMarketApi, ITrade> OnNewTrade;
 
         private readonly object LockOrdersTrades = new object();
         private readonly object LockBalances = new object();
-        private readonly List<ApiOrder> OrdersActive = new List<ApiOrder>();
+        private readonly List<Order> OrdersActive = new List<Order>();
         private readonly Stopwatch StopwatchSocketClose = new Stopwatch();
         private readonly Stopwatch UserDataPingStopwatch = new Stopwatch();
         private readonly Dictionary<string, long> UpdatedTrades = new Dictionary<string, long>();
 
-        private LiteCollection<ApiOrder> Orders;
-        private LiteCollection<ApiTrade> Trades;
-        private LiteCollection<ApiOrder> OrdersArchive;
-        private LiteCollection<ApiTrade> TradesArchive;
+        private ILiteCollection<Order> Orders;
+        private ILiteCollection<Trade> Trades;
+        private ILiteCollection<Order> OrdersArchive;
+        private ILiteCollection<Trade> TradesArchive;
         private HistoricalRateDataBase HistoryDb;
         private BinanceWebSocketClient WSClient;
         private CombinedWebSocketClient CombinedWebSocketClient;
@@ -190,15 +169,15 @@ namespace SharpTrader
                 lock (LockOrdersTrades)
                 {
                     TimeToArchive = Time - TimeSpan.FromDays(30);
-                    List<ApiOrder> ordersToMove = Orders.Find(o => o.Time < TimeToArchive).ToList();
-                    List<ApiTrade> tradesToMove = new List<ApiTrade>();
+                    List<Order> ordersToMove = Orders.Find(o => o.Time < TimeToArchive).ToList();
+                    List<Trade> tradesToMove = new List<Trade>();
                     foreach (var order in ordersToMove)
                     {
                         tradesToMove.AddRange(Trades.Find(t => t.OrderId == order.OrderId && t.Symbol == order.Symbol).ToArray());
                     }
                     foreach (var trade in tradesToMove.ToArray())
                     {
-                        Trades.Delete(tr => tr.Id == trade.Id);
+                        Trades.Delete(trade.Id);
                         if (TradesArchive.FindById(trade.Id) != null)
                             tradesToMove.Remove(trade);
 
@@ -206,16 +185,16 @@ namespace SharpTrader
 
                     foreach (var ord in ordersToMove.ToArray())
                     {
-                        Orders.Delete(o => o.Id == ord.Id);
+                        Orders.Delete(ord.Id);
                         if (OrdersArchive.FindById(ord.Id) != null)
                             ordersToMove.Remove(ord);
                     }
 
 
-                    TradesArchive.InsertBulk(tradesToMove);
-                    OrdersArchive.InsertBulk(ordersToMove);
+                    TradesArchive.Insert(tradesToMove);
+                    OrdersArchive.Insert(ordersToMove);
 
-                    TradesAndOrdersDb.Shrink();
+                    TradesAndOrdersDb.Rebuild();
                     LastOperationsArchivingTime = DateTime.Now;
                     TradesAndOrdersDb.Dispose();
                     TradesAndOrdersArch.Dispose();
@@ -238,14 +217,14 @@ namespace SharpTrader
             var dbs = new[] { TradesAndOrdersDb, TradesAndOrdersArch };
             foreach (var db in dbs)
             {
-                var orders = db.GetCollection<ApiOrder>("Orders");
+                var orders = db.GetCollection<Order>("Orders");
                 orders.EnsureIndex(o => o.Id, true);
                 orders.EnsureIndex(o => o.OrderId);
                 orders.EnsureIndex(o => o.Symbol);
                 orders.EnsureIndex(o => o.Filled);
                 orders.EnsureIndex(o => o.Status);
 
-                var trades = db.GetCollection<ApiTrade>("Trades");
+                var trades = db.GetCollection<Trade>("Trades");
                 trades.EnsureIndex(o => o.Id, true);
                 trades.EnsureIndex(o => o.TradeId);
                 trades.EnsureIndex(o => o.Symbol);
@@ -253,10 +232,10 @@ namespace SharpTrader
                 trades.EnsureIndex(o => o.TradeId);
             }
             //----
-            Orders = TradesAndOrdersDb.GetCollection<ApiOrder>("Orders");
-            Trades = TradesAndOrdersDb.GetCollection<ApiTrade>("Trades");
-            OrdersArchive = TradesAndOrdersArch.GetCollection<ApiOrder>("Orders");
-            TradesArchive = TradesAndOrdersArch.GetCollection<ApiTrade>("Trades");
+            Orders = TradesAndOrdersDb.GetCollection<Order>("Orders");
+            Trades = TradesAndOrdersDb.GetCollection<Trade>("Trades");
+            OrdersArchive = TradesAndOrdersArch.GetCollection<Order>("Orders");
+            TradesArchive = TradesAndOrdersArch.GetCollection<Trade>("Trades");
         }
 
         private async Task SynchAllOperations()
@@ -295,11 +274,11 @@ namespace SharpTrader
             var lastOrder = Orders.Find(o => o.Symbol == sym)?.OrderBy(o => o.OrderId).LastOrDefault();
             long start = (lastOrder != null) ? lastOrder.OrderId + 1 : 0;
             bool finish = false;
-            List<ApiOrder> orders = new List<ApiOrder>();
+            List<Order> orders = new List<Order>();
             while (!finish)
             {
                 var responses = await Client.GetAllOrders(new AllOrdersRequest() { OrderId = start, Symbol = sym });
-                var toInsert = responses.Select(or => new ApiOrder(or)).OrderBy(o => o.OrderId).ToArray();
+                var toInsert = responses.Select(or => new Order(or)).OrderBy(o => o.OrderId).ToArray();
                 orders.AddRange(toInsert);
                 if (toInsert.Length > 0)
                     start = toInsert.LastOrDefault().OrderId + 1;
@@ -316,16 +295,16 @@ namespace SharpTrader
             var lastTrade = Trades.Find(o => o.Symbol == sym)?.OrderBy(o => o.TradeId).LastOrDefault();
             long start = (lastTrade != null) ? lastTrade.TradeId + 1 : 0;
             bool finish = false;
-            List<ApiTrade> trades = new List<ApiTrade>();
+            List<Trade> trades = new List<Trade>();
             while (!finish)
             {
                 var responses = await Client.GetAccountTrades(new AllTradesRequest() { FromId = start, Symbol = sym });
-                var toInsert = responses.Select(or => new ApiTrade(sym, or)).OrderBy(o => o.TradeId).ToArray();
+                var toInsert = responses.Select(or => new Trade(sym, or)).OrderBy(o => o.TradeId).ToArray();
                 foreach (var tr in toInsert)
                 {
                     var order = Orders.FindOne(o => o.OrderId == tr.OrderId);
                     if (order == null)
-                        order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder;
+                        order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as Order;
                     tr.ClientOrderId = order.ClientId;
                 }
 
@@ -382,12 +361,12 @@ namespace SharpTrader
         /// </summary> 
         private async Task SynchOpenOrders()
         {
-            MarketOperation<object> oper = new MarketOperation<object>(MarketOperationStatus.Completed);
+            Request<object> oper = new Request<object>(RequestStatus.Completed);
             try
             {
                 var resp = await Client.GetCurrentOpenOrders(new CurrentOpenOrdersRequest() { Symbol = null });
-                var allOpen = resp.Select(o => new ApiOrder(o));
-                ApiOrder[] toClose;
+                var allOpen = resp.Select(o => new Order(o));
+                Order[] toClose;
                 lock (LockOrdersTrades)
                 {
                     foreach (var newOrder in allOpen)
@@ -412,7 +391,7 @@ namespace SharpTrader
                     if (ord.Status <= OrderStatus.PartiallyFilled)
                     {
                         var orderUpdated =
-                            new ApiOrder(await Client.QueryOrder(new QueryOrderRequest() { OrderId = ord.OrderId, Symbol = ord.Symbol }));
+                            new Order(await Client.QueryOrder(new QueryOrderRequest() { OrderId = ord.OrderId, Symbol = ord.Symbol }));
                         ord.Update(orderUpdated);
                         OrdersUpdateOrInsert(orderUpdated);
                     }
@@ -451,10 +430,10 @@ namespace SharpTrader
                     if (!updatedAlready || lastOrderUpdate != lastOrder.OrderId || hasActiveOrders || force)
                     {
                         var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = 100 });
-                        var trades = resp.Select(tr => new ApiTrade(sym, tr));
+                        var trades = resp.Select(tr => new Trade(sym, tr));
                         foreach (var tr in trades)
                         {
-                            ApiOrder order;
+                            Order order;
                             lock (LockOrdersTrades)
                             {
                                 order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
@@ -463,7 +442,7 @@ namespace SharpTrader
                             }
                             // put out of lokc to prevent deadlock
                             if (order == null)
-                                order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as ApiOrder;
+                                order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as Order;
                             tr.ClientOrderId = order.ClientId;
 
                             lock (LockOrdersTrades)
@@ -554,7 +533,7 @@ namespace SharpTrader
 
         private void HandleOrderUpdateMsg(BinanceTradeOrderData msg)
         {
-            var newOrder = new ApiOrder(msg);
+            var newOrder = new Order(msg);
             //update or add in database 
             OrdersUpdateOrInsert(newOrder);
             OrdersActiveInsertOrUpdate(newOrder);
@@ -563,8 +542,8 @@ namespace SharpTrader
 
         private void HandleTradeUpdateMsg(BinanceTradeOrderData msg)
         {
-            var tradeUpdate = new ApiTrade(msg);
-            var ordUpdate = new ApiOrder(msg);
+            var tradeUpdate = new Trade(msg);
+            var ordUpdate = new Order(msg);
 
             var order = Orders.FindOne(o => o.Id == ordUpdate.Id);
             if (order != null)
@@ -583,7 +562,7 @@ namespace SharpTrader
             }
         }
 
-        private void OrdersUpdateOrInsert(ApiOrder newOrder)
+        private void OrdersUpdateOrInsert(Order newOrder)
         {
             lock (LockOrdersTrades)
             {
@@ -608,9 +587,9 @@ namespace SharpTrader
             }
         }
 
-        private void OrdersActiveInsertOrUpdate(ApiOrder newOrder)
+        private void OrdersActiveInsertOrUpdate(Order newOrder)
         {
-            ApiOrder oldOpen;
+            Order oldOpen;
             lock (LockOrdersTrades)
             {
                 oldOpen = OrdersActive.FirstOrDefault(oo => oo.Id == newOrder.Id);
@@ -627,7 +606,7 @@ namespace SharpTrader
             }
         }
 
-        private void TradesUpdateOrInsert(ApiTrade newTrade)
+        private void TradesUpdateOrInsert(Trade newTrade)
         {
             lock (LockOrdersTrades)
             {
@@ -687,7 +666,7 @@ namespace SharpTrader
                 return ex.Message;
         }
 
-        public Task<IMarketOperation<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
+        public Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
         {
             try
             {
@@ -705,45 +684,45 @@ namespace SharpTrader
                 lock (LockOrdersTrades)
                 {
                     var result = Trades.Find(tr => tr.TradeId > tradeId && tr.Symbol == symbol).ToArray<ITrade>();
-                    var ret = new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result);
-                    return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(ret);
+                    var ret = new Request<IEnumerable<ITrade>>(RequestStatus.Completed, result);
+                    return Task.FromResult<IRequest<IEnumerable<ITrade>>>(ret);
                 }
             }
             catch (Exception ex)
             {
-                var ret = new MarketOperation<IEnumerable<ITrade>>(GetExceptionErrorInfo(ex));
-                return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(ret);
+                var ret = new Request<IEnumerable<ITrade>>(GetExceptionErrorInfo(ex));
+                return Task.FromResult<IRequest<IEnumerable<ITrade>>>(ret);
             }
         }
 
-        public Task<IMarketOperation<IEnumerable<ITrade>>> GetAllTradesAsync(string symbol)
+        public Task<IRequest<IEnumerable<ITrade>>> GetAllTradesAsync(string symbol)
         {
             lock (LockOrdersTrades)
             {
                 var result = Trades.Find(tr => tr.Symbol == symbol).ToArray<ITrade>();
-                return Task.FromResult<IMarketOperation<IEnumerable<ITrade>>>(
-                    new MarketOperation<IEnumerable<ITrade>>(MarketOperationStatus.Completed, result));
+                return Task.FromResult<IRequest<IEnumerable<ITrade>>>(
+                    new Request<IEnumerable<ITrade>>(RequestStatus.Completed, result));
             }
         }
 
-        public async Task<IMarketOperation<IOrder>> OrderSynchAsync(string id)
+        public async Task<IRequest<IOrder>> OrderSynchAsync(string id)
         {
             try
             {
                 var res = DeconstructId(id);
                 var binOrd = await Client.QueryOrder(new QueryOrderRequest() { OrderId = res.id, Symbol = res.symbol });
-                var result = new ApiOrder(binOrd);
+                var result = new Order(binOrd);
                 OrdersUpdateOrInsert(result);
                 OrdersActiveInsertOrUpdate(result);
-                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, result);
+                return new Request<IOrder>(RequestStatus.Completed, result);
             }
             catch (Exception ex)
             {
-                return new MarketOperation<IOrder>(GetExceptionErrorInfo(ex));
+                return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
 
-        public async Task<IMarketOperation<IOrder>> GetOrderAsync(string id)
+        public async Task<IRequest<IOrder>> GetOrderAsync(string id)
         {
             try
             {
@@ -752,34 +731,34 @@ namespace SharpTrader
                 {
                     var res = DeconstructId(id);
                     var binOrd = await Client.QueryOrder(new QueryOrderRequest() { OrderId = res.id, Symbol = res.symbol });
-                    result = new ApiOrder(binOrd);
+                    result = new Order(binOrd);
                     OrdersUpdateOrInsert(result);
                 }
-                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, result);
+                return new Request<IOrder>(RequestStatus.Completed, result);
             }
             catch (Exception ex)
             {
-                return new MarketOperation<IOrder>(GetExceptionErrorInfo(ex));
+                return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
 
-        public Task<IMarketOperation<ITrade>> GetTradeAsync(string id)
+        public Task<IRequest<ITrade>> GetTradeAsync(string id)
         {
             try
             {
                 var result = Trades.FindOne(o => o.Id == id);
                 if (result == null)
                 {
-                    return Task.FromResult<IMarketOperation<ITrade>>(
-                        new MarketOperation<ITrade>($"Trade {id} not found"));
+                    return Task.FromResult<IRequest<ITrade>>(
+                        new Request<ITrade>($"Trade {id} not found"));
                 }
-                return Task.FromResult<IMarketOperation<ITrade>>(
-                    new MarketOperation<ITrade>(MarketOperationStatus.Completed, result));
+                return Task.FromResult<IRequest<ITrade>>(
+                    new Request<ITrade>(RequestStatus.Completed, result));
             }
             catch (Exception ex)
             {
-                return Task.FromResult<IMarketOperation<ITrade>>(
-                    new MarketOperation<ITrade>(GetExceptionErrorInfo(ex)));
+                return Task.FromResult<IRequest<ITrade>>(
+                    new Request<ITrade>(GetExceptionErrorInfo(ex)));
             }
         }
 
@@ -804,7 +783,7 @@ namespace SharpTrader
 
 
         MemoryCache Cache = new MemoryCache();
-        public async Task<IMarketOperation<decimal>> GetEquity(string asset)
+        public async Task<IRequest<decimal>> GetEquity(string asset)
         {
 
             try
@@ -846,7 +825,7 @@ namespace SharpTrader
                                 }
                             }
                         }
-                        return new MarketOperation<decimal>(MarketOperationStatus.Completed, val);
+                        return new Request<decimal>(RequestStatus.Completed, val);
                     }
                 }
                 else
@@ -854,18 +833,18 @@ namespace SharpTrader
                     var btceq = await GetEquity("BTC");
                     var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == asset + "BTC");
                     var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == "BTC" + asset);
-                    if (price1 != null && btceq.Status == MarketOperationStatus.Completed)
-                        return new MarketOperation<decimal>(MarketOperationStatus.Completed, (decimal)price1.Price / btceq.Result);
-                    else if (price2 != null && btceq.Status == MarketOperationStatus.Completed)
-                        return new MarketOperation<decimal>(MarketOperationStatus.Completed, (decimal)price2.Price * btceq.Result);
+                    if (price1 != null && btceq.Status == RequestStatus.Completed)
+                        return new Request<decimal>(RequestStatus.Completed, (decimal)price1.Price / btceq.Result);
+                    else if (price2 != null && btceq.Status == RequestStatus.Completed)
+                        return new Request<decimal>(RequestStatus.Completed, (decimal)price2.Price * btceq.Result);
                     else
-                        return new MarketOperation<decimal>("Unable to get the price of the symbol");
+                        return new Request<decimal>("Unable to get the price of the symbol");
                 }
             }
             catch (Exception ex)
             {
                 Debug.Assert(ex != null);
-                return new MarketOperation<decimal>(MarketOperationStatus.Failed);
+                return new Request<decimal>(RequestStatus.Failed);
             }
 
         }
@@ -917,7 +896,7 @@ namespace SharpTrader
             }
         }
 
-        public async Task<IMarketOperation<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
+        public async Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
         {
             ResultCreateOrderResponse newOrd;
             try
@@ -936,24 +915,24 @@ namespace SharpTrader
                         TimeInForce = TimeInForce.GTC
                     });
 
-                var no = new ApiOrder(newOrd);
+                var no = new Order(newOrd);
                 OrdersUpdateOrInsert(no);
                 OrdersActiveInsertOrUpdate(no);
-                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, no);
+                return new Request<IOrder>(RequestStatus.Completed, no);
             }
             catch (Exception ex)
             {
-                return new MarketOperation<IOrder>(GetExceptionErrorInfo(ex));
+                return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
 
-        public async Task<IMarketOperation<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null)
+        public async Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null)
         {
             var side = type == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell;
             try
             {
                 var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == symbol);
-                ApiOrder newOrd = null;
+                Order newOrd = null;
                 var ord = (ResultCreateOrderResponse)await Client.CreateOrder(
                         new CreateOrderRequest()
                         {
@@ -967,7 +946,7 @@ namespace SharpTrader
 
                 lock (LockOrdersTrades)
                 {
-                    newOrd = new ApiOrder(ord);
+                    newOrd = new Order(ord);
                     var oldOrd = Orders.FindOne(o => o.Id == newOrd.Id);
                     if (oldOrd != null)
                         newOrd = oldOrd;
@@ -980,21 +959,21 @@ namespace SharpTrader
                     var quoteBal = _Balances[symbolInfo.quoteAsset];
                     var assetBal = _Balances[symbolInfo.baseAsset];
                 }
-                 
-                return new MarketOperation<IOrder>(MarketOperationStatus.Completed, newOrd); 
+
+                return new Request<IOrder>(RequestStatus.Completed, newOrd);
             }
             catch (Exception ex)
             {
 
-                return new MarketOperation<IOrder>(GetExceptionErrorInfo(ex));
+                return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
 
-        public async Task<IMarketOperation> OrderCancelAsync(string id)
+        public async Task<IRequest> OrderCancelAsync(string id)
         {
             try
             {
-                ApiOrder order = null;
+                Order order = null;
                 order = this.Orders.FindOne(or => or.Id == id);
                 if (order != null)
                 {
@@ -1017,16 +996,16 @@ namespace SharpTrader
                         {
                             assetBal.Free += order.Amount - order.Filled;
                         }
-                        return new MarketOperation<object>(MarketOperationStatus.Completed, order);
+                        return new Request<object>(RequestStatus.Completed, order);
                     }
                 }
                 else
-                    return new MarketOperation<object>($"Unknown order {id}");
+                    return new Request<object>($"Unknown order {id}");
 
             }
             catch (Exception ex)
             {
-                return new MarketOperation<object>(GetExceptionErrorInfo(ex));
+                return new Request<object>(GetExceptionErrorInfo(ex));
             }
         }
 
@@ -1084,26 +1063,41 @@ namespace SharpTrader
             TradesAndOrdersArch.Dispose();
         }
 
-        class MarketOperation<T> : IMarketOperation<T>
+        public ITrade GetTradeById(string tradeId)
+        {
+            return Trades.FindById(tradeId);
+        }
+
+        public IOrder GetOrderById(string orderId)
+        {
+            return Orders.FindById(orderId);
+        }
+
+        public ITrade GetTradeById(JToken tradeId)
+        {
+            throw new NotImplementedException();
+        }
+
+        class Request<T> : IRequest<T>
         {
             public T Result { get; }
             public string ErrorInfo { get; internal set; }
-            public MarketOperationStatus Status { get; internal set; }
-            public bool IsSuccessful => Status == MarketOperationStatus.Completed;
-            public MarketOperation(MarketOperationStatus status)
+            public RequestStatus Status { get; internal set; }
+            public bool IsSuccessful => Status == RequestStatus.Completed;
+            public Request(RequestStatus status)
             {
                 Status = status;
 
             }
-            public MarketOperation(MarketOperationStatus status, T res)
+            public Request(RequestStatus status, T res)
             {
                 Status = status;
                 Result = res;
             }
 
-            public MarketOperation(string errorInfo)
+            public Request(string errorInfo)
             {
-                this.Status = MarketOperationStatus.Failed;
+                this.Status = RequestStatus.Failed;
                 ErrorInfo = errorInfo;
             }
         }
@@ -1307,7 +1301,7 @@ namespace SharpTrader
                     history.AddRecord(symbolHistory.Ticks.Current, true);
 
                 return history;
-            } 
+            }
 
             public void Dispose()
             {
@@ -1342,7 +1336,6 @@ namespace SharpTrader
                 }
                 return x;
             }
-
             public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal amount, decimal price)
             {
 
@@ -1370,204 +1363,11 @@ namespace SharpTrader
                     amount = 0;
 
                 amount = NearestRoundLower(amount, Symbol.LotSizeStep);
-                 
+
                 return (price / 1.00000000000m, amount / 1.000000000000m);
             }
         }
     }
 
-    class ApiOrder : IOrder
-    {
-        [BsonId]
-        public string Id { get; set; }
-        public string Symbol { get; set; }
-        public long OrderId { get; set; }
-        public decimal Filled { get; set; }
-        public string Market { get; set; }
-        public decimal Price { get; set; }
-        public decimal Amount { get; set; }
-        public string ClientId { get; set; }
-        public TradeDirection TradeType { get; set; }
-        public OrderType Type { get; set; }
-        public OrderStatus Status { get; internal set; } = OrderStatus.Pending;
-        public List<long> ResultingTrades { get; set; } = new List<long>();
-        public DateTime Time { get; set; }
 
-        public bool IsClosed => Status >= OrderStatus.Cancelled;
-
-        public ApiOrder() { }
-
-        public ApiOrder(AcknowledgeCreateOrderResponse binanceOrder)
-        {
-            OrderId = binanceOrder.OrderId;
-            ClientId = binanceOrder.ClientOrderId;
-            Symbol = binanceOrder.Symbol;
-            Time = binanceOrder.TransactionTime;
-            Market = "Binance";
-            Id = Symbol + OrderId;
-        }
-
-        public ApiOrder(ResultCreateOrderResponse binanceOrder)
-        {
-            OrderId = binanceOrder.OrderId;
-            ClientId = binanceOrder.ClientOrderId;
-            Symbol = binanceOrder.Symbol;
-            Market = "Binance";
-
-            TradeType = binanceOrder.Side == OrderSide.Buy ? TradeDirection.Buy : TradeDirection.Sell;
-            Type = GetOrderType(binanceOrder.Type);
-            Amount = binanceOrder.OriginalQuantity;
-            Price = binanceOrder.Price;
-            Status = GetStatus(binanceOrder.Status);
-            Filled = binanceOrder.ExecutedQuantity;
-            Id = Symbol + OrderId;
-            Time = binanceOrder.TransactionTime;
-        }
-
-        public ApiOrder(OrderResponse or)
-        {
-            Symbol = or.Symbol;
-            Market = "Binance";
-            TradeType = or.Side == OrderSide.Buy ? TradeDirection.Buy : TradeDirection.Sell;
-            Type = GetOrderType(or.Type);
-            Amount = or.OriginalQuantity;
-            Price = or.Price;
-            Status = GetStatus(or.Status);
-            Filled = or.ExecutedQuantity;
-            OrderId = or.OrderId;
-            Id = Symbol + OrderId;
-            ClientId = or.ClientOrderId;
-            Time = or.Time;
-        }
-
-        public ApiOrder(BinanceTradeOrderData bo)
-        {
-            OrderId = bo.OrderId;
-            Symbol = bo.Symbol;
-            Market = "Binance";
-            TradeType = bo.Side == OrderSide.Buy ? TradeDirection.Buy : TradeDirection.Sell;
-            Type = GetOrderType(bo.Type);
-            Amount = bo.Quantity;
-            Price = bo.Price;
-            Status = GetStatus(bo.OrderStatus);
-            Filled = bo.AccumulatedQuantityOfFilledTradesThisOrder;
-            Id = Symbol + OrderId;
-            ClientId = bo.NewClientOrderId;
-            Time = bo.EventTime;
-        }
-
-        private static OrderType GetOrderType(be.Enums.OrderType type)
-        {
-            switch (type)
-            {
-                case be.Enums.OrderType.Limit:
-                    return OrderType.Limit;
-                case be.Enums.OrderType.Market:
-                    return OrderType.Market;
-                case be.Enums.OrderType.StopLoss:
-                    return OrderType.StopLoss;
-                case be.Enums.OrderType.StopLossLimit:
-                    return OrderType.StopLossLimit;
-                case be.Enums.OrderType.TakeProfit:
-                    return OrderType.TakeProfit;
-                case be.Enums.OrderType.TakeProfitLimit:
-                    return OrderType.TakeProfitLimit;
-                case be.Enums.OrderType.LimitMaker:
-                    return OrderType.LimitMaker;
-                default:
-                    return OrderType.Unknown;
-            }
-        }
-
-        private static OrderStatus GetStatus(be.Enums.OrderStatus status)
-        {
-            switch (status)
-            {
-                case be.Enums.OrderStatus.New:
-                    return OrderStatus.Pending;
-                case be.Enums.OrderStatus.PartiallyFilled:
-                    return OrderStatus.PartiallyFilled;
-                case be.Enums.OrderStatus.Filled:
-                    return OrderStatus.Filled;
-                case be.Enums.OrderStatus.Cancelled:
-                    return OrderStatus.Cancelled;
-                case be.Enums.OrderStatus.PendingCancel:
-                    return OrderStatus.PendingCancel;
-                case be.Enums.OrderStatus.Rejected:
-                    return OrderStatus.Rejected;
-                case be.Enums.OrderStatus.Expired:
-                    return OrderStatus.Expired;
-                default:
-                    throw new Exception("Unknown order status");
-            }
-        }
-
-        internal void Update(ApiOrder order)
-        {
-            this.Status = order.Status;
-            this.Filled = order.Filled;
-        }
-    }
-
-    class ApiTrade : ITrade
-    {
-        public ApiTrade()
-        {
-
-        }
-        public ApiTrade(string symbol, AccountTradeReponse tr)
-        {
-            Market = "Binance";
-            Symbol = symbol;
-            Direction = tr.IsBuyer ? TradeDirection.Buy : TradeDirection.Sell;
-            Price = tr.Price;
-            Amount = tr.Quantity;
-            Commission = tr.Commission;
-            CommissionAsset = tr.CommissionAsset;
-            Time = tr.Time;
-            OrderId = tr.OrderId;
-            TradeId = tr.Id;
-            Id = Symbol + TradeId;
-        }
-
-        public ApiTrade(BinanceTradeOrderData tr)
-        {
-            Market = "Binance";
-            Symbol = tr.Symbol;
-            Direction = tr.Side == OrderSide.Buy ? TradeDirection.Buy : TradeDirection.Sell;
-            Price = tr.PriceOfLastFilledTrade;
-            Amount = tr.QuantityOfLastFilledTrade;
-            Commission = Commission;
-            CommissionAsset = CommissionAsset;
-            Time = tr.TimeStamp;
-            OrderId = tr.OrderId;
-            ClientOrderId = tr.NewClientOrderId;
-            TradeId = tr.TradeId;
-            Id = Symbol + TradeId;
-        }
-        [BsonId]
-        public string Id { get; set; }
-        public long TradeId { get; set; }
-        public long OrderId { get; set; }
-        public string ClientOrderId { get; set; }
-        public decimal Amount { get; set; }
-        public decimal Commission { get; set; }
-        public string Market { get; set; }
-        public decimal Price { get; set; }
-        public string Symbol { get; set; }
-        public TradeDirection Direction { get; set; }
-        public string CommissionAsset { get; set; }
-        public DateTime Time { get; set; }
-
-        [BsonIgnore]
-        string ITrade.OrderId => Symbol + OrderId;
-    }
-
-    class AssetBalance
-    {
-        public string Asset;
-        public decimal Free;
-        public decimal Locked;
-        public decimal Total => Free + Locked;
-    }
 }

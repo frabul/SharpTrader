@@ -1,4 +1,7 @@
-﻿using System.Threading.Tasks;
+﻿using LiteDB;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Threading.Tasks;
 
 namespace SharpTrader.AlgoFramework
 {
@@ -13,6 +16,11 @@ namespace SharpTrader.AlgoFramework
             Algo = algo;
             return OnInitialize();
         }
+
+        internal virtual JToken GetSerializationData(object riskManagerData) { throw new NotImplementedException(); }
+        internal virtual object DeserializeOperationData(JToken jToken) { throw new NotImplementedException(); }
+
+        public abstract void RegisterSerializationMappers(BsonMapper mapper);
     }
 
 }

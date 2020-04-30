@@ -19,6 +19,7 @@ namespace SharpTrader.Indicators
         public AverageTrueRange(string name, int period, TimeSerieNavigator<ITradeBar> chart, DateTime warmUpTime) :
            base(name, chart, warmUpTime)
         {
+            TrueRanges = new RollingWindow<IndicatorDataPoint>(period + 1);
             Period = period;
             TrueRange = new TrueRange($"{name} Companion");
 
