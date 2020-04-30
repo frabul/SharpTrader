@@ -885,10 +885,14 @@ namespace SharpTrader
         /// </summary>
         public static readonly ColorARGB YellowGreen = ColorARGB.FromUInt32(0xFF9ACD32);
     }
+
     public struct Point
     {
         public Point(DateTime x, double y) { X = x; Y = y; }
         public DateTime X { get; }
         public double Y { get; }
     }
+
+
+    
 }

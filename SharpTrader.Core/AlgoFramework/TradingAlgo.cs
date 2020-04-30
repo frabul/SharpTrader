@@ -300,24 +300,24 @@ namespace SharpTrader.AlgoFramework
 
             BsonMapper mapper = BsonMapper.Global;
             BsonMapper defaultMapper = new BsonMapper();
-
+            Market.RegisterSerializationHandlers(mapper);
             //register symbol info mapper
             mapper.RegisterType<SymbolInfo>(o => defaultMapper.Serialize(o.Key), bson => Market.GetSymbols().FirstOrDefault(s => s.Key == bson.AsString));
-         
+
 
             //---- add mapper for operations
             BsonValue SerializeOp(Operation op)
             {
                 var document = defaultMapper.ToDocument(op);
-                document["AllTrades"] = new BsonArray(op.AllTrades.Select(tr =>  new BsonValue(tr.Id)));
+                document["AllTrades"] = new BsonArray(op.AllTrades.Select(tr => mapper.Serialize(tr)));
                 return document;
             }
             Operation DeserializeOp(BsonValue bson)
             {
                 var op = defaultMapper.Deserialize<Operation>(bson);
-                var allTrades = mapper.Deserialize<ITrade[]>(bson["AllTrades"]);
+                var allTrades = mapper.Deserialize<object[]>(bson["AllTrades"]);
                 foreach (var trade in allTrades)
-                    op.AddTrade(trade);
+                    op.AddTrade(trade as ITrade);
                 return op;
             }
             mapper.RegisterType<Operation>(SerializeOp, DeserializeOp);

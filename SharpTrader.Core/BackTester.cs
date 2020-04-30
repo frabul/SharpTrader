@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using SharpTrader.AlgoFramework;
 using SharpTrader.Indicators;
+using SharpTrader.MarketSimulator;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

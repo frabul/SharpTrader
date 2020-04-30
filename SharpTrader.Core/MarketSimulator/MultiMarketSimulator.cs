@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpTrader
+namespace SharpTrader.MarketSimulator
 {
     public partial class MultiMarketSimulator : IMarketsManager
     {
@@ -140,6 +140,13 @@ namespace SharpTrader
         public class Configuration
         {
             public MarketConfiguration[] Markets { get; set; }
+        }
+
+        public IEnumerable<ITrade> Trades => Markets.SelectMany(m => m.Trades);
+
+        public decimal GetEquity(string baseAsset)
+        {
+            return Markets.Sum(m => m.GetEquity(baseAsset).Result.Result);
         }
     }
 
