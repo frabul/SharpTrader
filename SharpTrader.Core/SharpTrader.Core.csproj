@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\LiteDB\LiteDB\LiteDB.csproj" />
     <ProjectReference Include="..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj" />
+    <ProjectReference Include="..\InteractiveBrokers\TWSClient\TWSClient.csproj" />
   </ItemGroup>
 
 </Project>
