@@ -23,8 +23,8 @@ namespace SharpTrader.AlgoFramework
 
             public HashSet<string> AllEntries { get; set; } = new HashSet<string>();
             public HashSet<string> AllExits { get; set; } = new HashSet<string>();
-            [BsonIgnore] public List<IOrder> LiquidationOrders { get; set; } = new List<IOrder>();
-         
+            public List<IOrder> LiquidationOrders { get; set; } = new List<IOrder>();
+
             public IOrder CurrentEntryOrder
             {
                 get => currentEntryOrder;
@@ -35,7 +35,7 @@ namespace SharpTrader.AlgoFramework
                     currentEntryOrder = value;
                 }
             }
-             
+
             public IOrder CurrentExitOrder
             {
                 get => currentExitOrder;
@@ -48,9 +48,10 @@ namespace SharpTrader.AlgoFramework
                 }
             }
 
-            [BsonIgnore] internal DeferredTask OperationManager;
-            [BsonIgnore] internal DeferredTask EntryManager;
-            [BsonIgnore] internal DeferredTask ExitManager;
+            [BsonIgnore] internal bool Initialized { get; set; }
+            [BsonIgnore] internal DeferredTask OperationManager { get; set; }
+            [BsonIgnore] internal DeferredTask EntryManager { get; set; }
+            [BsonIgnore] internal DeferredTask ExitManager { get; set; }
         }
         public MarketMakerOperationManager(decimal entryDistantThreshold, decimal entryNearThreshold)
         {
@@ -61,7 +62,7 @@ namespace SharpTrader.AlgoFramework
 
         public override void RegisterSerializationHandlers(BsonMapper mapper)
         {
-            
+
         }
 
         public decimal EntryDistantThreshold { get; private set; }
@@ -75,15 +76,24 @@ namespace SharpTrader.AlgoFramework
             {
                 myOpData = new MyOperationData();
                 op.ExecutorData = myOpData;
-                op.OnResumed += (o) => InitOpTasks(o, o.ExecutorData as MyOperationData);
-                InitOpTasks(op, myOpData);
             }
+
+            InitOpTasks(op, myOpData);
             return myOpData;
         }
 
         private void InitOpTasks(Operation op, MyOperationData myOpData)
         {
+            if (myOpData.Initialized)
+                return;
+
+        
+            op.OnResumed += (o) => InitOpTasks(o, o.ExecutorData as MyOperationData);
+
+            myOpData.Initialized = true;
+
             var symData = Algo.SymbolsData[op.Symbol.Key];
+
             if (myOpData.OperationManager == null)
                 myOpData.OperationManager =
                     new DeferredTask()
@@ -93,6 +103,7 @@ namespace SharpTrader.AlgoFramework
                         SymbolData = symData,
                         Next = MonitorOperation,
                     };
+
             if (myOpData.EntryManager == null)
                 myOpData.EntryManager =
                     new DeferredTask()
@@ -617,7 +628,7 @@ namespace SharpTrader.AlgoFramework
 
 
         internal delegate Task<bool> DeferredTaskDelegate(DeferredTask self);
-   
+
         internal class DeferredTask
         {
             public dynamic State = new ExpandoObject();

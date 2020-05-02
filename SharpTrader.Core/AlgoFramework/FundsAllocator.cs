@@ -1,9 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using LiteDB;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace SharpTrader.AlgoFramework
 {
-    public abstract class FundsAllocator
+    public abstract class FundsAllocator : IObjectSerializationProvider
     {
         public Dictionary<string, List<Operation>> Operations { get; private set; } = new Dictionary<string, List<Operation>>();
         public TradingAlgo Algo { get; private set; }
@@ -26,7 +27,7 @@ namespace SharpTrader.AlgoFramework
         /// </summary> 
         public virtual void RestoreState(object state) { }
 
-
+        public virtual void RegisterSerializationHandlers(BsonMapper mapper) { }
     }
 
 }

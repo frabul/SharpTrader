@@ -32,20 +32,7 @@ namespace SharpTrader.AlgoFramework
         private Signal _Signal;
         private HashSet<ITrade> _Entries = new HashSet<ITrade>();
         private HashSet<ITrade> _Exits = new HashSet<ITrade>();
-
-        /// <summary>
-        /// All trades associated with this operation
-        /// </summary> 
-        public IEnumerable<ITrade> AllTrades => _Entries.Concat(Exits);
-        /// <summary>
-        /// Trades that were meant as entries
-        /// </summary>
-        [BsonIgnore] public IEnumerable<ITrade> Entries => _Entries;
-        /// <summary>
-        /// Trades that were meant as exits
-        /// </summary>
-        [BsonIgnore] public IEnumerable<ITrade> Exits => _Exits;
-
+         
         public int OrdersCount { get; private set; } = 0;
         /// <summary>
         /// Unique identifier for this operation
@@ -79,21 +66,39 @@ namespace SharpTrader.AlgoFramework
         public decimal QuoteAmountRemaining { get; private set; }
         public OperationType Type { get; private set; }
         [BsonIgnore] public SymbolInfo Symbol => Signal.Symbol;
-        public bool RiskManaged { get; internal set; }
+        public bool RiskManaged { get; set; }
         public object ExecutorData { get; set; }
-        public object RiskManagerData { get; internal set; }
-        public TradeDirection EntryTradeDirection { get; internal set; }
-        public TradeDirection ExitTradeDirection { get; internal set; }
+        public object RiskManagerData { get; set; }
+        public TradeDirection EntryTradeDirection { get; private set; }
+        public TradeDirection ExitTradeDirection { get; private set; }
         public bool IsClosed { get; private set; }
         public bool IsClosing { get; private set; }
         public DateTime CloseDeadTime { get; private set; } = DateTime.MaxValue;
         public DateTime LastInvestmentTime { get; private set; }
-
-
-        [BsonCtor]
-        internal Operation(string id)
+        /// <summary>
+        /// All trades associated with this operation
+        /// </summary> 
+        [BsonIgnore]
+        public IEnumerable<ITrade> AllTrades
         {
-            this.Id = id;
+            get => _Entries.Concat(Exits);
+       
+             
+        }
+        /// <summary>
+        /// Trades that were meant as entries
+        /// </summary>
+        public IEnumerable<ITrade> Entries { get => _Entries; private set => _Entries = new HashSet<ITrade>(value); }//private setter used by serialization
+        /// <summary>
+        /// Trades that were meant as exits
+        /// </summary>
+        public IEnumerable<ITrade> Exits { get => _Exits; private set => _Exits = new HashSet<ITrade>(value); }//private setter used by serialization
+
+
+
+        public Operation( )
+        {
+        
         }
 
         public Operation(string id, Signal signal, AssetAmount amountTarget, OperationType type)

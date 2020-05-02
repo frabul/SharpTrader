@@ -20,7 +20,9 @@ namespace SharpTrader.AlgoFramework
         }
 
         public decimal MaxInvested { get; set; }
+
         public decimal MaxInvestedPerSymbol { get; set; }
+
         public AssetAmount Amount { get; set; }
 
         public override void Update(TimeSlice slice)

@@ -6,11 +6,12 @@ using System.Dynamic;
 namespace SharpTrader.AlgoFramework
 {
     public class Signal
-    { 
+    {
         public event Action<Signal> OnModify;
 
-        public Signal(string Id, SymbolInfo symbol, SignalKind kind, DateTime creationTime)
+        public Signal(string id, SymbolInfo symbol, SignalKind kind, DateTime creationTime)
         {
+            Id = id;
             Symbol = symbol;
             Kind = kind;
             CreationTime = creationTime;
@@ -18,8 +19,7 @@ namespace SharpTrader.AlgoFramework
 
         /// <summary>
         /// Constructor dedicated to serialization
-        /// </summary>
-        [BsonCtor]
+        /// </summary> 
         internal Signal(string id)
         {
             Id = id;
