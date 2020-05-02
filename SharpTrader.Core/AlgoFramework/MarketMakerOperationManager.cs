@@ -16,6 +16,42 @@ namespace SharpTrader.AlgoFramework
         //todo ogni volta che viene cancellato un ordine si deve aspettare del tempo prima di crearne uno nuovo
         NLog.Logger Logger;
         public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(5);
+        public class MyOperationData
+        {
+            private IOrder currentExitOrder;
+            private IOrder currentEntryOrder;
+
+            public HashSet<string> AllEntries { get; set; } = new HashSet<string>();
+            public HashSet<string> AllExits { get; set; } = new HashSet<string>();
+            [BsonIgnore] public List<IOrder> LiquidationOrders { get; set; } = new List<IOrder>();
+         
+            public IOrder CurrentEntryOrder
+            {
+                get => currentEntryOrder;
+                set
+                {
+                    if (value != null)
+                        AllEntries.Add(value.Id);
+                    currentEntryOrder = value;
+                }
+            }
+             
+            public IOrder CurrentExitOrder
+            {
+                get => currentExitOrder;
+                set
+                {
+                    if (value != null)
+                        AllExits.Add(value.Id);
+                    currentExitOrder = value;
+
+                }
+            }
+
+            [BsonIgnore] internal DeferredTask OperationManager;
+            [BsonIgnore] internal DeferredTask EntryManager;
+            [BsonIgnore] internal DeferredTask ExitManager;
+        }
         public MarketMakerOperationManager(decimal entryDistantThreshold, decimal entryNearThreshold)
         {
             Logger = NLog.LogManager.GetLogger(nameof(MarketMakerOperationManager));
@@ -23,10 +59,10 @@ namespace SharpTrader.AlgoFramework
             EntryNearThreshold = entryNearThreshold;
         }
 
-        public override void RegisterSerializationMappers(BsonMapper mapper)
+        public override void RegisterSerializationHandlers(BsonMapper mapper)
         {
-             
-        } 
+            
+        }
 
         public decimal EntryDistantThreshold { get; private set; }
 
@@ -579,46 +615,9 @@ namespace SharpTrader.AlgoFramework
             return total;
         }
 
-        public class MyOperationData
-        {
-            private IOrder currentExitOrder;
-            private IOrder currentEntryOrder;
-
-            public HashSet<string> AllEntries { get; set; } = new HashSet<string>();
-            public HashSet<string> AllExits { get; set; } = new HashSet<string>();
-            [BsonIgnore] public List<IOrder> LiquidationOrders { get; set; } = new List<IOrder>();
-            [BsonIgnore]
-            public IOrder CurrentEntryOrder
-            {
-                get => currentEntryOrder;
-                set
-                {
-                    if (value != null)
-                        AllEntries.Add(value.Id);
-                    currentEntryOrder = value;
-                }
-            }
-
-            [BsonIgnore]
-            public IOrder CurrentExitOrder
-            {
-                get => currentExitOrder;
-                set
-                {
-                    if (value != null)
-                        AllExits.Add(value.Id);
-                    currentExitOrder = value;
-
-                }
-            }
-
-            [BsonIgnore] internal DeferredTask OperationManager;
-            [BsonIgnore] internal DeferredTask EntryManager;
-            [BsonIgnore] internal DeferredTask ExitManager; 
-        }
 
         internal delegate Task<bool> DeferredTaskDelegate(DeferredTask self);
-
+   
         internal class DeferredTask
         {
             public dynamic State = new ExpandoObject();

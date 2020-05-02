@@ -406,21 +406,19 @@ namespace SharpTrader.MarketSimulator
             return ClosedOrders.Concat(PendingOrders).FirstOrDefault(o => o.Id == orderId);
         }
 
-
-
-        List<Order> DeserializedOrders = new List<Order>();
-        List<Trade> DeserializedTrades = new List<Trade>();
+        private List<Order> DeserializedOrders = new List<Order>();
+        private List<Trade> DeserializedTrades = new List<Trade>();
 
         public void RegisterSerializationHandlers(BsonMapper mapper)
         {
             //this implementation is only for testing as the simulator doesn't save it's state 
             BsonMapper defaultMapper = new BsonMapper();
-            
-            BsonValue OrderToBson( Order order)
+
+            BsonValue OrderToBson(Order order)
             {
                 return defaultMapper.Serialize(typeof(IOrder), order);
             }
-            
+
             Order BsonToOrder(BsonValue value)
             {
                 var order = DeserializedOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
@@ -428,12 +426,12 @@ namespace SharpTrader.MarketSimulator
                     DeserializedOrders.Add(order = defaultMapper.Deserialize<Order>(value));
                 return order;
             }
-            
+
             BsonValue SerializeTrade(Trade trade)
             {
                 return defaultMapper.Serialize(typeof(ITrade), trade);
             }
-            
+
             Trade DeserializeTrade(BsonValue value)
             {
                 var trade = DeserializedTrades.FirstOrDefault(o => o.Id == value["_id"].AsString);
@@ -442,7 +440,7 @@ namespace SharpTrader.MarketSimulator
                 return trade;
             }
 
-            mapper.RegisterType<Order>(OrderToBson,BsonToOrder);
+            mapper.RegisterType<Order>(OrderToBson, BsonToOrder);
             mapper.RegisterType<Trade>(SerializeTrade, DeserializeTrade);
         }
     }

@@ -18,6 +18,12 @@ namespace SharpTrader.AlgoFramework
             public string Name { get; set; } = "Unnamed";
             public bool SaveData { get; set; } = false;
         }
+        class NonVolatileVars
+        {
+            public long TotalOperations { get; set; }
+            public long TotalSignals { get; set; }
+        }
+
         //todo the main components should be allowed to be set only during Initialize 
         private Dictionary<string, SymbolData> _SymbolsData = new Dictionary<string, SymbolData>();
         private TimeSlice WorkingSlice = new TimeSlice();
@@ -25,8 +31,8 @@ namespace SharpTrader.AlgoFramework
         private List<Operation> _ActiveOperations = new List<Operation>();
         private NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private Configuration Config;
-        private LiteDatabase Db;
-
+        private LiteDatabase Db; 
+        private NonVolatileVars State = new NonVolatileVars();
 
         public string Name => Config.Name;
         public string MyDataDir => Path.Combine(Config.DataDir, Config.Name);
@@ -46,13 +52,11 @@ namespace SharpTrader.AlgoFramework
         public bool IsTradingStopped { get; private set; } = false;
         public bool IsPlottingEnabled { get; set; } = false;
 
-
         public TradingAlgo(IMarketApi marketApi, Configuration config)
         {
             Config = config;
             Market = marketApi;
             Market.OnNewTrade += Market_OnNewTrade;
-
         }
 
         public async Task Initialize()
@@ -64,7 +68,6 @@ namespace SharpTrader.AlgoFramework
             //call on initialize
             await this.OnInitialize();
         }
-
 
         protected abstract Task OnInitialize();
 
@@ -197,9 +200,25 @@ namespace SharpTrader.AlgoFramework
                 await RiskManager.Update(slice);
         }
 
-        public Task Stop()
+
+        public string GetNewOperationId()
         {
-            throw new NotImplementedException();
+            return (State.TotalOperations++).ToString();
+        }
+
+        public string GetNewSignalId()
+        {
+            return (State.TotalSignals++).ToString();
+        }
+
+        public async Task Stop()
+        {
+            await this.StopEntries();
+            foreach (var op in this.ActiveOperations)
+            {
+                await this.Executor.CancelAllOrders(op);
+                await this.RiskManager.CancelAllOrders(op);
+            }
         }
 
         private SymbolData GetSymbolData(SymbolInfo sym)
@@ -283,14 +302,12 @@ namespace SharpTrader.AlgoFramework
         {
 
         }
-
         public void SaveState()
         {
 
-
-
         }
 
+        private List<Signal> SignalsDeserialized = new List<Signal>();
         public void ReloadSavedState()
         {
             var dbPath = Path.Combine(MyDataDir, "MyData.db");
@@ -300,10 +317,25 @@ namespace SharpTrader.AlgoFramework
 
             BsonMapper mapper = BsonMapper.Global;
             BsonMapper defaultMapper = new BsonMapper();
+            //todo register mapper for custom components
             Market.RegisterSerializationHandlers(mapper);
+            this.Executor?.RegisterSerializationHandlers(mapper);
+            this.RiskManager?.RegisterSerializationHandlers(mapper);
+            this.Sentry?.RegisterSerializationHandlers(mapper);
+
             //register symbol info mapper
             mapper.RegisterType<SymbolInfo>(o => defaultMapper.Serialize(o.Key), bson => Market.GetSymbols().FirstOrDefault(s => s.Key == bson.AsString));
 
+            //---- add mapper for signals
+            //this mappers 
+            BsonValue serializeSignal(Signal signal) => defaultMapper.Serialize(signal); 
+            Signal deserializeSignal(BsonValue bson){
+                var signal = SignalsDeserialized.FirstOrDefault(s => s.Id == bson["Id"].AsString);
+                if (signal == null)
+                    signal = defaultMapper.Deserialize<Signal>(bson);
+                return signal;
+            }
+            mapper.RegisterType<Signal>(serializeSignal, deserializeSignal);
 
             //---- add mapper for operations
             BsonValue SerializeOp(Operation op)
@@ -322,13 +354,6 @@ namespace SharpTrader.AlgoFramework
             }
             mapper.RegisterType<Operation>(SerializeOp, DeserializeOp);
 
-
-            //todo register mapper for custom components
-            this.Executor?.RegisterSerializationMappers(mapper);
-            this.RiskManager?.RegisterSerializationMappers(mapper);
-            this.Sentry?.RegisterSerializationMappers(mapper);
-
-
             //rebuild symbols data
             foreach (var symData in Db.GetCollection<SymbolData>("SymbolsData").FindAll())
                 _SymbolsData[symData.Id] = symData;
@@ -343,13 +368,50 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
+        protected virtual object GetState() { return new object(); }
+        protected virtual void RestoreState(object state) { }
+
+        public void SaveNonVolatileVars()
+        {
+            //save my internal state
+            BsonDocument states = new BsonDocument();
+            states["_id"] = "TradingAlgoState"; 
+            states["State"] = Db.Mapper.Serialize(State);
+            
+            //Save derived state  
+            states["DerivedClassState"] = Db.Mapper.Serialize(GetState()); 
+
+            //save module states 
+            states["Sentry"] = Db.Mapper.Serialize(Sentry.GetState());
+            states["Allocator"] = Db.Mapper.Serialize(Allocator.GetState()); 
+            states["Executor"] = Db.Mapper.Serialize(Executor.GetState());
+            states["RiskManager"] = Db.Mapper.Serialize(RiskManager.GetState());
+
+            Db.GetCollection("State").Upsert(states);
+        }
+
+        public void LoadNonVolatileVars()
+        { 
+            //reload my internal state
+            BsonDocument states = Db.GetCollection("State").FindById("TradingAlgoState");
+            State = Db.Mapper.Deserialize<NonVolatileVars>(states["State"]);
+            
+            //reload derived class state
+            this.RestoreState(Db.Mapper.Deserialize<object>(states["DerivedClassState"]));
+
+            //reload modules state
+            Sentry.RestoreState(Db.Mapper.Deserialize<object>(states["Sentry"]));
+            Allocator.RestoreState(Db.Mapper.Deserialize<object>(states["Allocator"]));
+            Executor.RestoreState(Db.Mapper.Deserialize<object>(states["Executor"]));
+            RiskManager.RestoreState(Db.Mapper.Deserialize<object>(states["RiskManager"])); 
+        }
+
         public void SaveDataBase()
         {
             //todo Signals need to be saved and all of theirs reference need to be stored byref
             foreach (var symData in SymbolsData.Values)
                 Db.GetCollection<SymbolData>("SymbolsData").Upsert(symData);
-            Db.Checkpoint();
-
+            Db.Checkpoint(); 
         }
 
 

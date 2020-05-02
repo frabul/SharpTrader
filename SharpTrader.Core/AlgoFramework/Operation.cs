@@ -91,14 +91,14 @@ namespace SharpTrader.AlgoFramework
 
 
         [BsonCtor]
-        public Operation(string id)
+        internal Operation(string id)
         {
             this.Id = id;
         }
 
-        public Operation(string _id, Signal signal, AssetAmount amountTarget, OperationType type)
+        public Operation(string id, Signal signal, AssetAmount amountTarget, OperationType type)
         {
-            this.Id = _id;
+            this.Id = id;
             this.Signal = signal;
             this.AmountTarget = amountTarget;
             this.Type = type;

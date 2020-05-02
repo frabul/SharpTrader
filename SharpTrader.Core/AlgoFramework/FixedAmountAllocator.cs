@@ -7,8 +7,7 @@ namespace SharpTrader.AlgoFramework
 {
     public class FixedAmountAllocator : FundsAllocator
     {
-        private List<Signal> PendingSignals = new List<Signal>();
-        private int TotalOperations = 0;
+        private List<Signal> PendingSignals = new List<Signal>(); 
         public TimeSpan CoolDown = TimeSpan.FromMinutes(30);
         public bool ProportinalToProfit = true;
         public decimal TargetProfit { get; set; } = 0.05m;
@@ -75,11 +74,9 @@ namespace SharpTrader.AlgoFramework
                         {
                             //create operations
                             var operType = signal.Kind == SignalKind.Buy ? OperationType.BuyThenSell : OperationType.SellThenBuy;
-                            var newOper = new Operation( TotalOperations.ToString(), signal, new AssetAmount(Amount.Asset, budget), operType);
+                            var newOper = new Operation( Algo.GetNewOperationId(), signal, new AssetAmount(Amount.Asset, budget), operType);
                             newOper.OnNewTrade += (o, t) => { (symData.AllocatorData as MySymbolData).LastInvestmentTime = t.Time; };
-                            slice.Add(newOper);
-
-                            TotalOperations++;
+                            slice.Add(newOper); 
                         }
                         else
                         {

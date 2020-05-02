@@ -36,7 +36,7 @@ namespace SharpTrader.AlgoFramework
         public bool TrailingStopLoss { get; set; } = false;
 
 
-        public override void RegisterSerializationMappers(BsonMapper mapper)
+        public override void RegisterSerializationHandlers(BsonMapper mapper)
         {
             BsonMapper defaultMapper = new BsonMapper();
             mapper.RegisterType<MyOperationData>(o => defaultMapper.Serialize(o), bson => mapper.Deserialize<MyOperationData>(bson));
@@ -185,7 +185,7 @@ namespace SharpTrader.AlgoFramework
             StopLoss = stopLoss;
         }
 
-        public override void RegisterSerializationMappers(BsonMapper mapper)
+        public override void RegisterSerializationHandlers(BsonMapper mapper)
         {
             mapper.RegisterType<RMData>(o => mapper.Serialize(o), bson => mapper.Deserialize<RMData>(bson));
         }

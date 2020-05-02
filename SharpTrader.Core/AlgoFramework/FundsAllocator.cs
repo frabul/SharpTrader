@@ -16,6 +16,17 @@ namespace SharpTrader.AlgoFramework
             Algo = algo;
             return OnInitialize();
         }
+
+        /// <summary>
+        /// Gets a state object that should be saved and restored on restarts
+        /// </summary> 
+        public virtual object GetState() { return new object(); }
+        /// <summary>
+        /// Restorse the statate that had been saved ( taken with GetState)
+        /// </summary> 
+        public virtual void RestoreState(object state) { }
+
+
     }
 
 }

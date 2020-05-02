@@ -15,11 +15,7 @@ namespace SharpTrader.AlgoFramework
         {
             return Task.CompletedTask;
         }
-        public override void RegisterSerializationMappers(BsonMapper mapper)
-        {
-            mapper.RegisterType<MyOperationData>(o => new BsonValue(), bson => null);
-
-        }
+        
         public override Task CancelEntryOrders()
         {
             return Task.CompletedTask;
@@ -142,7 +138,12 @@ namespace SharpTrader.AlgoFramework
                 }
             }
         }
-         
+
+        public override void RegisterSerializationHandlers(BsonMapper mapper)
+        {
+            mapper.RegisterType<MyOperationData>(o => new BsonValue(), bson => null);
+        }
+
         class MyOperationData
         {
             public IOrder LastEntryOrder;
