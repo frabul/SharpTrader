@@ -18,7 +18,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using be = BinanceExchange.API;
 
-namespace SharpTrader
+namespace SharpTrader.BrokersApi.Binance
 {
     public partial class BinanceMarketApi : IMarketApi
     {
@@ -642,7 +642,7 @@ namespace SharpTrader
             return (symbol, id);
         }
 
-        private static string GetExceptionErrorInfo(Exception ex)
+        public static string GetExceptionErrorInfo(Exception ex)
         {
             if (ex is AggregateException ae)
             {
