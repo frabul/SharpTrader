@@ -53,6 +53,10 @@ namespace SharpTrader.AlgoFramework
             [BsonIgnore] internal DeferredTask EntryManager { get; set; }
             [BsonIgnore] internal DeferredTask ExitManager { get; set; }
         }
+        public decimal EntryDistantThreshold { get; private set; }
+
+        public decimal EntryNearThreshold { get; private set; }
+
         public MarketMakerOperationManager(decimal entryDistantThreshold, decimal entryNearThreshold)
         {
             Logger = NLog.LogManager.GetLogger(nameof(MarketMakerOperationManager));
@@ -64,10 +68,50 @@ namespace SharpTrader.AlgoFramework
         {
 
         }
+          
+        public override Task CancelAllOrders(Operation op)
+        {
+            var myOpData = GetMyOperationData(op);
+            var tasks = new[] {
+                CloseEntryOrder(op, myOpData),
+                CloseExitOrder(op, myOpData)
+            };
+            return Task.WhenAll(tasks);
+        }
 
-        public decimal EntryDistantThreshold { get; private set; }
-
-        public decimal EntryNearThreshold { get; private set; }
+        public override async Task Update(TimeSlice slice)
+        {
+            foreach (var symSlice in Algo.SymbolsData.Values)
+            {
+                //if we got a new signal let
+                await ManageSymbol(slice, symSlice);
+            }
+        }
+        public override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
+        {
+            decimal total = 0;
+            foreach (var op in Algo.SymbolsData[symbol.Key].ActiveOperations)
+            {
+                var myOpData = GetMyOperationData(op);
+                if (op.Symbol.Asset == asset)
+                {
+                    total += op.AmountRemaining;
+                    if (myOpData.CurrentEntryOrder != null)
+                        total += myOpData.CurrentEntryOrder.Amount - myOpData.CurrentEntryOrder.Filled;
+                }
+                else if (op.Symbol.QuoteAsset == asset)
+                {
+                    total += op.QuoteAmountRemaining;
+                    if (myOpData.CurrentEntryOrder != null)
+                        total +=
+                            (myOpData.CurrentEntryOrder.Amount - myOpData.CurrentEntryOrder.Filled)
+                            * myOpData.CurrentEntryOrder.Price;
+                }
+                else
+                    throw new NotSupportedException("Only supported operations where asset or quoteAsset coincide with budget asset");
+            }
+            return total;
+        }
 
         private MyOperationData GetMyOperationData(Operation op)
         {
@@ -87,7 +131,7 @@ namespace SharpTrader.AlgoFramework
             if (myOpData.Initialized)
                 return;
 
-        
+
             op.OnResumed += (o) => InitOpTasks(o, o.ExecutorData as MyOperationData);
 
             myOpData.Initialized = true;
@@ -123,26 +167,6 @@ namespace SharpTrader.AlgoFramework
                         Next = OpenExitOrder,
                     };
         }
-
-        public override Task CancelAllOrders(Operation op)
-        {
-            var myOpData = GetMyOperationData(op);
-            var tasks = new[] {
-                CloseEntryOrder(op, myOpData),
-                CloseExitOrder(op, myOpData)
-            };
-            return Task.WhenAll(tasks);
-        }
-
-        public override async Task Update(TimeSlice slice)
-        {
-            foreach (var symSlice in Algo.SymbolsData.Values)
-            {
-                //if we got a new signal let
-                await ManageSymbol(slice, symSlice);
-            }
-        }
-
         private async Task ManageSymbol(TimeSlice slice, SymbolData symData)
         {
             // for each operation check entry and exit orders
@@ -600,32 +624,7 @@ namespace SharpTrader.AlgoFramework
             op.ScheduleClose(Algo.Time + delay);
         }
 
-        public override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
-        {
-            decimal total = 0;
-            foreach (var op in Algo.SymbolsData[symbol.Key].ActiveOperations)
-            {
-                var myOpData = GetMyOperationData(op);
-                if (op.Symbol.Asset == asset)
-                {
-                    total += op.AmountRemaining;
-                    if (myOpData.CurrentEntryOrder != null)
-                        total += myOpData.CurrentEntryOrder.Amount - myOpData.CurrentEntryOrder.Filled;
-                }
-                else if (op.Symbol.QuoteAsset == asset)
-                {
-                    total += op.QuoteAmountRemaining;
-                    if (myOpData.CurrentEntryOrder != null)
-                        total +=
-                            (myOpData.CurrentEntryOrder.Amount - myOpData.CurrentEntryOrder.Filled)
-                            * myOpData.CurrentEntryOrder.Price;
-                }
-                else
-                    throw new NotSupportedException("Only supported operations where asset or quoteAsset coincide with budget asset");
-            }
-            return total;
-        }
-
+    
 
         internal delegate Task<bool> DeferredTaskDelegate(DeferredTask self);
 

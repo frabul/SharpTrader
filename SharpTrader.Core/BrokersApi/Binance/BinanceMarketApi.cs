@@ -22,15 +22,22 @@ namespace SharpTrader.BrokersApi.Binance
 {
     public partial class BinanceMarketApi : IMarketApi
     {
+        class SymbolData
+        {
+            [BsonId]
+            public string Symbol { get; set; }
+            public long LastOrderAtTradesSynch { get; set; }
+        }
         public event Action<IMarketApi, ITrade> OnNewTrade;
 
         private readonly object LockOrdersTrades = new object();
         private readonly object LockBalances = new object();
-        private readonly List<Order> OrdersActive = new List<Order>();
+        private readonly List<Order> OpenOrders = new List<Order>();
         private readonly Stopwatch StopwatchSocketClose = new Stopwatch();
         private readonly Stopwatch UserDataPingStopwatch = new Stopwatch();
-        private readonly Dictionary<string, long> UpdatedTrades = new Dictionary<string, long>();
 
+        private ILiteCollection<SymbolData> SymbolsData;
+        private ILiteCollection<Order> OpenOrdersArchive;
         private ILiteCollection<Order> Orders;
         private ILiteCollection<Trade> Trades;
         private ILiteCollection<Order> OrdersArchive;
@@ -47,12 +54,13 @@ namespace SharpTrader.BrokersApi.Binance
         private List<SymbolFeed> Feeds = new List<SymbolFeed>();
         private Guid UserDataSocket;
         private Regex IdRegex = new Regex("([A-Z]+)([0-9]+)", RegexOptions.Compiled);
-        private System.Timers.Timer TimerFastUpdates;
-        private System.Timers.Timer TimerOrdersTradesSynch;
+        private Task FastUpdatesTask;
+        private Task OrdersAndTradesSynchTask;
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
         private string OperationsDbPath;
         private string OperationsArchivePath;
-
+        private DateTime TimeToArchive;
+        private MemoryCache Cache = new MemoryCache();
         public BinanceClient Client { get; private set; }
 
         public string MarketName => "Binance";
@@ -61,7 +69,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         IEnumerable<ITrade> IMarketApi.Trades => Trades.FindAll().ToArray();
 
-        IEnumerable<IOrder> IMarketApi.OpenOrders { get { lock (LockOrdersTrades) return OrdersActive.ToArray(); } }
+        IEnumerable<IOrder> IMarketApi.OpenOrders { get { lock (LockOrdersTrades) return OpenOrders.ToArray(); } }
 
         public (string Symbol, decimal balance)[] FreeBalances
         {
@@ -72,7 +80,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
-        public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb, bool resynchTradesAndOrders = false, double rateLimitFactor = 1)
+        public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb, double rateLimitFactor = 1)
         {
             Logger = LogManager.GetLogger("BinanceMarketApi");
             Logger.Info("starting initialization...");
@@ -87,77 +95,73 @@ namespace SharpTrader.BrokersApi.Binance
                 SecretKey = apiSecret ?? "null",
                 RateLimitFactor = rateLimitFactor
             });
+        }
 
-            ExchangeInfo = Client.GetExchangeInfo().Result;
+        public async Task Initialize(bool resynchTradesAndOrders = false, bool publicOnly = false)
+        {
+            ExchangeInfo = await Client.GetExchangeInfo();
             WSClient = new BinanceWebSocketClient(Client);
             CombinedWebSocketClient = new CombinedWebSocketClient();
-            this.ServerTimeSynch().Wait();
+            await this.ServerTimeSynch();
             Logger.Info("Archiving old oders...");
             ArchiveOldOperations();
 
-
             if (resynchTradesAndOrders)
-                SynchAllOperations().Wait();
+                await DownloadAllOrdersAndTrades();
             else
             {
                 Logger.Info("Synching oders and trades....");
-                if (apiKey != null)
+                if (!publicOnly)
                 {
-                    SynchOpenOrders().Wait();
-                    SynchLastTrades().Wait();
+                    var oldOpenOrders = OpenOrdersArchive.FindAll().ToArray();
+                    await SynchOpenOrders();
+                    await SynchLastTrades(); 
                 }
             }
 
-            if (apiKey != null)
+            if (!publicOnly)
             {
-                Task.WaitAll(ListenUserData(), SynchBalance());
+                await ListenUserData();
+                await SynchBalance();
+
                 TimerListenUserData = new System.Timers.Timer(30000)
                 {
                     AutoReset = false,
                     Enabled = true,
                 };
                 TimerListenUserData.Elapsed += (s, ea) => ListenUserData().ContinueWith(t => TimerListenUserData.Start());
+
                 //----------
-                TimerOrdersTradesSynch = new System.Timers.Timer(60000)
+
+                async Task SynchOrdersAndTrades()
                 {
-                    AutoReset = false,
-                    Enabled = true,
-                };
-                TimerOrdersTradesSynch.Elapsed +=
-                    async (s, e) =>
+                    while (true)
                     {
                         //we first synch open orders 
                         await SynchOpenOrders();
-                        //then last trades
+                        //synch last trades 
                         await SynchLastTrades();
-                        //then finally we restart the timer and archive operations 
-                        TimerOrdersTradesSynch.Start();
+                        //then finally we restart the timer and archive operations  
                         ArchiveOldOperations();
-                    };
-            }
-
-            TimerFastUpdates = new System.Timers.Timer(15000)
-            {
-                AutoReset = false,
-                Enabled = true,
-            };
-            TimerFastUpdates.Elapsed +=
-                async (s, e) =>
-                {
-                    //first synch server time then balance then restart timer
-                    if (apiKey != null)
-                    {
-                        await ServerTimeSynch();
-                        await SynchBalance();
-                        TimerFastUpdates.Start();
-                    }
-                    else
-                    {
-                        await ServerTimeSynch();
-                        TimerFastUpdates.Start();
+                        await Task.Delay(TimeSpan.FromSeconds(60));
                     }
                 };
+                OrdersAndTradesSynchTask = Task.Run(SynchOrdersAndTrades);
+            }
 
+            FastUpdatesTask =
+                Task.Run(
+                    async () =>
+                    {
+                        while (true)
+                        {
+                            //first synch server time then balance then restart timer
+                            if (!publicOnly)
+                                await ServerTimeSynch();
+                            await ServerTimeSynch();
+                            await Task.Delay(15000);
+                        }
+                    });
             Logger.Info("initialization complete");
         }
 
@@ -201,8 +205,6 @@ namespace SharpTrader.BrokersApi.Binance
                 }
         }
 
-        private DateTime TimeToArchive;
-
         private void InitializeOperationsDb()
         {
 
@@ -230,14 +232,20 @@ namespace SharpTrader.BrokersApi.Binance
                 trades.EnsureIndex(o => o.OrderId);
                 trades.EnsureIndex(o => o.TradeId);
             }
+
             //----
+            OpenOrdersArchive = TradesAndOrdersDb.GetCollection<Order>("OpenOrders");
             Orders = TradesAndOrdersDb.GetCollection<Order>("Orders");
             Trades = TradesAndOrdersDb.GetCollection<Trade>("Trades");
+            SymbolsData = TradesAndOrdersDb.GetCollection<SymbolData>("SymbolsData");
+
             OrdersArchive = TradesAndOrdersArch.GetCollection<Order>("Orders");
             TradesArchive = TradesAndOrdersArch.GetCollection<Trade>("Trades");
+
+
         }
 
-        private async Task SynchAllOperations()
+        private async Task DownloadAllOrdersAndTrades()
         {
             var symbols = ExchangeInfo.Symbols.Select(s => s.symbol).ToArray();
             List<Task> tasks = new List<Task>();
@@ -355,12 +363,21 @@ namespace SharpTrader.BrokersApi.Binance
 
         }
 
+
+
+
+
+        private void RemoveOpenOrder(Order order)
+        {
+            OpenOrdersArchive.Delete(order.Id);
+            OpenOrders.Remove(order);
+        }
+
         /// <summary>
         /// Synchronizes all open orders
         /// </summary> 
         private async Task SynchOpenOrders()
         {
-            Request<object> oper = new Request<object>(RequestStatus.Completed);
             try
             {
                 var resp = await Client.GetCurrentOpenOrders(new CurrentOpenOrdersRequest() { Symbol = null });
@@ -369,20 +386,11 @@ namespace SharpTrader.BrokersApi.Binance
                 lock (LockOrdersTrades)
                 {
                     foreach (var newOrder in allOpen)
-                    {
-                        OrdersUpdateOrInsert(newOrder);
+                        OrdersActiveInsertOrUpdate(newOrder);
 
-                        var foundOrder = OrdersActive.FirstOrDefault(o => o.Id == newOrder.Id);
-                        if (foundOrder != null)
-                            foundOrder.Update(newOrder);
-                        else
-                            OrdersActive.Add(newOrder);
-                    }
-
-
-                    toClose = OrdersActive.Where(oo => !allOpen.Any(no => no.Id == oo.Id)).ToArray();
+                    toClose = OpenOrders.Where(oo => !allOpen.Any(no => no.Id == oo.Id)).ToArray();
                     foreach (var orderToClose in toClose)
-                        OrdersActive.Remove(orderToClose);
+                        RemoveOpenOrder(orderToClose);
                 }
 
                 foreach (var ord in toClose)
@@ -405,28 +413,32 @@ namespace SharpTrader.BrokersApi.Binance
         private async Task SynchLastTrades()
         {
             foreach (var sym in ExchangeInfo.Symbols.Select(s => s.symbol))
-            {
                 await SynchLastTrades(sym);
-            }
         }
-
         public async Task SynchLastTrades(string sym, bool force = false)
         {
+            var symData = SymbolsData.FindById(sym);
+            if (symData == null)
+            {
+                symData = new SymbolData { Symbol = sym };
+                SymbolsData.Insert(symData);
+            }
+
+
             if (sym == null)
                 throw new Exception("Parameter sym cannot be null");
             try
             {
                 bool hasActiveOrders = false;
                 lock (LockOrdersTrades)
-                    hasActiveOrders = OrdersActive.Any(o => o.Symbol == sym);
+                    hasActiveOrders = OpenOrders.Any(o => o.Symbol == sym);
 
                 var sOrders = Orders.Find(o => o.Symbol == sym).OrderBy(o => o.OrderId);
                 var lastOrder = sOrders.LastOrDefault();
 
                 if (lastOrder != null)
                 {
-                    var updatedAlready = UpdatedTrades.TryGetValue(sym, out long lastOrderUpdate);
-                    if (!updatedAlready || lastOrderUpdate != lastOrder.OrderId || hasActiveOrders || force)
+                    if (symData.LastOrderAtTradesSynch != lastOrder.OrderId || hasActiveOrders || force)
                     {
                         var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = 100 });
                         var trades = resp.Select(tr => new Trade(sym, tr));
@@ -449,7 +461,11 @@ namespace SharpTrader.BrokersApi.Binance
                         }
                         //if has active orders we want it to continue updating when the active order becomes inactive
                         if (!hasActiveOrders)
-                            UpdatedTrades[sym] = lastOrder.OrderId;
+                        {
+                            symData.LastOrderAtTradesSynch = lastOrder.OrderId;
+                            SymbolsData.Update(symData);
+                        }
+
                     }
                 }
             }
@@ -591,16 +607,21 @@ namespace SharpTrader.BrokersApi.Binance
             Order oldOpen;
             lock (LockOrdersTrades)
             {
-                oldOpen = OrdersActive.FirstOrDefault(oo => oo.Id == newOrder.Id);
+                oldOpen = OpenOrders.FirstOrDefault(oo => oo.Id == newOrder.Id);
                 if (oldOpen != null)
                 {
                     oldOpen.Update(newOrder);
+                    OpenOrdersArchive.Upsert(newOrder);
                     if (oldOpen.Status > OrderStatus.PartiallyFilled)
-                        OrdersActive.Remove(oldOpen);
+                    {
+                        OpenOrders.Remove(newOrder);
+                        OpenOrdersArchive.Delete(newOrder.Id);
+                    }
                 }
                 else if (newOrder.Status <= OrderStatus.PartiallyFilled)
                 {
-                    OrdersActive.Add(newOrder);
+                    OpenOrders.Add(newOrder);
+                    OpenOrdersArchive.Upsert(newOrder);
                 }
             }
         }
@@ -780,11 +801,8 @@ namespace SharpTrader.BrokersApi.Binance
             return 0;
         }
 
-
-        MemoryCache Cache = new MemoryCache();
         public async Task<IRequest<decimal>> GetEquity(string asset)
         {
-
             try
             {
                 List<SymbolPriceResponse> allPrices;
@@ -894,7 +912,7 @@ namespace SharpTrader.BrokersApi.Binance
                 }
             }
         }
-         
+
         public async Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
         {
             ResultCreateOrderResponse newOrd;
@@ -911,7 +929,7 @@ namespace SharpTrader.BrokersApi.Binance
                         NewOrderResponseType = NewOrderResponseType.Result,
                         Price = rate / 1.00000000000000000000000000000m,
                         Type = be.Enums.OrderType.Limit,
-                        TimeInForce = GetTimeInForce(timeInForce) 
+                        TimeInForce = GetTimeInForce(timeInForce)
                     });
 
                 var no = new Order(newOrd);
@@ -963,7 +981,7 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<IOrder>(RequestStatus.Completed, newOrd);
             }
             catch (Exception ex)
-            { 
+            {
                 return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
@@ -1085,7 +1103,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         public void RegisterSerializationHandlers(BsonMapper mapper)
         {
-            throw new NotImplementedException();
+            registra trades e orders
         }
 
         class Request<T> : IRequest<T>
