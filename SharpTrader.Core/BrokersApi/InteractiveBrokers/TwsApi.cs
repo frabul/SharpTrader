@@ -8,9 +8,8 @@ using NLog;
 
 namespace SharpTrader.BrokersApi.InteractiveBrokers
 {
-    public partial class TwsApi : IMarketApi
-    {
-
+    public partial class InteractiveBrokersApi : IMarketApi
+    { 
         public EClientSocket Client { get; }
 
         public string MarketName => "InteractiveBrokers";
@@ -22,10 +21,8 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
         public IEnumerable<ITrade> Trades => throw new NotImplementedException();
 
         public event Action<IMarketApi, ITrade> OnNewTrade;
-
-      
-
-        public TwsApi()
+         
+        public InteractiveBrokersApi()
         {
             Logger = LogManager.GetLogger("IbApi");
             EReaderSignal = new EReaderMonitorSignal();
@@ -77,7 +74,7 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
             throw new NotImplementedException();
         }
 
-        public IEnumerable<SymbolInfo> GetSymbols()
+        public IEnumerable<SharpTrader.SymbolInfo> GetSymbols()
         {
             throw new NotImplementedException();
         }
@@ -91,17 +88,7 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
         {
             throw new NotImplementedException();
         }
-
-        public Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null)
-        {
-            throw new NotImplementedException();
-        }
-
+         
         public Task<IRequest> OrderCancelAsync(string id)
         {
             throw new NotImplementedException();
@@ -113,6 +100,16 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
         }
 
         public void RegisterSerializationHandlers(BsonMapper mapper)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
         {
             throw new NotImplementedException();
         }

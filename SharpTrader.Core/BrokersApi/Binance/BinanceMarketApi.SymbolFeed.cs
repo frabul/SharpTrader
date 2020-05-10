@@ -12,24 +12,22 @@ using System.Threading.Tasks;
 using System.Timers;
 
 namespace SharpTrader.BrokersApi.Binance
-{ 
+{
     class SymbolFeed : ISymbolFeed, IDisposable
     {
         public event Action<ISymbolFeed, IBaseData> OnData;
         private NLog.Logger Logger;
         private BinanceClient Client;
-        private CombinedWebSocketClient WebSocketClient;
-
-        private HistoricalRateDataBase HistoryDb;
-
+        private CombinedWebSocketClient WebSocketClient; 
+        private HistoricalRateDataBase HistoryDb; 
         private System.Timers.Timer HearthBeatTimer;
         private Stopwatch KlineWatchdog = new Stopwatch();
-        private Stopwatch DepthWatchdog = new Stopwatch();
-
+        private Stopwatch DepthWatchdog = new Stopwatch(); 
         private DateTime LastKlineWarn = DateTime.Now;
         private DateTime LastDepthWarn = DateTime.Now;
         private BinanceKline FormingCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
 
+        ISymbolInfo ISymbolFeed.Symbol => Symbol;
         public SymbolInfo Symbol { get; private set; }
         public DateTime Time { get; private set; }
         public double Ask { get; private set; }
@@ -199,7 +197,7 @@ namespace SharpTrader.BrokersApi.Binance
 
             //--- download latest data
             var refreshTime = historyPeriodSpan > TimeSpan.FromHours(6) ? TimeSpan.FromHours(6) : historyPeriodSpan;
-            var downloader = new SharpTrader.Utils.BinanceDataDownloader(HistoryDb, Client);
+            var downloader = new BinanceDataDownloader(HistoryDb, Client);
             await downloader.DownloadHistoryAsync(Symbol.Key, historyStartTime, refreshTime);
 
             //--- load the history into this 
@@ -261,8 +259,7 @@ namespace SharpTrader.BrokersApi.Binance
 
 
             return (price / 1.00000000000m, amount / 1.000000000000m);
-        }
-
+        } 
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal amount, decimal price)
         {
 

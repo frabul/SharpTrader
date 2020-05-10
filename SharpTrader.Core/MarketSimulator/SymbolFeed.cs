@@ -9,10 +9,11 @@ namespace SharpTrader.MarketSimulator
 {
     public class SymbolFeed : ISymbolFeed
     {
-        public event Action<ISymbolFeed, IBaseData> OnData;
-
+        public event Action<ISymbolFeed, IBaseData> OnData; 
         private TimeSpan Resolution = TimeSpan.FromSeconds(60);
+        private List<IBaseData> NewData = new List<IBaseData>(10);
 
+        ISymbolInfo ISymbolFeed.Symbol => Symbol;
         public SymbolInfo Symbol { get; private set; }
         public double Ask { get; private set; }
         public DateTime Time { get; internal set; }
@@ -28,7 +29,7 @@ namespace SharpTrader.MarketSimulator
             this.Market = market;
         }
 
-        public virtual async Task<TimeSerie<ITradeBar>> GetHistoryNavigator(DateTime historyStartTime)
+        public virtual Task<TimeSerie<ITradeBar>> GetHistoryNavigator(DateTime historyStartTime)
         {
             //todo fetch history from database
             TimeSerie<ITradeBar> newNavigator = new TimeSerie<ITradeBar>();
@@ -42,10 +43,9 @@ namespace SharpTrader.MarketSimulator
                     newNavigator.AddRecord(navigator.Current);
                 }
             }
-            return newNavigator;
+            return Task.FromResult(newNavigator);
         }
 
-        List<IBaseData> NewData = new List<IBaseData>(10);
         internal void AddNewData(IBaseData newMarketData)
         {
             Bid = newMarketData.Value;
@@ -87,6 +87,5 @@ namespace SharpTrader.MarketSimulator
                 amount = 0.001m / price;
             return (price, amount);
         }
-    }
-
+    } 
 }

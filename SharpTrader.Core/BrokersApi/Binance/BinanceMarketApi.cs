@@ -894,8 +894,8 @@ namespace SharpTrader.BrokersApi.Binance
                 }
             }
         }
-
-        public async Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
+         
+        public async Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
         {
             ResultCreateOrderResponse newOrd;
             try
@@ -911,7 +911,7 @@ namespace SharpTrader.BrokersApi.Binance
                         NewOrderResponseType = NewOrderResponseType.Result,
                         Price = rate / 1.00000000000000000000000000000m,
                         Type = be.Enums.OrderType.Limit,
-                        TimeInForce = TimeInForce.GTC
+                        TimeInForce = GetTimeInForce(timeInForce) 
                     });
 
                 var no = new Order(newOrd);
@@ -925,7 +925,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
-        public async Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null)
+        public async Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
         {
             var side = type == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell;
             try
@@ -941,6 +941,7 @@ namespace SharpTrader.BrokersApi.Binance
                             Quantity = (decimal)amount / 1.00000000000000m,
                             NewClientOrderId = clientOrderId,
                             NewOrderResponseType = NewOrderResponseType.Result,
+                            TimeInForce = GetTimeInForce(timeInForce)
                         });
 
                 lock (LockOrdersTrades)
@@ -962,12 +963,17 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<IOrder>(RequestStatus.Completed, newOrd);
             }
             catch (Exception ex)
-            {
-
+            { 
                 return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
-
+        private be.Enums.TimeInForce GetTimeInForce(TimeInForce tif)
+        {
+            if (tif == TimeInForce.GTC)
+                return be.Enums.TimeInForce.GTC;
+            else
+                return be.Enums.TimeInForce.IOC;
+        }
         public async Task<IRequest> OrderCancelAsync(string id)
         {
             try

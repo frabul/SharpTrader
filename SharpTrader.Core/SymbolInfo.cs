@@ -1,6 +1,6 @@
 ﻿namespace SharpTrader
 {
-    public class SymbolInfo
+    public class SymbolInfo : ISymbolInfo
     {
         public string Key { get; set; }
         public string Asset { get; set; }

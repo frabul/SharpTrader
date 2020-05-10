@@ -1,50 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace SharpTrader
 {
-    public class AssetAmount
-    {
-        public string Asset { get; set; }
-        public decimal Amount { get; set; }
-
-        public AssetAmount(string asset, decimal budget)
-        {
-            Asset = asset;
-            Amount = budget;
-        }
-
-        public static decimal Convert(AssetAmount amount, string targetAsset, IEnumerable<ISymbolFeed> feeds  )
-        {
-            if (amount.Asset == targetAsset)
-                return amount.Amount;
-            var feed = feeds.FirstOrDefault();
-            if (feed == null)
-                throw new ArgumentException("No feed provieded for the conversion");
-            if (feed.Symbol.Asset == targetAsset && feed.Symbol.QuoteAsset == amount.Asset)
-                return amount.Amount / (decimal)feed.Ask;
-            else if (feed.Symbol.QuoteAsset == targetAsset && feed.Symbol.Asset == amount.Asset)
-                return amount.Amount * (decimal)feed.Bid;
-            else
-                throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair"); 
-        }
-        public static decimal Convert(AssetAmount amount, string targetAsset, ISymbolFeed feed)
-        {
-            if (amount.Asset == targetAsset)
-                return amount.Amount; 
-            if (feed == null)
-                throw new ArgumentException("No feed provieded for the conversion");
-            if (feed.Symbol.Asset == targetAsset && feed.Symbol.QuoteAsset == amount.Asset)
-                return amount.Amount / (decimal)feed.Ask;
-            else if (feed.Symbol.QuoteAsset == targetAsset && feed.Symbol.Asset == amount.Asset)
-                return amount.Amount * (decimal)feed.Bid;
-            else
-                throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair");
-        }
-    }
 
     public static class Extensions
     {
@@ -69,7 +29,7 @@ namespace SharpTrader
         {
             return Extensions.BaseUnixTime.AddSeconds(epoch);
         }
-     
+
         public static bool EpsilonEqual(this double x1, double x2, double epsilon) => Math.Abs((x1 - x2) / x1) < epsilon;
         public static bool EpsilonEqual(this decimal x1, decimal x2, double epsilon) => Math.Abs((x1 - x2) / x1) < (decimal)epsilon;
     }
@@ -80,14 +40,12 @@ namespace SharpTrader
             return x.Time.CompareTo(y.Time);
         }
     }
- 
- 
-
-
+   
     public class CandlestickTimeComparer : IComparer<ITradeBar>
     {
         public int Compare(ITradeBar x, ITradeBar y)
         {
+           
             return x.OpenTime.CompareTo(y);
             //return (int)(x.OpenTime.Ticks - y.OpenTime.Ticks);
             //var val = x.OpenTime.Ticks - y.OpenTime.Ticks;
@@ -97,6 +55,28 @@ namespace SharpTrader
             //    return int.MinValue;
             //else
             //    return (int)val;
+        }
+    }
+
+    public static class Utils
+    {
+        public static decimal RoundNumberHigher(decimal x, decimal precision)
+        {
+            if (precision != 0)
+            {
+                var resto = x % precision;
+                x = x - resto + precision;
+            }
+            return x;
+        }
+        public static decimal RoundNumberLower(decimal x, decimal precision)
+        {
+            if (precision != 0)
+            {
+                var resto = x % precision;
+                x = x - resto;
+            }
+            return x;
         }
     }
 

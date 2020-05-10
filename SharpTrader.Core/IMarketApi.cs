@@ -20,12 +20,12 @@ namespace SharpTrader
         /// <summary>
         /// Put a market order
         /// </summary> 
-        Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null);
+        Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC);
 
         /// <summary>
         /// Puts a limit order on the market
         /// </summary> 
-        Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null);
+        Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC);
 
         /// <summary>
         /// Gets the feed for the given symbol
@@ -66,5 +66,14 @@ namespace SharpTrader
         void DisposeFeed(ISymbolFeed feed);
         ITrade GetTradeById(string tradeId);
         IOrder GetOrderById(string asString);
+
+
+
+    }
+
+    public enum TimeInForce
+    {
+        GTC,
+        IOC,
     }
 }

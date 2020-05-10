@@ -33,13 +33,13 @@ namespace SharpTrader.AlgoFramework
             _NewOperations.Add(newOper);
         }
 
-        public void Add(SymbolInfo symbol, IBaseData dataRecord)
+        public void Add(ISymbolInfo symbol, IBaseData dataRecord)
         {
             var data = GetOrAddData(symbol);
             data.Add(dataRecord);
         }
 
-        public void Add(SymbolInfo symbol, ITrade trade)
+        public void Add(ISymbolInfo symbol, ITrade trade)
         {
             var data = GetOrAddData(symbol);
             data.Add(trade);
@@ -55,7 +55,7 @@ namespace SharpTrader.AlgoFramework
             _SymbolsData.Clear();
         }
 
-        private SymbolData GetOrAddData(SymbolInfo symbol)
+        private SymbolData GetOrAddData(ISymbolInfo symbol)
         {
             if (!SymbolsData.TryGetValue(symbol.Key, out SymbolData data))
             {
@@ -74,13 +74,13 @@ namespace SharpTrader.AlgoFramework
             private List<Operation> _NewOperations = new List<Operation>(2);
             private List<ITrade> _Trades = new List<ITrade>(2);
             private List<IBaseData> _Records = new List<IBaseData>(2);
-            public SymbolInfo Symbol { get; }
+            public ISymbolInfo Symbol { get; }
             public IReadOnlyList<IBaseData> Records => _Records;
             public IReadOnlyList<Signal> NewSignals => _NewSignals;
             public IReadOnlyList<Operation> NewOperations => _NewOperations;
             public IReadOnlyList<ITrade> Trades => _Trades;
 
-            public SymbolData(SymbolInfo info)
+            public SymbolData(ISymbolInfo info)
             {
                 this.Symbol = info;
             }

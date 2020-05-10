@@ -12,7 +12,7 @@ using BinanceExchange.API.Models.Response.Error;
 using System.Diagnostics;
 using BinanceExchange.API.Models.Response;
 
-namespace SharpTrader.Utils
+namespace SharpTrader.BrokersApi.Binance
 {
     public class BinanceDataDownloader
     {

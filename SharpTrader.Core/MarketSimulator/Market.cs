@@ -88,7 +88,7 @@ namespace SharpTrader.MarketSimulator
             return Task.FromResult<ISymbolFeed>(feed);
         }
 
-        public async Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null)
+        public async Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
         {
             if (amount <= 0)
                 throw new InvalidOperationException("Amount should be > 0");
@@ -140,7 +140,7 @@ namespace SharpTrader.MarketSimulator
 
         }
 
-        public async Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null)
+        public async Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
         {
             if (amount <= 0)
                 throw new InvalidOperationException("Amount should be > 0");
