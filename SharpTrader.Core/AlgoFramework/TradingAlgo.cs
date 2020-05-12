@@ -107,7 +107,7 @@ namespace SharpTrader.AlgoFramework
             if (changes != SelectedSymbolsChanges.None)
             {
                 if (Sentry != null)
-                    Sentry.OnSymbolsChanged(changes);
+                    Sentry.OnSymbolsChangedAsync(changes);
 
                 if (Allocator != null)
                     Allocator.OnSymbolsChanged(changes);

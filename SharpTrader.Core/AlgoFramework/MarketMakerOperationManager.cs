@@ -87,6 +87,7 @@ namespace SharpTrader.AlgoFramework
                 await ManageSymbol(slice, symSlice);
             }
         }
+
         public override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
         {
             decimal total = 0;
@@ -167,6 +168,7 @@ namespace SharpTrader.AlgoFramework
                         Next = OpenExitOrder,
                     };
         }
+
         private async Task ManageSymbol(TimeSlice slice, SymbolData symData)
         {
             // for each operation check entry and exit orders
@@ -623,9 +625,7 @@ namespace SharpTrader.AlgoFramework
 
             op.ScheduleClose(Algo.Time + delay);
         }
-
-    
-
+         
         internal delegate Task<bool> DeferredTaskDelegate(DeferredTask self);
 
         internal class DeferredTask

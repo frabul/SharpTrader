@@ -18,15 +18,15 @@ namespace SharpTrader.BrokersApi.Binance
         public event Action<ISymbolFeed, IBaseData> OnData;
         private NLog.Logger Logger;
         private BinanceClient Client;
-        private CombinedWebSocketClient WebSocketClient; 
-        private HistoricalRateDataBase HistoryDb; 
+        private CombinedWebSocketClient WebSocketClient;
+        private HistoricalRateDataBase HistoryDb;
         private System.Timers.Timer HearthBeatTimer;
         private Stopwatch KlineWatchdog = new Stopwatch();
-        private Stopwatch DepthWatchdog = new Stopwatch(); 
+        private Stopwatch DepthWatchdog = new Stopwatch();
         private DateTime LastKlineWarn = DateTime.Now;
         private DateTime LastDepthWarn = DateTime.Now;
         private BinanceKline FormingCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
-
+        private volatile bool HistoryInitialized = false;
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
         public SymbolInfo Symbol { get; private set; }
         public DateTime Time { get; private set; }
@@ -136,6 +136,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         private void HandleKlineEvent(BinanceKlineData msg)
         {
+            
             if (FormingCandle != null && msg.Kline.StartTime > FormingCandle.StartTime)
             {
                 //if this tick is a new candle and the last candle was not added to ticks
@@ -150,11 +151,12 @@ namespace SharpTrader.BrokersApi.Binance
                     Open = (double)FormingCandle.Open,
                     QuoteAssetVolume = (double)FormingCandle.QuoteVolume
                 };
+                if(HistoryInitialized)
+                    HistoryDb.AddCandlesticks("Binance", Symbol.Key, new[] { candle });
                 this.OnData?.Invoke(this, candle);
                 FormingCandle = null;
             }
-
-
+             
             if (msg.Kline.IsBarFinal)
             {
                 KlineWatchdog.Restart();
@@ -168,7 +170,8 @@ namespace SharpTrader.BrokersApi.Binance
                     Open = (double)msg.Kline.Open,
                     QuoteAssetVolume = (double)msg.Kline.QuoteVolume
                 };
-
+                if (HistoryInitialized)
+                    HistoryDb.AddCandlesticks("Binance", Symbol.Key, new[] { candle });
                 this.OnData?.Invoke(this, candle);
                 FormingCandle = null;
             }
@@ -189,31 +192,29 @@ namespace SharpTrader.BrokersApi.Binance
                 throw new InvalidOperationException("Requested future quotes");
             if (resolution != TimeSpan.FromMinutes(1))
                 throw new NotSupportedException("Binance symbol history only supports resolution 1 minute");
-            historyStartTime -= TimeSpan.FromMinutes(1);
-            //load missing data to hist db 
-            Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
 
-            var historyPeriodSpan = DateTime.UtcNow - historyStartTime;
-
-            //--- download latest data
-            var refreshTime = historyPeriodSpan > TimeSpan.FromHours(6) ? TimeSpan.FromHours(6) : historyPeriodSpan;
-            var downloader = new BinanceDataDownloader(HistoryDb, Client);
-            await downloader.DownloadHistoryAsync(Symbol.Key, historyStartTime, refreshTime);
-
-            //--- load the history into this 
+            //download missing data to hist db   
+            if(!HistoryInitialized)
+            {
+                Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
+                var downloader = new BinanceDataDownloader(HistoryDb, Client);
+                await downloader.DownloadHistoryAsync(Symbol.Key, historyStartTime, TimeSpan.FromHours(6)); 
+            }
+            //--- get the data from db
             var historyInfo = new HistoryInfo(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
             ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(historyInfo, historyStartTime, DateTime.MaxValue);
-            HistoryDb.CloseFile(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
-
+            //HistoryDb.CloseFile(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
+             
             var history = new TimeSerie<ITradeBar>();
             while (symbolHistory.Ticks.MoveNext())
                 history.AddRecord(symbolHistory.Ticks.Current, true);
-
+            HistoryInitialized = true;
             return history;
         }
 
         public void Dispose()
-        {
+        { 
+            HistoryDb.CloseFile(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
             HearthBeatTimer.Stop();
             HearthBeatTimer.Dispose();
             try
@@ -259,7 +260,7 @@ namespace SharpTrader.BrokersApi.Binance
 
 
             return (price / 1.00000000000m, amount / 1.000000000000m);
-        } 
+        }
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal amount, decimal price)
         {
 

@@ -306,6 +306,7 @@ namespace SharpTrader
                 this.end = end;
             }
         }
+
         private SymbolHistoryRaw GetHistoryRaw(HistoryInfo historyInfo, DateTime startOfData, DateTime endOfData)
         {
             startOfData = new DateTime(startOfData.Year, startOfData.Month, 1);
@@ -371,6 +372,7 @@ namespace SharpTrader
                 return history;
             }
         }
+
         public void AddCandlesticks(string market, string symbol, IEnumerable<Candlestick> candles)
         {
             var hinfo = new HistoryInfo(market, symbol, candles.First().Timeframe);
@@ -380,6 +382,7 @@ namespace SharpTrader
             //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
             AddCandlesToHistData(candles, sdata);
         }
+
         private static void AddCandlesToHistData(IEnumerable<Candlestick> candles, SymbolHistoryRaw sdata)
         {
             lock (sdata.Locker)

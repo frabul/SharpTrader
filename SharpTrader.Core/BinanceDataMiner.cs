@@ -104,8 +104,8 @@ namespace SharpTrader.BrokersApi.Binance
                         startTime = new DateTime(lastKnownCandle.OpenTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
                     else
                     {
-                        //otherwise we search for first candle on the server
-                        var firstServerCandle = (await Client.GetKlinesCandlesticks(
+                        //start time is earlier than first known candle.. we start download from first candle on server
+                        var firstAvailable = (await Client.GetKlinesCandlesticks(
                             new GetKlinesCandlesticksRequest
                             {
                                 Symbol = symbol,
@@ -114,8 +114,8 @@ namespace SharpTrader.BrokersApi.Binance
                                 EndTime = startTime.AddYears(3),
                                 Limit = 10
                             })).FirstOrDefault();
-                        //if it's already been downloaded we can set our start time at the end of known data 
-                        if (firstServerCandle != null && firstServerCandle.CloseTime.AddSeconds(1) >= firstKnowCandle.OpenTime)
+                        //if we already downloaded the first available we can start download from the last known
+                        if (firstAvailable != null && firstAvailable.CloseTime.AddSeconds(1) >= firstKnowCandle.OpenTime)
                             startTime = new DateTime(lastKnownCandle.Time.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
                         //otherwise we leave start time as it is to avoid creating holes ( //todo optimize adding end time = firstKnowCandle.OpenTme )
                     }

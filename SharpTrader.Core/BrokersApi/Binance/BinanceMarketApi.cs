@@ -1103,7 +1103,34 @@ namespace SharpTrader.BrokersApi.Binance
 
         public void RegisterSerializationHandlers(BsonMapper mapper)
         {
-            registra trades e orders
+            //this implementation is only for testing as the simulator doesn't save it's state 
+            BsonMapper defaultMapper = new BsonMapper();
+
+            BsonValue OrderToBson(Order order)
+            {
+                return defaultMapper.Serialize(typeof(IOrder), order);
+            }
+
+            Order BsonToOrder(BsonValue value)
+            {
+                var order = OpenOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
+                if (order == null)
+                    order = Orders.FindById(value["_id"].AsString);
+                return order; 
+            }
+
+            BsonValue SerializeTrade(Trade trade)
+            {
+                return defaultMapper.Serialize(typeof(ITrade), trade);
+            }
+
+            Trade DeserializeTrade(BsonValue value)
+            { 
+                return Trades.FindById(value["_id"].AsString); 
+            }
+
+            mapper.RegisterType<Order>(OrderToBson, BsonToOrder);
+            mapper.RegisterType<Trade>(SerializeTrade, DeserializeTrade);
         }
 
         class Request<T> : IRequest<T>
