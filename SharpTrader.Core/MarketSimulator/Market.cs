@@ -376,6 +376,15 @@ namespace SharpTrader.MarketSimulator
                 trades = Trades.Where(t => t.Symbol == symbol);
             return new MarketRequest<IEnumerable<ITrade>>(RequestStatus.Completed, trades);
         }
+        public async Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, DateTime fromTime)
+        {
+            return new MarketRequest<IEnumerable<ITrade>>(RequestStatus.Completed, Trades.Where(t => t.Symbol == symbol && t.Time >= fromTime).ToList());
+        }
+
+        public async Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(DateTime fromTime)
+        {
+            return new MarketRequest<IEnumerable<ITrade>>(RequestStatus.Completed, Trades.Where(t => t.Time >= fromTime).ToList());
+        }
 
         public async Task<IRequest<IOrder>> OrderSynchAsync(string id)
         {
@@ -443,5 +452,7 @@ namespace SharpTrader.MarketSimulator
             mapper.RegisterType<Order>(OrderToBson, BsonToOrder);
             mapper.RegisterType<Trade>(SerializeTrade, DeserializeTrade);
         }
+
+
     }
 }

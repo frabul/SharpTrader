@@ -113,5 +113,15 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
         {
             throw new NotImplementedException();
         }
+
+        public Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, DateTime fromTime)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(DateTime fromTime)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

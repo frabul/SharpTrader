@@ -58,5 +58,10 @@ namespace SharpTrader.BrokersApi.Binance
 
         [BsonIgnore]
         string ITrade.OrderId => Symbol + OrderId;
+
+        public override string ToString()
+        {
+            return $"Trade{{ Id: {Id}, Symbol:{Symbol}, Direction:{Direction}, Time:{Time} }}";
+        }
     }
 }

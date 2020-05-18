@@ -329,11 +329,11 @@ namespace SharpTrader.AlgoFramework
             var myOpData = self.myOpData;
             Operation op = self.Op;
             SymbolData symData = self.SymbolData;
-            Debug.Assert(myOpData.CurrentExitOrder == null);
+            Debug.Assert(myOpData.CurrentExitOrder == null, "Current exit order is not null");
 
             if (op.IsClosing || op.IsClosed)
             {
-                Debug.Assert(op.AmountRemaining == 0);
+                Debug.Assert(op.AmountRemaining == 0, "op is not closed but amountremaining is > 0");
                 return true;
             }
 
@@ -392,7 +392,7 @@ namespace SharpTrader.AlgoFramework
             //check if we need to change order in case that the amount invested was increased
             var currentExitOrder = myOpData.CurrentExitOrder;
             var wrongAmout = Math.Abs(op.AmountRemaining - (currentExitOrder.Amount - currentExitOrder.Filled)) > op.AmountRemaining * 0.10m;
-            var wrongPrice = Math.Abs(currentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.002m;
+            var wrongPrice = Math.Abs(currentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m;
 
             if (wrongPrice || wrongAmout || Algo.Time > op.Signal.ExpireDate)
             {

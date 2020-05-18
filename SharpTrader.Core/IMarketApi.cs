@@ -46,7 +46,8 @@ namespace SharpTrader
         IEnumerable<ITrade> Trades { get; }
 
         Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId);
-
+        Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, DateTime fromTime);
+        Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(DateTime fromTime);
         Task<IRequest<IOrder>> OrderSynchAsync(string id);
 
         Task<IRequest> OrderCancelAsync(string id);

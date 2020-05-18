@@ -5,16 +5,17 @@ namespace SharpTrader.AlgoFramework
 {
     public class SymbolData
     {
-        [BsonId] public string Id => Symbol.Key;
+        private List<Operation> _ActiveOperations { get; } = new List<Operation>();
+        private List<Operation> _ClosedOperations { get; } = new List<Operation>(); 
         public SymbolInfo Symbol { get; set; }
-
+        [BsonId] public string Id => Symbol.Key;
+      
         /// <summary>
         /// Feed is automaticly initialized by the algo for the symbols requested by the symbols selector module
         /// </summary>
-        [BsonIgnore] public ISymbolFeed Feed { get; set; }
-
-        [BsonIgnore] public List<Operation> ActiveOperations { get; set; } = new List<Operation>();
-        [BsonIgnore] public List<Operation> ClosedOperations { get; set; } = new List<Operation>();
+        [BsonIgnore] public ISymbolFeed Feed { get; set; } 
+        [BsonIgnore] public IReadOnlyList<Operation> ActiveOperations => _ActiveOperations;
+        [BsonIgnore] public IReadOnlyList<Operation> ClosedOperations => _ClosedOperations;
 
         /// <summary>
         /// This property can be used by sentry module to store its data
@@ -24,7 +25,8 @@ namespace SharpTrader.AlgoFramework
         public object AllocatorData { get; set; }
         public object RiskManagerData { get; set; }
 
-        
+        [BsonIgnore] public bool IsSelectedForTrading { get; internal set; } = false;
+
         public SymbolData(SymbolInfo symbol)
         {
             Symbol = symbol;
@@ -34,6 +36,19 @@ namespace SharpTrader.AlgoFramework
 
         }
 
+        public void AddActiveOperation(Operation op)
+        {
+            _ActiveOperations.Add(op); 
+        }
+        public void RemoveActiveOperation(Operation op)
+        {
+            _ActiveOperations.Remove(op);
+            //if there wasn't any transaction for the operation then we just forget it
+            if (op.AmountInvested > 0)
+                this._ClosedOperations.Add(op);
+        }
+
+     
     }
 
 }

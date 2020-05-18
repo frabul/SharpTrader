@@ -81,21 +81,19 @@ namespace SharpTrader.AlgoFramework
         [BsonIgnore]
         public IEnumerable<ITrade> AllTrades
         {
-            get => _Entries.Concat(Exits);
-       
-             
+            get => _Entries.Concat(Exits); 
         }
+
         /// <summary>
         /// Trades that were meant as entries
         /// </summary>
         public IEnumerable<ITrade> Entries { get => _Entries; private set => _Entries = new HashSet<ITrade>(value); }//private setter used by serialization
+
         /// <summary>
         /// Trades that were meant as exits
         /// </summary>
         public IEnumerable<ITrade> Exits { get => _Exits; private set => _Exits = new HashSet<ITrade>(value); }//private setter used by serialization
-
-
-
+         
         public Operation( )
         {
         
@@ -107,8 +105,7 @@ namespace SharpTrader.AlgoFramework
             this.Signal = signal;
             this.AmountTarget = amountTarget;
             this.Type = type;
-            SetTradesDirections();
-
+            SetTradesDirections(); 
         }
 
         public Operation(JObject me)

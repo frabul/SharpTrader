@@ -115,7 +115,7 @@ namespace SharpTrader.BrokersApi.Binance
                 {
                     var oldOpenOrders = OpenOrdersArchive.FindAll().ToArray();
                     await SynchOpenOrders();
-                    await SynchLastTrades(); 
+                    await SynchLastTrades();
                 }
             }
 
@@ -330,7 +330,6 @@ namespace SharpTrader.BrokersApi.Binance
             try
             {
                 var time = await Client.GetServerTime();
-                var delta = time.ServerTime - DateTime.UtcNow;
                 Client.TimestampOffset = time.ServerTime - DateTime.UtcNow;
             }
             catch (Exception ex)
@@ -685,7 +684,41 @@ namespace SharpTrader.BrokersApi.Binance
             else
                 return ex.Message;
         }
+        public Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(DateTime fromTime)
+        {
+            try
+            {
+                lock (LockOrdersTrades)
+                {
+                    var result = Trades.Find(tr => tr.Time >= fromTime).ToArray<ITrade>();
+                    var ret = new Request<IEnumerable<ITrade>>(RequestStatus.Completed, result);
+                    return Task.FromResult<IRequest<IEnumerable<ITrade>>>(ret);
+                }
+            }
+            catch (Exception ex)
+            {
+                var ret = new Request<IEnumerable<ITrade>>(GetExceptionErrorInfo(ex));
+                return Task.FromResult<IRequest<IEnumerable<ITrade>>>(ret);
+            }
+        }
 
+        public Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, DateTime fromTime)
+        {
+            try
+            {
+                lock (LockOrdersTrades)
+                {
+                    var result = Trades.Find(tr => tr.Time >= fromTime && tr.Symbol == symbol).ToArray<ITrade>();
+                    var ret = new Request<IEnumerable<ITrade>>(RequestStatus.Completed, result);
+                    return Task.FromResult<IRequest<IEnumerable<ITrade>>>(ret);
+                }
+            }
+            catch (Exception ex)
+            {
+                var ret = new Request<IEnumerable<ITrade>>(GetExceptionErrorInfo(ex));
+                return Task.FromResult<IRequest<IEnumerable<ITrade>>>(ret);
+            }
+        }
         public Task<IRequest<IEnumerable<ITrade>>> GetLastTradesAsync(string symbol, int count, string fromId)
         {
             try
@@ -891,7 +924,7 @@ namespace SharpTrader.BrokersApi.Binance
                     PricePrecision = pricePrecision.TickSize
                 };
 
-                feed = new SymbolFeed(Client, CombinedWebSocketClient, HistoryDb, MarketName, symInfo);
+                feed = new SymbolFeed(Client, CombinedWebSocketClient, HistoryDb, MarketName, symInfo, this.Time);
                 await feed.Initialize();
                 lock (LockBalances)
                 {
@@ -1116,7 +1149,7 @@ namespace SharpTrader.BrokersApi.Binance
                 var order = OpenOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
                 if (order == null)
                     order = Orders.FindById(value["_id"].AsString);
-                return order; 
+                return order;
             }
 
             BsonValue SerializeTrade(Trade trade)
@@ -1125,13 +1158,14 @@ namespace SharpTrader.BrokersApi.Binance
             }
 
             Trade DeserializeTrade(BsonValue value)
-            { 
-                return Trades.FindById(value["_id"].AsString); 
+            {
+                return Trades.FindById(value["_id"].AsString);
             }
 
             mapper.RegisterType<Order>(OrderToBson, BsonToOrder);
             mapper.RegisterType<Trade>(SerializeTrade, DeserializeTrade);
         }
+
 
         class Request<T> : IRequest<T>
         {

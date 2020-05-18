@@ -21,12 +21,7 @@ namespace SharpTrader.AlgoFramework
         internal virtual object DeserializeOperationData(JToken jToken) { throw new NotImplementedException(); }
 
         public abstract void RegisterSerializationHandlers(BsonMapper mapper);
-
-        internal Task CancelAllOrders(Operation op)
-        {
-            throw new NotImplementedException();
-        }
-
+         
         /// <summary>
         /// Gets a state object that should be saved and restored on restarts
         /// </summary> 

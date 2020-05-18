@@ -7,6 +7,10 @@ namespace SharpTrader.AlgoFramework
 {
     public class Signal
     {
+        private DateTime creationTime;
+        private DateTime entryExpiry;
+        private DateTime expireDate;
+
         public event Action<Signal> OnModify;
 
         public Signal(string id, SymbolInfo symbol, SignalKind kind, DateTime creationTime)
@@ -34,7 +38,7 @@ namespace SharpTrader.AlgoFramework
 
         public SymbolInfo Symbol { get; private set; }
         public SignalKind Kind { get; private set; }
-        public DateTime CreationTime { get; private set; }
+        public DateTime CreationTime { get => creationTime; private set => creationTime = value.ToUniversalTime(); }
         public decimal PriceTarget { get; private set; }
 
         /// <summary>
@@ -46,12 +50,12 @@ namespace SharpTrader.AlgoFramework
         /// <summary>
         /// Any operation 
         /// </summary>
-        public DateTime EntryExpiry { get; private set; }
-
+        public DateTime EntryExpiry { get => entryExpiry; private set => entryExpiry = value.ToUniversalTime(); }
+        trasformare tutti i datetime
         /// <summary>
         /// Every operation based on this signal is meant to be closed after this time
         /// </summary>
-        public DateTime ExpireDate { get; private set; }
+        public DateTime ExpireDate { get => expireDate; private set => expireDate = value.ToUniversalTime(); }
 
         public void ModifyConditions(decimal entry, DateTime entryExpiry, decimal target, DateTime targetExpiry)
         {

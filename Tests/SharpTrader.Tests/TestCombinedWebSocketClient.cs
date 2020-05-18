@@ -1,6 +1,7 @@
 ﻿using BinanceExchange.API.Enums;
 using BinanceExchange.API.Models.WebSocket;
 using BinanceExchange.API.Websockets;
+using SharpTrader.BrokersApi.Binance;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

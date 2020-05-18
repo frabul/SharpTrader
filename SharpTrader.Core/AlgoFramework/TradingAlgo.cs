@@ -48,7 +48,7 @@ namespace SharpTrader.AlgoFramework
         public DateTime LastUpdate { get; set; }
         public DateTime Time => Market.Time;
         public DateTime NextUpdateTime { get; private set; } = DateTime.MinValue;
-        public TimeSpan Resolution { get; set; } = TimeSpan.FromMinutes(1);
+        public TimeSpan Resolution { get; set; } = TimeSpan.FromSeconds(10);
         public bool IsTradingStopped { get; private set; } = false;
         public bool IsPlottingEnabled { get; set; } = false;
 
@@ -66,6 +66,20 @@ namespace SharpTrader.AlgoFramework
             {
                 this.ConfigureSerialization();
                 ReloadSavedState();
+            }
+            //on restart there is the possibility that we missed some trades, let's reload the last trades
+            var req = await Market.GetLastTradesAsync(Market.Time - TimeSpan.FromHours(12));
+            if (req.IsSuccessful)
+            {
+                foreach (var trade in req.Result)
+                    if (SymbolsData.ContainsKey(trade.Symbol))
+                        this.WorkingSlice.Add(SymbolsData[trade.Symbol].Symbol, trade);
+                    else
+                        Logger.Error($"Symbol data not found for trade {trade} during initialize.");
+            }
+            else
+            {
+                Logger.Error("GetLastTrades failed during initialize");
             }
 
             //call on initialize
@@ -94,35 +108,22 @@ namespace SharpTrader.AlgoFramework
         {
             this._ActiveOperations.Add(op);
             var symData = GetSymbolData(op.Symbol);
-            symData.ActiveOperations.Add(op);
+            symData.AddActiveOperation(op);
             this.Db?.GetCollection<Operation>("ActiveOperations").Upsert(op);
         }
 
         public async Task Update(TimeSlice slice)
         {
             LastUpdate = Market.Time;
-
             //update selected symbols
             var changes = await SymbolsFilter.UpdateAsync(slice);
             if (changes != SelectedSymbolsChanges.None)
             {
-                if (Sentry != null)
-                    Sentry.OnSymbolsChangedAsync(changes);
-
-                if (Allocator != null)
-                    Allocator.OnSymbolsChanged(changes);
-
-
-                if (Executor != null)
-                    Executor.OnSymbolsChanged(changes);
-
-                if (RiskManager != null)
-                    RiskManager.OnSymbolsChanged(changes);
-
                 //release feeds of unused symbols
                 foreach (var sym in changes.RemovedSymbols)
                 {
-                    SymbolData symbolData = _SymbolsData[sym.Key];
+                    SymbolData symbolData = GetSymbolData(sym);
+                    symbolData.IsSelectedForTrading = false;
                     symbolData.Feed.OnData -= Feed_OnData;
                     this.ReleaseFeed(symbolData.Feed);
                     symbolData.Feed = null;
@@ -132,26 +133,49 @@ namespace SharpTrader.AlgoFramework
                 foreach (var sym in changes.AddedSymbols)
                 {
                     SymbolData symbolData = GetSymbolData(sym);
-
+                    symbolData.IsSelectedForTrading = true;
                     symbolData.Feed = await this.GetSymbolFeed(sym.Key);
                     symbolData.Feed.OnData -= Feed_OnData;
                     symbolData.Feed.OnData += Feed_OnData;
                 }
+
+                if (Sentry != null)
+                    await Sentry.OnSymbolsChanged(changes);
+
+                if (Allocator != null)
+                    Allocator.OnSymbolsChanged(changes);
+
+                if (Executor != null)
+                    Executor.OnSymbolsChanged(changes);
+
+                if (RiskManager != null)
+                    RiskManager.OnSymbolsChanged(changes);
             }
 
             // register trades with their linked operations
+            Operation[] oldOperations = null;
             foreach (ITrade trade in slice.Trades)
             {
                 //first search in active operations
-                var activeOp = _SymbolsData[trade.Symbol].ActiveOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
+                var symData = _SymbolsData[trade.Symbol];
+                var activeOp = symData.ActiveOperations.Concat(symData.ClosedOperations).FirstOrDefault(op => op.IsTradeAssociated(trade)); 
                 if (activeOp != null)
                 {
                     activeOp.AddTrade(trade);
-                    Logger.Info($"New trade {trade} added top operation {activeOp}");
+                    Logger.Info($"New trade {trade.ToString()} added to operation {activeOp.ToString()}");
                 }
                 else
                 {
-                    Logger.Info($"New trade {trade} without any associated operation");
+                    //let's search in closed operations
+                    oldOperations = oldOperations ?? this.Db?.GetCollection<Operation>("ClosedOperations").Find(o => o.CreationTime >= Market.Time.AddDays(2)).ToArray();
+                    var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
+                    if (oldOp != null)
+                    {
+                        oldOp.AddTrade(trade);
+                        Logger.Info($"New trade {trade.ToString()} added to old operation {activeOp.ToString()}");
+                    }
+                    else
+                        Logger.Info($"New trade {trade.ToString()} without any associated operation");
                 }
 
             }
@@ -175,17 +199,12 @@ namespace SharpTrader.AlgoFramework
                 {
                     op.Close();
                     //move closed operations
-                    this.SymbolsData[op.Symbol.Key].ActiveOperations.Remove(op);
+                    this.SymbolsData[op.Symbol.Key].RemoveActiveOperation(op);
                     this._ActiveOperations.RemoveAt(i--);
 
-                    //update database
+                    //update database 
                     this.Db?.GetCollection("ActiveOperations").Delete(op.Id);
-                    this.Db?.GetCollection<Operation>("ClosedOperations").Upsert(op);
-
-
-                    //if there wasn't any transaction for the operation then we just forget it
-                    if (op.AmountInvested > 0)
-                        this.SymbolsData[op.Symbol.Key].ClosedOperations.Add(op);
+                    this.Db?.GetCollection<Operation>("ClosedOperations").Upsert(op); 
                 }
             }
             this.Db?.Commit();
@@ -201,8 +220,13 @@ namespace SharpTrader.AlgoFramework
             //manage risk
             if (RiskManager != null)
                 await RiskManager.Update(slice);
-        }
 
+            if (Config.SaveData)
+            {
+                SaveSymbolsData();
+                Db.Checkpoint();
+            }
+        }
 
         public string GetNewOperationId()
         {
@@ -217,11 +241,7 @@ namespace SharpTrader.AlgoFramework
         public async Task Stop()
         {
             await this.StopEntries();
-            foreach (var op in this.ActiveOperations)
-            {
-                await this.Executor.CancelAllOrders(op);
-                await this.RiskManager.CancelAllOrders(op);
-            }
+            await this.Executor.CancelEntryOrders();
         }
 
         private SymbolData GetSymbolData(SymbolInfo sym)
@@ -232,7 +252,6 @@ namespace SharpTrader.AlgoFramework
                 symbolData = new SymbolData(sym);
                 _SymbolsData.Add(sym.Key, symbolData);
             }
-
             return symbolData;
         }
 
@@ -253,6 +272,7 @@ namespace SharpTrader.AlgoFramework
 
         private void Feed_OnData(ISymbolFeed symFeed, IBaseData dataRecord)
         {
+            //todo bisogna accertartci che i dati che riceviamo sono del giusto timeframe!
             lock (WorkingSlice)
                 WorkingSlice.Add(symFeed.Symbol, dataRecord);
         }
@@ -301,32 +321,14 @@ namespace SharpTrader.AlgoFramework
             //close all entry orders
             return this.Executor.CancelEntryOrders();
         }
-        public void LoadState()
-        {
 
-        }
-        public void SaveState()
-        {
-
-        }
-
-        public void ReloadSavedState()
-        {
-            //rebuild symbols data
-            foreach (var symData in Db.GetCollection<SymbolData>("SymbolsData").FindAll())
-                _SymbolsData[symData.Id] = symData;
-            var closedOperations = Db.GetCollection<Operation>("ClosedOperations").FindAll().ToArray();
-            //rebuild operations 
-            //closed operations are not loaded in current session behind
-            var activeOperations = Db.GetCollection<Operation>("ActiveOperations");
-            foreach (var op in activeOperations.FindAll().ToArray())
-            {
-                var symData = GetSymbolData(op.Symbol);
-                symData.ActiveOperations.Add(op);
-            }
-        }
-
+        /// <summary>
+        /// This function should provide and object that is going to be saved for reload after reset
+        /// </summary> 
         protected virtual object GetState() { return new object(); }
+        /// <summary>
+        /// This function receives the state saved ( provided by GetState() ) and restore the internal variables
+        /// </summary> 
         protected virtual void RestoreState(object state) { }
 
         public void SaveNonVolatileVars()
@@ -364,12 +366,27 @@ namespace SharpTrader.AlgoFramework
             RiskManager.RestoreState(Db.Mapper.Deserialize<object>(states["RiskManager"]));
         }
 
-        public void SaveDataBase()
+        public void ReloadSavedState()
         {
-            //todo Signals need to be saved and all of theirs reference need to be stored byref
+            //rebuild symbols data
+            foreach (var symData in Db.GetCollection<SymbolData>("SymbolsData").FindAll())
+                _SymbolsData[symData.Id] = symData;
+
+            var closedOperations = Db.GetCollection<Operation>("ClosedOperations").FindAll().ToArray();
+            //rebuild operations 
+            //closed operations are not loaded in current session  
+            var activeOperations = Db.GetCollection<Operation>("ActiveOperations");
+            foreach (var op in activeOperations.FindAll().ToArray())
+            {
+                var symData = GetSymbolData(op.Symbol);
+                symData.AddActiveOperation(op);
+            }
+        }
+
+        public void SaveSymbolsData()
+        {
             foreach (var symData in SymbolsData.Values)
                 Db.GetCollection<SymbolData>("SymbolsData").Upsert(symData);
-            Db.Checkpoint();
         }
 
 

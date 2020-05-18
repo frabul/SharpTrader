@@ -199,8 +199,9 @@ namespace SharpTrader.AlgoFramework
             foreach (var op in Algo.ActiveOperations)
             {
                 //---
-                if (!op.RiskManaged)
+                if ( op.AmountRemaining > 0 && !op.RiskManaged )
                 {
+                   
                     //get gain percent
                     if (op.Type == OperationType.BuyThenSell)
                     {

@@ -53,10 +53,6 @@ namespace SharpTrader
         {
             return $"{market}_{symbol}_{(int)Timeframe.TotalMilliseconds}_{Date.ToString("yyyyMM")}.bin";
         }
-        public static HistoryFileInfo FromFileName(string fileName)
-        {
-            return null;
-        }
     }
     //TODO make thread safe
     public class HistoricalRateDataBase
@@ -161,7 +157,7 @@ namespace SharpTrader
                                 Ticks = sdata.Ticks,
                                 Timeframe = finfo.Timeframe,
                                 StartOfData = DateTime.MinValue,
-                                EndOfData = DateTime.MaxValue, 
+                                EndOfData = DateTime.MaxValue,
                             };
                             SymbolsData.Add(history);
                             shist = history;
@@ -229,6 +225,7 @@ namespace SharpTrader
             }
             return (first, last);
         }
+        
         public void ValidateData(HistoryInfo finfo)
         {
             lock (SymbolsDataLocker)
@@ -245,11 +242,12 @@ namespace SharpTrader
                 }
             }
         }
+        
         public void Delete(string market, string symbol, TimeSpan time)
         {
             var histInfo = new HistoryInfo(market, symbol, time);
             var filesInfos = GetHistoryFiles(histInfo);
-            if (filesInfos.Length > 0)
+            if (filesInfos.Count > 0)
             {
                 lock (SymbolsDataLocker)
                 {
@@ -258,12 +256,16 @@ namespace SharpTrader
                         if (SymbolsData[i].HistoryInfoEquals(histInfo))
                             SymbolsData.RemoveAt(i--);
                     }
-                    foreach (var filePath in filesInfos.Select(fi => fi.FilePath))
-                        if (File.Exists(filePath))
-                            File.Delete(filePath);
+                    foreach (var fileInfo in filesInfos.ToArray())
+                    {
+                        if (File.Exists(fileInfo.FilePath))
+                            File.Delete(fileInfo.FilePath);
+                        filesInfos.Remove(fileInfo);
+                    } 
                 }
             }
         }
+
         public HistoryInfo[] ListAvailableData()
         {
             var files = Directory.GetFiles(BaseDirectory, "*.bin");
@@ -279,6 +281,7 @@ namespace SharpTrader
             }
             return result.ToArray();
         }
+
         public ISymbolHistory GetSymbolHistory(HistoryInfo info, DateTime startOfData, DateTime endOfData)
         {
             var rawHist = GetHistoryRaw(info, startOfData, endOfData);
@@ -423,21 +426,25 @@ namespace SharpTrader
             }
         }
 
-        Dictionary<string, HistoryFileInfo[]> CachedHistoryFilesPerinfoMask = new Dictionary<string, HistoryFileInfo[]>();
-        string[] AllFilesInDir;
-        private HistoryFileInfo[] GetHistoryFiles(HistoryInfo info)
+        private Dictionary<string, List<HistoryFileInfo>> CachedHistoryFilesPerinfoMask = new Dictionary<string, List<HistoryFileInfo>>();
+        private string[] AllFilesInDir;
+        private List<HistoryFileInfo> GetHistoryFiles(HistoryInfo info)
         {
             string fileNameMask = info.GetFileMask();
-            if (!CachedHistoryFilesPerinfoMask.ContainsKey(fileNameMask))
-            {
-                if (AllFilesInDir == null)
-                    AllFilesInDir = Directory.GetFiles(BaseDirectory, "*.bin");
-                var files = AllFilesInDir.Select(fp => GetFileInfo(fp)).Where(fi => fi != null && fi.GetFileMask() == info.GetFileMask()).ToArray();
-                CachedHistoryFilesPerinfoMask[fileNameMask] = files;
-                return files;
+            lock (CachedHistoryFilesPerinfoMask)
+            { 
+                if (!CachedHistoryFilesPerinfoMask.ContainsKey(fileNameMask))
+                {
+                    if (AllFilesInDir == null)
+                        AllFilesInDir = Directory.GetFiles(BaseDirectory, "*.bin");
+                    var files = AllFilesInDir.Select(fp => GetFileInfo(fp)).Where(fi => fi != null && fi.GetFileMask() == info.GetFileMask()).ToList();
+                    CachedHistoryFilesPerinfoMask.Add(fileNameMask, files);
+                    return files;
+                }
+                return CachedHistoryFilesPerinfoMask[fileNameMask];
             }
-            return CachedHistoryFilesPerinfoMask[fileNameMask];
         }
+
         private HistoryInfo GetFileInfoV1(string fileName)
         {
             fileName = Path.GetFileName(fileName);
@@ -470,9 +477,9 @@ namespace SharpTrader
             }
             catch (Exception ex)
             {
-                Debug.Assert(ex != null);
                 //Console.WriteLine($"Error while parsing file info for file {fileName}");
             }
+            Debug.Assert(ret != null);
             return ret;
         }
         public void SaveAll()
@@ -534,19 +541,24 @@ namespace SharpTrader
                         candlesOfMont.Add(new Candlestick(data.Ticks[i]));
                         i++;
                     }
-                    HistoryFileInfo finfo = new HistoryFileInfo(data.Market, data.Symbol, data.Timeframe, startDate);
-                    finfo.FilePath = Path.Combine(BaseDirectory, finfo.GetFileName());
+                    HistoryFileInfo newInfo = new HistoryFileInfo(data.Market, data.Symbol, data.Timeframe, startDate);
+                    newInfo.FilePath = Path.Combine(BaseDirectory, newInfo.GetFileName());
                     SymbolHistoryRaw sdata = new SymbolHistoryRaw()
                     {
-                        FileName = finfo.GetFileName(),
+                        FileName = newInfo.GetFileName(),
                         Market = data.Market,
                         Spread = data.Spread,
                         Symbol = data.Symbol,
                         Ticks = candlesOfMont,
                         Timeframe = data.Timeframe
                     };
-                    using (var fs = File.Open(finfo.FilePath, FileMode.Create))
+                    using (var fs = File.Open(newInfo.FilePath, FileMode.Create))
                         Serializer.Serialize<SymbolHistoryRaw>(fs, sdata);
+
+                    //update cache
+                    var files = GetHistoryFiles(newInfo);
+                    if (!files.Any(f => f.FilePath == newInfo.FilePath))
+                        files.Add(newInfo);
                 }
             }
         }
@@ -623,6 +635,7 @@ namespace SharpTrader
             }
         }
     }
+
     public interface ISymbolHistory
     {
         string Market { get; }
