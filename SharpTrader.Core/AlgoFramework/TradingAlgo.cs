@@ -65,10 +65,10 @@ namespace SharpTrader.AlgoFramework
             if (Config.SaveData)
             {
                 this.ConfigureSerialization();
-                ReloadSavedState();
+                this.LoadNonVolatileVars();
             }
             //on restart there is the possibility that we missed some trades, let's reload the last trades
-            var req = await Market.GetLastTradesAsync(Market.Time - TimeSpan.FromHours(12));
+            var req = await Market.GetLastTradesAsync(Market.Time - TimeSpan.FromHours(24));
             if (req.IsSuccessful)
             {
                 foreach (var trade in req.Result)
@@ -158,7 +158,7 @@ namespace SharpTrader.AlgoFramework
             {
                 //first search in active operations
                 var symData = _SymbolsData[trade.Symbol];
-                var activeOp = symData.ActiveOperations.Concat(symData.ClosedOperations).FirstOrDefault(op => op.IsTradeAssociated(trade)); 
+                var activeOp = symData.ActiveOperations.Concat(symData.ClosedOperations).FirstOrDefault(op => op.IsTradeAssociated(trade));
                 if (activeOp != null)
                 {
                     activeOp.AddTrade(trade);
@@ -197,14 +197,16 @@ namespace SharpTrader.AlgoFramework
                 var op = this.ActiveOperations[i];
                 if (this.Time >= op.CloseDeadTime)
                 {
+                    Logger.Info($"Closing operation {op}.");
                     op.Close();
                     //move closed operations
-                    this.SymbolsData[op.Symbol.Key].RemoveActiveOperation(op);
                     this._ActiveOperations.RemoveAt(i--);
+                    this.SymbolsData[op.Symbol.Key].RemoveActiveOperation(op);
+                    
 
                     //update database 
                     this.Db?.GetCollection("ActiveOperations").Delete(op.Id);
-                    this.Db?.GetCollection<Operation>("ClosedOperations").Upsert(op); 
+                    this.Db?.GetCollection<Operation>("ClosedOperations").Upsert(op);
                 }
             }
             this.Db?.Commit();
@@ -223,8 +225,7 @@ namespace SharpTrader.AlgoFramework
 
             if (Config.SaveData)
             {
-                SaveSymbolsData();
-                Db.Checkpoint();
+                SaveNonVolatileVars();
             }
         }
 
@@ -348,31 +349,53 @@ namespace SharpTrader.AlgoFramework
             states["RiskManager"] = Db.Mapper.Serialize(RiskManager.GetState());
 
             Db.GetCollection("State").Upsert(states);
+
+            foreach (var symData in SymbolsData.Values)
+                Db.GetCollection<SymbolData>("SymbolsData").Upsert(symData);
+
+            Db.Checkpoint();
         }
 
         public void LoadNonVolatileVars()
         {
             //reload my internal state
             BsonDocument states = Db.GetCollection("State").FindById("TradingAlgoState");
-            State = Db.Mapper.Deserialize<NonVolatileVars>(states["State"]);
+            if (states != null)
+            {
+                State = Db.Mapper.Deserialize<NonVolatileVars>(states["State"]);
 
-            //reload derived class state
-            this.RestoreState(Db.Mapper.Deserialize<object>(states["DerivedClassState"]));
+                //reload derived class state
+                this.RestoreState(Db.Mapper.Deserialize<object>(states["DerivedClassState"]));
 
-            //reload modules state
-            Sentry.RestoreState(Db.Mapper.Deserialize<object>(states["Sentry"]));
-            Allocator.RestoreState(Db.Mapper.Deserialize<object>(states["Allocator"]));
-            Executor.RestoreState(Db.Mapper.Deserialize<object>(states["Executor"]));
-            RiskManager.RestoreState(Db.Mapper.Deserialize<object>(states["RiskManager"]));
-        }
+                //reload modules state
+                Sentry.RestoreState(Db.Mapper.Deserialize<object>(states["Sentry"]));
+                Allocator.RestoreState(Db.Mapper.Deserialize<object>(states["Allocator"]));
+                Executor.RestoreState(Db.Mapper.Deserialize<object>(states["Executor"]));
+                RiskManager.RestoreState(Db.Mapper.Deserialize<object>(states["RiskManager"]));
+            }
 
-        public void ReloadSavedState()
-        {
+
+
             //rebuild symbols data
             foreach (var symData in Db.GetCollection<SymbolData>("SymbolsData").FindAll())
                 _SymbolsData[symData.Id] = symData;
 
-            var closedOperations = Db.GetCollection<Operation>("ClosedOperations").FindAll().ToArray();
+            if (Db.UserVersion == 0)
+            {
+                var toRefresh = Db.GetCollection<Operation>("ClosedOperations");
+                foreach (var op in toRefresh.FindAll().ToArray())
+                    toRefresh.Upsert(op);
+
+                toRefresh = Db.GetCollection<Operation>("ActiveOperations");
+                foreach (var op in toRefresh.FindAll().ToArray())
+                    toRefresh.Upsert(op);
+
+                
+                Db.UserVersion = 1;
+                Db.Checkpoint();
+                Db.Rebuild();
+            }
+
             //rebuild operations 
             //closed operations are not loaded in current session  
             var activeOperations = Db.GetCollection<Operation>("ActiveOperations");
@@ -382,14 +405,6 @@ namespace SharpTrader.AlgoFramework
                 symData.AddActiveOperation(op);
             }
         }
-
-        public void SaveSymbolsData()
-        {
-            foreach (var symData in SymbolsData.Values)
-                Db.GetCollection<SymbolData>("SymbolsData").Upsert(symData);
-        }
-
-
     }
 
 }

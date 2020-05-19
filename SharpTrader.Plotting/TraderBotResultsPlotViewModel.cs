@@ -51,7 +51,7 @@ namespace SharpTrader.Plotting
                     // Start the Dispatcher Processing
                     System.Windows.Threading.Dispatcher.Run();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                 }
 

@@ -591,12 +591,9 @@ namespace SharpTrader.BrokersApi.Binance
                     if (ord != null)
                     {
                         ord.Update(newOrder);
-                        Orders.Update(newOrder);
+
                     }
-                    else
-                    {
-                        Orders.Insert(newOrder);
-                    }
+                    Orders.Upsert(newOrder);
                 }
             }
         }
@@ -767,7 +764,9 @@ namespace SharpTrader.BrokersApi.Binance
                 var result = new Order(binOrd);
                 OrdersUpdateOrInsert(result);
                 OrdersActiveInsertOrUpdate(result);
-                return new Request<IOrder>(RequestStatus.Completed, result);
+                //try to return the order instance from openoders instead of the new created one
+                var theOrder = OpenOrders.FirstOrDefault(o => o.Id == id) ?? result;
+                return new Request<IOrder>(RequestStatus.Completed, theOrder);
             }
             catch (Exception ex)
             {

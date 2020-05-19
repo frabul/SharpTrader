@@ -68,7 +68,7 @@ namespace SharpTrader.AlgoFramework
         {
 
         }
-          
+
         public override Task CancelAllOrders(Operation op)
         {
             var myOpData = GetMyOperationData(op);
@@ -297,7 +297,9 @@ namespace SharpTrader.AlgoFramework
                     //stop entries and exits
                     myOpData.EntryManager = null;
                     myOpData.ExitManager = null;
+
                     //put in close queue
+                    Logger.Info($"Putting operation {self.Op} in close queue because amount remaining is 0 and entry expired.");
                     await CloseQueueAsync(self.Op, TimeSpan.FromMinutes(5));
                 }
                 else
@@ -352,7 +354,7 @@ namespace SharpTrader.AlgoFramework
                             adj = ClampOrderAmount(symData, op.ExitTradeDirection, adj);
                             if (adj.amount > 0)
                             {
-                                Debug.Assert(adj.amount == op.AmountRemaining);
+                                //Debug.Assert(adj.amount == op.AmountRemaining);
                                 Logger.Info($"Setting EXIT order for oper {op} - amount:{adj.amount} - price: {adj.price}");
                                 var request =
                                     await Algo.Market.LimitOrderAsync(
@@ -560,12 +562,15 @@ namespace SharpTrader.AlgoFramework
                 {
                     //check if order was closed already
                     var req2 = await Algo.Market.OrderSynchAsync(order.Id);
-                    if (!req2.IsSuccessful)
+                    if (req2.IsSuccessful)
+                        order = req2.Result;
+                    else
                     {
                         ok = false;
                         Logger.Error($"Unable to close or synch order {order} in operation {op.ToString()}, errors:" +
                                         $"\n\t{req.ErrorInfo.Replace("\n", "\n\t")}" + $"\n\t{req.ErrorInfo.Replace("\n", "\n\t")}");
                     }
+
                     if (!order.IsClosed)
                     {
                         ok = false;
@@ -625,7 +630,7 @@ namespace SharpTrader.AlgoFramework
 
             op.ScheduleClose(Algo.Time + delay);
         }
-         
+
         internal delegate Task<bool> DeferredTaskDelegate(DeferredTask self);
 
         internal class DeferredTask

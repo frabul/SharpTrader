@@ -31,15 +31,15 @@ namespace SharpTrader.AlgoFramework
 
         private Signal _Signal;
         private HashSet<ITrade> _Entries = new HashSet<ITrade>();
-        private HashSet<ITrade> _Exits = new HashSet<ITrade>();
-         
+        private HashSet<ITrade> _Exits = new HashSet<ITrade>(); 
+
         public int OrdersCount { get; private set; } = 0;
         /// <summary>
         /// Unique identifier for this operation
         /// </summary> 
         public string Id { get; private set; }
 
-        [BsonIgnore] public DateTime CreationTime => Signal.CreationTime;
+        public DateTime CreationTime { get; private set; }
 
         /// <summary>
         /// Signal associated with the operation
@@ -53,6 +53,7 @@ namespace SharpTrader.AlgoFramework
                 _Signal = value;
                 _Signal.Operation = this;
                 _Signal.OnModify += (s) => Resume();
+                CreationTime = _Signal.CreationTime;
             }
         }
         public AssetAmount AmountTarget { get; private set; }
@@ -81,7 +82,7 @@ namespace SharpTrader.AlgoFramework
         [BsonIgnore]
         public IEnumerable<ITrade> AllTrades
         {
-            get => _Entries.Concat(Exits); 
+            get => _Entries.Concat(Exits);
         }
 
         /// <summary>
@@ -93,10 +94,10 @@ namespace SharpTrader.AlgoFramework
         /// Trades that were meant as exits
         /// </summary>
         public IEnumerable<ITrade> Exits { get => _Exits; private set => _Exits = new HashSet<ITrade>(value); }//private setter used by serialization
-         
-        public Operation( )
+
+        public Operation()
         {
-        
+
         }
 
         public Operation(string id, Signal signal, AssetAmount amountTarget, OperationType type)
@@ -105,7 +106,7 @@ namespace SharpTrader.AlgoFramework
             this.Signal = signal;
             this.AmountTarget = amountTarget;
             this.Type = type;
-            SetTradesDirections(); 
+            SetTradesDirections();
         }
 
         public Operation(JObject me)

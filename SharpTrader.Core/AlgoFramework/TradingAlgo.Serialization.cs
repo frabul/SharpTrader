@@ -78,10 +78,16 @@ namespace SharpTrader.AlgoFramework
             var dbPath = Path.Combine(MyDataDir, "MyData.db");
             if (!Directory.Exists(MyDataDir))
                 Directory.CreateDirectory(MyDataDir);
+
             //init db 
             this.Db = new LiteDatabase(dbPath, mapper);
+            var closedOperationsCollection = this.Db.GetCollection<Operation>("ClosedOperations");
+            var activeOperationsCollection = this.Db.GetCollection<Operation>("ActiveOperations");
+            closedOperationsCollection.EnsureIndex(oper => oper.CreationTime);
+            activeOperationsCollection.EnsureIndex(oper => oper.Id);
 
-
+            this.Db.Pragma("UTC_DATE", true);
+             
             //todo register mapper for custom components
             Market.RegisterSerializationHandlers(mapper);
             this.Executor?.RegisterSerializationHandlers(mapper);

@@ -225,7 +225,7 @@ namespace SharpTrader
             }
             return (first, last);
         }
-        
+
         public void ValidateData(HistoryInfo finfo)
         {
             lock (SymbolsDataLocker)
@@ -242,7 +242,7 @@ namespace SharpTrader
                 }
             }
         }
-        
+
         public void Delete(string market, string symbol, TimeSpan time)
         {
             var histInfo = new HistoryInfo(market, symbol, time);
@@ -261,7 +261,7 @@ namespace SharpTrader
                         if (File.Exists(fileInfo.FilePath))
                             File.Delete(fileInfo.FilePath);
                         filesInfos.Remove(fileInfo);
-                    } 
+                    }
                 }
             }
         }
@@ -432,7 +432,7 @@ namespace SharpTrader
         {
             string fileNameMask = info.GetFileMask();
             lock (CachedHistoryFilesPerinfoMask)
-            { 
+            {
                 if (!CachedHistoryFilesPerinfoMask.ContainsKey(fileNameMask))
                 {
                     if (AllFilesInDir == null)
@@ -475,9 +475,9 @@ namespace SharpTrader
                     ret = new HistoryFileInfo(filePath, market, symbol, time, date);
                 }
             }
-            catch (Exception ex)
-            {
-                //Console.WriteLine($"Error while parsing file info for file {fileName}");
+            catch (Exception _ex)
+            { 
+                Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
             }
             Debug.Assert(ret != null);
             return ret;
