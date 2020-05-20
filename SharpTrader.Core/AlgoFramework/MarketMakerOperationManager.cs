@@ -130,8 +130,7 @@ namespace SharpTrader.AlgoFramework
         private void InitOpTasks(Operation op, MyOperationData myOpData)
         {
             if (myOpData.Initialized)
-                return;
-
+                return; 
 
             op.OnResumed += (o) => InitOpTasks(o, o.ExecutorData as MyOperationData);
 

@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -14,13 +15,8 @@ namespace SharpTrader.AlgoFramework
         BuyThenSell,
         SellThenBuy,
     }
-
-    public interface IJObjectConvertible
-    {
-        JObject ToJobject(TradingAlgo algo);
-    }
-
-    public class Operation
+     
+    public class Operation : IChangeTracking
     {
         public event Action<Operation, ITrade> OnNewTrade;
         public event Action<Operation> OnClosing;
@@ -31,13 +27,18 @@ namespace SharpTrader.AlgoFramework
 
         private Signal _Signal;
         private HashSet<ITrade> _Entries = new HashSet<ITrade>();
-        private HashSet<ITrade> _Exits = new HashSet<ITrade>(); 
+        private HashSet<ITrade> _Exits = new HashSet<ITrade>();
+        private volatile bool _IsChanged;
 
+     
         public int OrdersCount { get; private set; } = 0;
         /// <summary>
         /// Unique identifier for this operation
         /// </summary> 
         public string Id { get; private set; }
+        public bool RiskManaged { get; set; }
+        public IChangeTracking ExecutorData { get; set; }
+        public IChangeTracking RiskManagerData { get; set; }
 
         public DateTime CreationTime { get; private set; }
 
@@ -67,9 +68,7 @@ namespace SharpTrader.AlgoFramework
         public decimal QuoteAmountRemaining { get; private set; }
         public OperationType Type { get; private set; }
         [BsonIgnore] public SymbolInfo Symbol => Signal.Symbol;
-        public bool RiskManaged { get; set; }
-        public object ExecutorData { get; set; }
-        public object RiskManagerData { get; set; }
+       
         public TradeDirection EntryTradeDirection { get; private set; }
         public TradeDirection ExitTradeDirection { get; private set; }
         public bool IsClosed { get; private set; }
@@ -94,6 +93,7 @@ namespace SharpTrader.AlgoFramework
         /// Trades that were meant as exits
         /// </summary>
         public IEnumerable<ITrade> Exits { get => _Exits; private set => _Exits = new HashSet<ITrade>(value); }//private setter used by serialization
+       
 
         public Operation()
         {
@@ -189,6 +189,9 @@ namespace SharpTrader.AlgoFramework
 
                 this.AmountRemaining = this.AmountInvested - AmountLiquidated;
                 this.QuoteAmountRemaining = this.QuoteAmountInvested - QuoteAmountLiquidated;
+                this.SetChanged();
+                Resume();
+                OnNewTrade?.Invoke(this, entry);
             }
 
         }
@@ -203,6 +206,9 @@ namespace SharpTrader.AlgoFramework
 
                 this.AmountRemaining = this.AmountInvested - AmountLiquidated;
                 this.QuoteAmountRemaining = this.QuoteAmountInvested - QuoteAmountLiquidated;
+                this.SetChanged();
+                Resume();
+                OnNewTrade?.Invoke(this, exit);
             }
         }
 
@@ -218,9 +224,7 @@ namespace SharpTrader.AlgoFramework
             else if (trade.Direction == this.ExitTradeDirection)
                 this.AddExit(trade);
             else
-                throw new Exception("Unknown trade direction");
-            Resume();
-            OnNewTrade?.Invoke(this, trade);
+                throw new Exception("Unknown trade direction"); 
         }
 
         public override string ToString()
@@ -234,13 +238,15 @@ namespace SharpTrader.AlgoFramework
             {
                 this.IsClosing = true;
                 this.CloseDeadTime = deadTime;
-                OnClosing?.Invoke(this);
+                this.SetChanged();
+                OnClosing?.Invoke(this); 
             }
         }
 
         public void Close()
         {
             this.IsClosed = true;
+            this.SetChanged();
             OnClosed?.Invoke(this);
         }
 
@@ -251,26 +257,23 @@ namespace SharpTrader.AlgoFramework
             {
                 IsClosing = false;
                 CloseDeadTime = DateTime.MaxValue;
+                this.SetChanged();
                 OnResumed?.Invoke(this);
             }
         }
+ 
 
-        public JObject ToJObject()
+        public void AcceptChanges()
         {
-            JObject me = new JObject();
-            //me["OrdersCount"] = this.OrdersCount;
-            //me["AllTrades"] = new JArray(this.AllTrades.Select(tr => tr.Id));
-            //me["Id"] = this.Id;
-            //me["Type"] = JToken.FromObject(this.Type);
-            //me["AmountTarget"] = JObject.FromObject(this.AmountTarget);
-            ////me["Signal"] = Algo.Sentry.GetSerializationData(this.Signal);
-            //me["CloseDeadTime"] = JToken.FromObject(this.CloseDeadTime);
-            //me["IsClosed"] = this.IsClosed;
-            //me["IsClosing"] = this.IsClosing;
-            //me["RiskManaged"] = this.RiskManaged;
-            //me["RiskManagerData"] = Algo.RiskManager.GetSerializationData(this.RiskManagerData);
-            //me["ExecutorData"] = Algo.Executor.SerializeOperationData(this.ExecutorData);
-            return me;
+            _IsChanged = false;
         }
+
+        private void SetChanged()
+        {
+            _IsChanged = true;
+        }
+
+        public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
+       
     }
 }

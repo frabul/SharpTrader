@@ -1,16 +1,15 @@
 ﻿using LiteDB;
 using Newtonsoft.Json.Linq;
 using System;
+using System.ComponentModel;
 using System.Dynamic;
 
 namespace SharpTrader.AlgoFramework
 {
-    public class Signal
-    {
-        
-
+    public class Signal : IChangeTracking
+    { 
         public event Action<Signal> OnModify;
-
+        private volatile bool _IsChanged = true;
         public Signal(string id, SymbolInfo symbol, SignalKind kind, DateTime creationTime)
         {
             Id = id;
@@ -55,18 +54,27 @@ namespace SharpTrader.AlgoFramework
         /// </summary>
         public DateTime ExpireDate { get; private set; }
 
+        public bool IsChanged => _IsChanged;
+
         public void ModifyConditions(decimal entry, DateTime entryExpiry, decimal target, DateTime targetExpiry)
         {
             PriceEntry = entry;
             EntryExpiry = entryExpiry;
             PriceTarget = target;
             ExpireDate = targetExpiry;
+            _IsChanged = true;
             OnModify?.Invoke(this);
         }
 
         public void SetTargetPrice(decimal target)
         {
             PriceTarget = target;
+            _IsChanged = true;
+        }
+
+        public void AcceptChanges()
+        {
+            _IsChanged = false; 
         }
     }
 }

@@ -69,25 +69,14 @@ namespace SharpTrader.AlgoFramework
     }
     public abstract partial class TradingAlgo
     {
+        private ILiteCollection<Operation> DbClosedOperations;
+        private ILiteCollection<Operation> DbActiveOperations;
 
         private List<Signal> SignalsDeserialized = new List<Signal>();
         public void ConfigureSerialization()
         {
-            BsonMapperCustom mapper = new BsonMapperCustom();
-            //build db path
-            var dbPath = Path.Combine(MyDataDir, "MyData.db");
-            if (!Directory.Exists(MyDataDir))
-                Directory.CreateDirectory(MyDataDir);
+            BsonMapperCustom mapper = new BsonMapperCustom(); 
 
-            //init db 
-            this.Db = new LiteDatabase(dbPath, mapper);
-            var closedOperationsCollection = this.Db.GetCollection<Operation>("ClosedOperations");
-            var activeOperationsCollection = this.Db.GetCollection<Operation>("ActiveOperations");
-            closedOperationsCollection.EnsureIndex(oper => oper.CreationTime);
-            activeOperationsCollection.EnsureIndex(oper => oper.Id);
-
-            this.Db.Pragma("UTC_DATE", true);
-             
             //todo register mapper for custom components
             Market.RegisterSerializationHandlers(mapper);
             this.Executor?.RegisterSerializationHandlers(mapper);
@@ -107,10 +96,110 @@ namespace SharpTrader.AlgoFramework
                 {
                     signal = new Signal(id);
                     SignalsDeserialized.Add(signal);
-                } 
+                }
                 return signal;
             }
             mapper.Entity<Signal>().Ctor(deserializeSignal);
+
+
+            //build db path
+            var dbPath = Path.Combine(MyDataDir, "MyData.db");
+            if (!Directory.Exists(MyDataDir))
+                Directory.CreateDirectory(MyDataDir);
+
+            //init db 
+            this.Db = new LiteDatabase(dbPath, mapper);
+            this.Db.Pragma("UTC_DATE", true);
+            DbClosedOperations = this.Db.GetCollection<Operation>("ClosedOperations");
+            DbClosedOperations.EnsureIndex(oper => oper.CreationTime);
+            DbActiveOperations = this.Db.GetCollection<Operation>("ActiveOperations");
+            DbActiveOperations.EnsureIndex(oper => oper.Id);
+        }
+        /// <summary>
+        /// This function should provide and object that is going to be saved for reload after reset
+        /// </summary> 
+        protected virtual object GetState() { return new object(); }
+        /// <summary>
+        /// This function receives the state saved ( provided by GetState() ) and restore the internal variables
+        /// </summary> 
+        protected virtual void RestoreState(object state) { }
+
+        public void SaveNonVolatileVars()
+        {
+            //save my internal state
+            BsonDocument states = new BsonDocument();
+            states["_id"] = "TradingAlgoState";
+            states["State"] = Db.Mapper.Serialize(State);
+
+            //Save derived state  
+            states["DerivedClassState"] = Db.Mapper.Serialize(GetState());
+
+            //save module states 
+            states["Sentry"] = Db.Mapper.Serialize(Sentry.GetState());
+            states["Allocator"] = Db.Mapper.Serialize(Allocator.GetState());
+            states["Executor"] = Db.Mapper.Serialize(Executor.GetState());
+            states["RiskManager"] = Db.Mapper.Serialize(RiskManager.GetState());
+
+            Db.GetCollection("State").Upsert(states);
+
+            foreach (var symData in SymbolsData.Values)
+                Db.GetCollection<SymbolData>("SymbolsData").Upsert(symData);
+
+            Db.BeginTrans();
+            foreach (var op in ActiveOperations.Where(op => op.IsChanged))
+                DbActiveOperations.Upsert(op);
+            foreach (var op in ClosedOperations.Where(op => op.IsChanged))
+                DbClosedOperations.Upsert(op); 
+            Db.Commit();
+
+            Db.Checkpoint();
+        }
+
+        public void LoadNonVolatileVars()
+        {
+            //reload my internal state
+            BsonDocument states = Db.GetCollection("State").FindById("TradingAlgoState");
+            if (states != null)
+            {
+                State = Db.Mapper.Deserialize<NonVolatileVars>(states["State"]);
+
+                //reload derived class state
+                this.RestoreState(Db.Mapper.Deserialize<object>(states["DerivedClassState"]));
+
+                //reload modules state
+                Sentry.RestoreState(Db.Mapper.Deserialize<object>(states["Sentry"]));
+                Allocator.RestoreState(Db.Mapper.Deserialize<object>(states["Allocator"]));
+                Executor.RestoreState(Db.Mapper.Deserialize<object>(states["Executor"]));
+                RiskManager.RestoreState(Db.Mapper.Deserialize<object>(states["RiskManager"]));
+            }
+
+
+
+            //rebuild symbols data
+            foreach (var symData in Db.GetCollection<SymbolData>("SymbolsData").FindAll())
+                _SymbolsData[symData.Id] = symData;
+
+            if (Db.UserVersion == 0)
+            {
+              
+                foreach (var op in DbClosedOperations.FindAll().ToArray())
+                    DbClosedOperations.Upsert(op);
+
+             
+                foreach (var op in DbClosedOperations.FindAll().ToArray())
+                    DbClosedOperations.Upsert(op); 
+                Db.UserVersion = 1;
+                Db.Checkpoint();
+                Db.Rebuild();
+            }
+
+            //rebuild operations 
+            //closed operations are not loaded in current session   
+            foreach (var op in DbActiveOperations.FindAll().ToArray())
+            {
+                var symData = GetSymbolData(op.Symbol);
+                symData.AddActiveOperation(op);
+            }
         }
     }
 }
