@@ -1,6 +1,7 @@
 ﻿using LiteDB;
 using SharpTrader.Indicators;
 using System;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -23,12 +24,35 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-        class MyOperationData
+        class MyOperationData : IChangeTracking
         {
-            public IOrder LastExit { get; set; }
-            public double StopLossDelta { get; set; }
-            public double HighestPrice { get; set; }
+            private volatile bool _IsChanged = true;
+            private IOrder lastExit;
+            private double stopLossDelta;
+            private double highestPrice;
 
+            public IOrder LastExit
+            {
+                get => lastExit;
+                set { lastExit = value; _IsChanged = true; }
+            }
+            public double StopLossDelta
+            {
+                get => stopLossDelta;
+                set { stopLossDelta = value; _IsChanged = true; }
+            }
+            public double HighestPrice
+            {
+                get => highestPrice;
+                set { highestPrice = value; _IsChanged = true; }
+            }
+
+            public bool IsChanged => _IsChanged;
+
+            public void AcceptChanges()
+            {
+                _IsChanged = false;
+            }
         }
 
         public double RiskRewardRatio { get; set; } = 1;
@@ -199,9 +223,9 @@ namespace SharpTrader.AlgoFramework
             foreach (var op in Algo.ActiveOperations)
             {
                 //---
-                if ( op.AmountRemaining > 0 && !op.RiskManaged )
+                if (op.AmountRemaining > 0 && !op.RiskManaged)
                 {
-                   
+
                     //get gain percent
                     if (op.Type == OperationType.BuyThenSell)
                     {

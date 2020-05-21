@@ -28,7 +28,7 @@ namespace SharpTrader.AlgoFramework
         private Signal _Signal;
         private HashSet<ITrade> _Entries = new HashSet<ITrade>();
         private HashSet<ITrade> _Exits = new HashSet<ITrade>();
-        private volatile bool _IsChanged;
+        private volatile bool _IsChanged = true;
 
      
         public int OrdersCount { get; private set; } = 0;
@@ -274,6 +274,11 @@ namespace SharpTrader.AlgoFramework
         }
 
         public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
-       
+
+        public override int GetHashCode()
+        {
+            return this.Id.GetHashCode();
+        }
+
     }
 }

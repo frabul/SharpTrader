@@ -1,6 +1,7 @@
 ﻿using LiteDB;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
@@ -15,15 +16,16 @@ namespace SharpTrader.AlgoFramework
         //todo avoid problems due to unsynched info about trades
         //todo ogni volta che viene cancellato un ordine si deve aspettare del tempo prima di crearne uno nuovo
         NLog.Logger Logger;
+      
         public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(5);
-        public class MyOperationData
+        public class MyOperationData : IChangeTracking
         {
+            private volatile bool _IsChanged = true;
             private IOrder currentExitOrder;
             private IOrder currentEntryOrder;
 
             public HashSet<string> AllEntries { get; set; } = new HashSet<string>();
-            public HashSet<string> AllExits { get; set; } = new HashSet<string>();
-            public List<IOrder> LiquidationOrders { get; set; } = new List<IOrder>();
+            public HashSet<string> AllExits { get; set; } = new HashSet<string>(); 
 
             public IOrder CurrentEntryOrder
             {
@@ -33,6 +35,7 @@ namespace SharpTrader.AlgoFramework
                     if (value != null)
                         AllEntries.Add(value.Id);
                     currentEntryOrder = value;
+                    _IsChanged = true;
                 }
             }
 
@@ -44,14 +47,21 @@ namespace SharpTrader.AlgoFramework
                     if (value != null)
                         AllExits.Add(value.Id);
                     currentExitOrder = value;
-
+                    _IsChanged = true;
                 }
             }
 
-            [BsonIgnore] internal bool Initialized { get; set; }
+            public bool IsChanged => _IsChanged;
+
+            [BsonIgnore] internal bool Initialized { get; set; } = false;
             [BsonIgnore] internal DeferredTask OperationManager { get; set; }
             [BsonIgnore] internal DeferredTask EntryManager { get; set; }
             [BsonIgnore] internal DeferredTask ExitManager { get; set; }
+
+            public void AcceptChanges()
+            {
+                _IsChanged = false;
+            }
         }
         public decimal EntryDistantThreshold { get; private set; }
 
@@ -330,7 +340,7 @@ namespace SharpTrader.AlgoFramework
             var myOpData = self.myOpData;
             Operation op = self.Op;
             SymbolData symData = self.SymbolData;
-            Debug.Assert(myOpData.CurrentExitOrder == null, "Current exit order is not null");
+            Debug.Assert(myOpData.CurrentExitOrder == null || !Algo.BackTesting, "Current exit order is not null");
 
             if (op.IsClosing || op.IsClosed)
             {
@@ -392,14 +402,15 @@ namespace SharpTrader.AlgoFramework
             Debug.Assert(myOpData.CurrentExitOrder != null);
             //check if we need to change order in case that the amount invested was increased
             var currentExitOrder = myOpData.CurrentExitOrder;
-            var wrongAmout = Math.Abs(op.AmountRemaining - (currentExitOrder.Amount - currentExitOrder.Filled)) > op.AmountRemaining * 0.10m;
+            var tradableAmout  = ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)).amount + (currentExitOrder.Amount - currentExitOrder.Filled); 
+            var wrongAmout = Math.Abs(tradableAmout - (currentExitOrder.Amount - currentExitOrder.Filled)) > tradableAmout * 0.10m;
             var wrongPrice = Math.Abs(currentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m;
-
+             
             if (wrongPrice || wrongAmout || Algo.Time > op.Signal.ExpireDate)
             {
                 Logger.Info($"Cancelling exit order for operation {op} - wrongAmout: {wrongAmout} - wrongPrice: {wrongPrice} ");
-                var requestResult = await Algo.Market.OrderCancelAsync(currentExitOrder.Id);
-                if (requestResult.IsSuccessful)
+                var requestResult = await this.CloseExitOrder(op, myOpData);
+                if (requestResult)
                 {
                     myOpData.CurrentExitOrder = null;
                     self.Next = OpenExitOrder;
@@ -427,7 +438,7 @@ namespace SharpTrader.AlgoFramework
             Operation op = self.Op;
             SymbolData symData = self.SymbolData;
 
-            Debug.Assert(myOpData.CurrentEntryOrder == null);
+            Debug.Assert(myOpData.CurrentEntryOrder == null || !Algo.BackTesting);
 
             if (op.IsClosing || op.IsClosed)
             {
@@ -598,7 +609,7 @@ namespace SharpTrader.AlgoFramework
                 return true;
             var closedok = await CloseOrder(opdata.CurrentExitOrder, operation);
             if (closedok)
-                opdata.CurrentEntryOrder = null;
+                opdata.CurrentExitOrder = null;
             return closedok;
         }
 

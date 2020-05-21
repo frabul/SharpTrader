@@ -195,11 +195,8 @@ namespace SharpTrader.AlgoFramework
 
             //rebuild operations 
             //closed operations are not loaded in current session   
-            foreach (var op in DbActiveOperations.FindAll().ToArray())
-            {
-                var symData = GetSymbolData(op.Symbol);
-                symData.AddActiveOperation(op);
-            }
+            foreach (var op in DbActiveOperations.FindAll().ToArray()) 
+                this.AddActiveOperation(op); 
         }
     }
 }

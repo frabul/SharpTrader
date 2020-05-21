@@ -28,8 +28,8 @@ namespace SharpTrader.AlgoFramework
         private Dictionary<string, SymbolData> _SymbolsData = new Dictionary<string, SymbolData>();
         private TimeSlice WorkingSlice = new TimeSlice();
         private TimeSlice OldSlice = new TimeSlice();
-        private List<Operation> _ActiveOperations = new List<Operation>();
-        private List<Operation> _ClosedOperations = new List<Operation>();
+        private HashSet<Operation> _ActiveOperations = new HashSet<Operation>();
+        private HashSet<Operation> _ClosedOperations = new HashSet<Operation>();
         private NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private Configuration Config;
         private LiteDatabase Db;
@@ -39,8 +39,8 @@ namespace SharpTrader.AlgoFramework
         public string MyDataDir => Path.Combine(Config.DataDir, Config.Name);
         public Action<PlotHelper> ShowPlotCallback { get; set; }
         public IReadOnlyDictionary<string, SymbolData> SymbolsData => _SymbolsData;
-        public IReadOnlyList<Operation> ActiveOperations => _ActiveOperations;
-        public IReadOnlyList<Operation> ClosedOperations => _ActiveOperations;
+        public IReadOnlyCollection<Operation> ActiveOperations => _ActiveOperations;
+        public IReadOnlyCollection<Operation> ClosedOperations => _ClosedOperations;
         public SymbolsSelector SymbolsFilter { get; set; }
         public Sentry Sentry { get; set; }
         public FundsAllocator Allocator { get; set; }
@@ -106,8 +106,6 @@ namespace SharpTrader.AlgoFramework
                 await RiskManager.Initialize(this);
         }
 
-
-
         public async Task Update(TimeSlice slice)
         {
             LastUpdate = Market.Time;
@@ -165,17 +163,19 @@ namespace SharpTrader.AlgoFramework
                     //let's search in closed operations
                     oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(2)).ToArray();
                     var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
+
                     if (oldOp != null)
                     {
                         oldOp.AddTrade(trade);
+                        //check if it got resumed by this new trade
+                        if (!oldOp.IsClosed)
+                            this.ResumeOperation(oldOp);
                         Logger.Info($"New trade {trade.ToString()} added to old operation {activeOp.ToString()}");
                     }
                     else
                         Logger.Info($"New trade {trade.ToString()} without any associated operation");
                 }
             }
-            //todo 
-            muovere le operazioni riesumate
             await OnUpdate(slice);
 
             // get signals 
@@ -187,38 +187,30 @@ namespace SharpTrader.AlgoFramework
                 Allocator.Update(slice);
 
             this.Db?.BeginTrans();
+
             //close operations that have been in close queue for enough time
-            for (int i = 0; i < this.ActiveOperations.Count; i++)
+            List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
+            foreach (var op in operationsToClose)
             {
-                var op = this.ActiveOperations[i];
-                if (this.Time >= op.CloseDeadTime)
+                Logger.Info($"Closing operation {op}.");
+                op.Close();
+                _ActiveOperations.Remove(op);
+                if (this.Config.SaveData || op.AmountInvested > 0)
+                    this._ClosedOperations.Add(op);
+                this.SymbolsData[op.Symbol.Key].CloseOperation(op);
+
+                if (this.Config.SaveData)
                 {
-                    Logger.Info($"Closing operation {op}.");
-                    op.Close();
-                    //move closed operations
-                    this._ActiveOperations.RemoveAt(i--);
-                    if (this.Config.SaveData || op.AmountInvested > 0)
-                        this._ClosedOperations.Add(op);
-                    this.SymbolsData[op.Symbol.Key].CloseOperation(op);
-                     
-                    if (this.Config.SaveData)
-                    {
-                        //update database 
-                        DbActiveOperations.Delete(op.Id);
-                        DbClosedOperations.Upsert(op);
-                    } 
+                    //update database 
+                    DbActiveOperations.Delete(op.Id);
+                    DbClosedOperations.Upsert(op);
                 }
             }
             this.Db?.Commit();
 
             //add new operations that have been created 
-            foreach (var op in slice.NewOperations)
-            {
-                this._ActiveOperations.Add(op);
-                var symData = GetSymbolData(op.Symbol);
-                symData.AddActiveOperation(op);
-                DbActiveOperations.Upsert(op);
-            }
+            foreach (var op in slice.NewOperations) 
+                AddActiveOperation(op); 
 
             //manage orders
             if (Executor != null)
@@ -234,6 +226,23 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
+        private void AddActiveOperation(Operation op)
+        {
+            this._ActiveOperations.Add(op);
+            var symData = GetSymbolData(op.Symbol);
+            symData.AddActiveOperation(op);
+            if (this.Config.SaveData)
+                DbActiveOperations.Upsert(op);
+        }
+
+        private void ResumeOperation(Operation op)
+        {
+            Logger.Info($"Resuming operation {op}.");
+            AddActiveOperation(op); 
+            var removed = this._ClosedOperations.Remove(op); 
+            if (this.Config.SaveData) 
+                DbClosedOperations.Delete(op.Id); 
+        }
         public string GetNewOperationId()
         {
             return (State.TotalOperations++).ToString();

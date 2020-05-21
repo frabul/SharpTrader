@@ -53,14 +53,14 @@ namespace SharpTrader.BrokersApi.Binance
         private LiteDatabase TradesAndOrdersDb;
         private List<SymbolFeed> Feeds = new List<SymbolFeed>();
         private Guid UserDataSocket;
-        private Regex IdRegex = new Regex("([A-Z]+)([0-9]+)", RegexOptions.Compiled);
-        private Task FastUpdatesTask;
-        private Task OrdersAndTradesSynchTask;
+        private Regex IdRegex = new Regex("([A-Z]+)([0-9]+)", RegexOptions.Compiled); 
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
         private string OperationsDbPath;
         private string OperationsArchivePath;
         private DateTime TimeToArchive;
         private MemoryCache Cache = new MemoryCache();
+        private Task FastUpdatesTask;
+        private Task OrdersAndTradesSynchTask;
         public BinanceClient Client { get; private set; }
 
         public string MarketName => "Binance";
@@ -137,13 +137,19 @@ namespace SharpTrader.BrokersApi.Binance
                 {
                     while (true)
                     {
-                        //we first synch open orders 
-                        await SynchOpenOrders();
-                        //synch last trades 
-                        await SynchLastTrades();
-                        //then finally we restart the timer and archive operations  
-                        ArchiveOldOperations();
+                        try
+                        {
+                            await SynchBalance();
+                            //we first synch open orders 
+                            await SynchOpenOrders();
+                            //synch last trades 
+                            await SynchLastTrades();
+                            //then finally we restart the timer and archive operations  
+                            ArchiveOldOperations();
+                        }
+                        catch { }
                         await Task.Delay(TimeSpan.FromSeconds(60));
+
                     }
                 };
                 OrdersAndTradesSynchTask = Task.Run(SynchOrdersAndTrades);
@@ -155,11 +161,15 @@ namespace SharpTrader.BrokersApi.Binance
                     {
                         while (true)
                         {
-                            //first synch server time then balance then restart timer
-                            if (!publicOnly)
+                            try
+                            {
+                                //first synch server time then balance then restart timer
+                                if (!publicOnly)
+                                    await ServerTimeSynch();
                                 await ServerTimeSynch();
-                            await ServerTimeSynch();
-                            await Task.Delay(15000);
+                            }
+                            catch { }
+                            await Task.Delay(15000); 
                         }
                     });
             Logger.Info("initialization complete");
@@ -240,9 +250,7 @@ namespace SharpTrader.BrokersApi.Binance
             SymbolsData = TradesAndOrdersDb.GetCollection<SymbolData>("SymbolsData");
 
             OrdersArchive = TradesAndOrdersArch.GetCollection<Order>("Orders");
-            TradesArchive = TradesAndOrdersArch.GetCollection<Trade>("Trades");
-
-
+            TradesArchive = TradesAndOrdersArch.GetCollection<Trade>("Trades"); 
         }
 
         private async Task DownloadAllOrdersAndTrades()
