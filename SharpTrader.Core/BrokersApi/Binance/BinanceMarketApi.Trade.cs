@@ -63,5 +63,9 @@ namespace SharpTrader.BrokersApi.Binance
         {
             return $"Trade{{ Id: {Id}, Symbol:{Symbol}, Direction:{Direction}, Time:{Time} }}";
         }
+        public override int GetHashCode()
+        {
+            return this.Id.GetHashCode();
+        }
     }
 }

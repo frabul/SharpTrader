@@ -335,8 +335,6 @@ namespace SharpTrader.AlgoFramework
             IsTradingStopped = true;
             //close all entry orders
             return this.Executor.CancelEntryOrders();
-        }
-
-
+        } 
     }
 }

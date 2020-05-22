@@ -15,9 +15,10 @@ namespace SharpTrader.AlgoFramework
         BuyThenSell,
         SellThenBuy,
     }
-     
+
     public class Operation : IChangeTracking
     {
+        
         public event Action<Operation, ITrade> OnNewTrade;
         public event Action<Operation> OnClosing;
         public event Action<Operation> OnClosed;
@@ -26,11 +27,10 @@ namespace SharpTrader.AlgoFramework
         //todo prevedere la possibile chiusura di una operazione passando i fondi ad un'altra 
 
         private Signal _Signal;
-        private HashSet<ITrade> _Entries = new HashSet<ITrade>();
-        private HashSet<ITrade> _Exits = new HashSet<ITrade>();
+        private HashSet<ITrade> _Entries = new HashSet<ITrade>(EntriesEqualityComparer.Instance);
+        private HashSet<ITrade> _Exits = new HashSet<ITrade>(EntriesEqualityComparer.Instance);
         private volatile bool _IsChanged = true;
 
-     
         public int OrdersCount { get; private set; } = 0;
         /// <summary>
         /// Unique identifier for this operation
@@ -39,7 +39,6 @@ namespace SharpTrader.AlgoFramework
         public bool RiskManaged { get; set; }
         public IChangeTracking ExecutorData { get; set; }
         public IChangeTracking RiskManagerData { get; set; }
-
         public DateTime CreationTime { get; private set; }
 
         /// <summary>
@@ -50,7 +49,7 @@ namespace SharpTrader.AlgoFramework
             get => _Signal;
             private set
             {
-                System.Diagnostics.Debug.Assert(value.Operation == null);
+                //System.Diagnostics.Debug.Assert(value.Operation == null);
                 _Signal = value;
                 _Signal.Operation = this;
                 _Signal.OnModify += (s) => Resume();
@@ -68,13 +67,15 @@ namespace SharpTrader.AlgoFramework
         public decimal QuoteAmountRemaining { get; private set; }
         public OperationType Type { get; private set; }
         [BsonIgnore] public SymbolInfo Symbol => Signal.Symbol;
-       
+
         public TradeDirection EntryTradeDirection { get; private set; }
         public TradeDirection ExitTradeDirection { get; private set; }
         public bool IsClosed { get; private set; }
         public bool IsClosing { get; private set; }
         public DateTime CloseDeadTime { get; private set; } = DateTime.MaxValue;
         public DateTime LastInvestmentTime { get; private set; }
+        public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
+
         /// <summary>
         /// All trades associated with this operation
         /// </summary> 
@@ -84,16 +85,32 @@ namespace SharpTrader.AlgoFramework
             get => _Entries.Concat(Exits);
         }
 
-        /// <summary>
+        /// <summary>W
         /// Trades that were meant as entries
         /// </summary>
-        public IEnumerable<ITrade> Entries { get => _Entries; private set => _Entries = new HashSet<ITrade>(value); }//private setter used by serialization
+        public IEnumerable<ITrade> Entries
+        {
+            get => _Entries; private set
+            { 
+                foreach (var trade in value)
+                    _Entries.Add(trade);
+            }
+        }//private setter used by serialization
 
-        /// <summary>
+        /// <summaropera
         /// Trades that were meant as exits
         /// </summary>
-        public IEnumerable<ITrade> Exits { get => _Exits; private set => _Exits = new HashSet<ITrade>(value); }//private setter used by serialization
-       
+        public IEnumerable<ITrade> Exits
+        {
+            get => _Exits;
+            private set
+            {
+                
+                foreach (var trade in value)
+                    _Exits.Add(trade);
+            }
+        }//private setter used by serialization
+
 
         public Operation()
         {
@@ -109,27 +126,23 @@ namespace SharpTrader.AlgoFramework
             SetTradesDirections();
         }
 
-        public Operation(JObject me)
+        internal void Recalculate()
         {
-            //this.OrdersCount = me["OrdersCount"].ToObject<int>();
-            //this.Algo = algo;
-            //this.Id = me["Id"].ToObject<string>();
-            ////this.Signal = Algo.Sentry.DeserializeSignal(me["Signal"]);
-            //this.AmountTarget = me["AmountTarget"].ToObject<AssetAmount>();
-            //this.Type = me["Type"].ToObject<OperationType>();
-            //SetTradesDirections();
+            var entries = this.Entries.ToList();
+            _Entries.Clear();
+            var exits = this.Exits.ToList();
+            _Exits.Clear();
 
-            //this.CloseDeadTime = me["CloseDeadTime"].ToObject<DateTime>();
-            //this.IsClosed = me["IsClosed"].ToObject<bool>();
-            //this.IsClosed = me["IsClosed"].ToObject<bool>();
-            //this.RiskManaged = me["RiskManaged"].ToObject<bool>();
-
-            //this.RiskManagerData = Algo.RiskManager.DeserializeOperationData(me["RiskManagerData"]);
-            //this.ExecutorData = Algo.Executor.DeserializeOperationData(me["ExecutorData"]);
-
-            ////deserialize trades
-            //foreach (var tradeId in me["AllTrades"].ToArray())
-            //    this.AddTrade(Algo.Market.GetTradeById(tradeId));
+            AverageEntryPrice = 0;
+            AverageExitPrice = 0;
+            AmountInvested = 0;
+            QuoteAmountInvested = 0;
+            AmountLiquidated = 0;
+            QuoteAmountLiquidated = 0;
+            AmountRemaining = 0;
+            QuoteAmountRemaining = 0;
+            foreach (var trade in entries.Concat(exits))
+                this.AddTrade(trade);
         }
 
         private void SetTradesDirections()
@@ -152,6 +165,7 @@ namespace SharpTrader.AlgoFramework
         {
             var orderId = $"{this.Id}-{OrdersCount}";
             OrdersCount++;
+            _IsChanged = true;
             return orderId;
         }
 
@@ -224,7 +238,7 @@ namespace SharpTrader.AlgoFramework
             else if (trade.Direction == this.ExitTradeDirection)
                 this.AddExit(trade);
             else
-                throw new Exception("Unknown trade direction"); 
+                throw new Exception("Unknown trade direction");
         }
 
         public override string ToString()
@@ -239,7 +253,7 @@ namespace SharpTrader.AlgoFramework
                 this.IsClosing = true;
                 this.CloseDeadTime = deadTime;
                 this.SetChanged();
-                OnClosing?.Invoke(this); 
+                OnClosing?.Invoke(this);
             }
         }
 
@@ -252,7 +266,6 @@ namespace SharpTrader.AlgoFramework
 
         public void Resume()
         {
-            Debug.Assert(this.IsClosed == false);
             if (IsClosing)
             {
                 IsClosing = false;
@@ -261,7 +274,6 @@ namespace SharpTrader.AlgoFramework
                 OnResumed?.Invoke(this);
             }
         }
- 
 
         public void AcceptChanges()
         {
@@ -273,12 +285,23 @@ namespace SharpTrader.AlgoFramework
             _IsChanged = true;
         }
 
-        public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
+
 
         public override int GetHashCode()
         {
             return this.Id.GetHashCode();
         }
+        class EntriesEqualityComparer : IEqualityComparer<ITrade>, IEqualityComparer<IOrder>
+        {
+            public bool Equals(ITrade x, ITrade y) => x.Id == y.Id;
 
+            public int GetHashCode(ITrade obj) => obj.GetHashCode();
+
+            public bool Equals(IOrder x, IOrder y) => x.Id == y.Id;
+
+            public int GetHashCode(IOrder obj) => obj.GetHashCode();
+
+            public static EntriesEqualityComparer Instance { get; } = new EntriesEqualityComparer();
+        }
     }
 }

@@ -296,7 +296,7 @@ namespace SharpTrader.AlgoFramework
 
             //if signal entry is expired and we yet didn't get to enter, then we can just   
             //      queue the operation for close 
-            if (op.IsEntryExpired(Algo.Time) && op.AmountInvested <= 0)
+            if (op.IsEntryExpired(Algo.Time) && op.AmountRemaining <= 0)
             {
                 self.Time = Algo.Time.AddSeconds(30);
                 var entryClosed = await CloseEntryOrder(self.Op, self.myOpData);

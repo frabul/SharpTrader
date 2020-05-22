@@ -75,7 +75,7 @@ namespace SharpTrader.AlgoFramework
         private List<Signal> SignalsDeserialized = new List<Signal>();
         public void ConfigureSerialization()
         {
-            BsonMapperCustom mapper = new BsonMapperCustom(); 
+            BsonMapperCustom mapper = new BsonMapperCustom();
 
             //todo register mapper for custom components
             Market.RegisterSerializationHandlers(mapper);
@@ -149,7 +149,7 @@ namespace SharpTrader.AlgoFramework
             foreach (var op in ActiveOperations.Where(op => op.IsChanged))
                 DbActiveOperations.Upsert(op);
             foreach (var op in ClosedOperations.Where(op => op.IsChanged))
-                DbClosedOperations.Upsert(op); 
+                DbClosedOperations.Upsert(op);
             Db.Commit();
 
             Db.Checkpoint();
@@ -179,24 +179,30 @@ namespace SharpTrader.AlgoFramework
             foreach (var symData in Db.GetCollection<SymbolData>("SymbolsData").FindAll())
                 _SymbolsData[symData.Id] = symData;
 
-            if (Db.UserVersion == 0)
+            if (Db.UserVersion < 4)
             {
-              
-                foreach (var op in DbClosedOperations.FindAll().ToArray())
-                    DbClosedOperations.Upsert(op);
 
-             
                 foreach (var op in DbClosedOperations.FindAll().ToArray())
-                    DbClosedOperations.Upsert(op); 
-                Db.UserVersion = 1;
+                {
+                    op.Recalculate();
+                    DbClosedOperations.Upsert(op);
+                }
+
+                foreach (var op in DbActiveOperations.FindAll().ToArray())
+                {
+                    op.Recalculate();
+                    DbActiveOperations.Upsert(op);
+                }
+
+                Db.UserVersion = 4;
                 Db.Checkpoint();
                 Db.Rebuild();
             }
 
             //rebuild operations 
             //closed operations are not loaded in current session   
-            foreach (var op in DbActiveOperations.FindAll().ToArray()) 
-                this.AddActiveOperation(op); 
+            foreach (var op in DbActiveOperations.FindAll().ToArray())
+                this.AddActiveOperation(op);
         }
     }
 }

@@ -53,7 +53,7 @@ namespace SharpTrader.BrokersApi.Binance
         private LiteDatabase TradesAndOrdersDb;
         private List<SymbolFeed> Feeds = new List<SymbolFeed>();
         private Guid UserDataSocket;
-        private Regex IdRegex = new Regex("([A-Z]+)([0-9]+)", RegexOptions.Compiled); 
+        private Regex IdRegex = new Regex("([A-Z]+)([0-9]+)", RegexOptions.Compiled);
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
         private string OperationsDbPath;
         private string OperationsArchivePath;
@@ -112,8 +112,7 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 Logger.Info("Synching oders and trades....");
                 if (!publicOnly)
-                {
-                    var oldOpenOrders = OpenOrdersArchive.FindAll().ToArray();
+                { 
                     await SynchOpenOrders();
                     await SynchLastTrades();
                 }
@@ -169,7 +168,7 @@ namespace SharpTrader.BrokersApi.Binance
                                 await ServerTimeSynch();
                             }
                             catch { }
-                            await Task.Delay(15000); 
+                            await Task.Delay(15000);
                         }
                     });
             Logger.Info("initialization complete");
@@ -250,7 +249,7 @@ namespace SharpTrader.BrokersApi.Binance
             SymbolsData = TradesAndOrdersDb.GetCollection<SymbolData>("SymbolsData");
 
             OrdersArchive = TradesAndOrdersArch.GetCollection<Order>("Orders");
-            TradesArchive = TradesAndOrdersArch.GetCollection<Trade>("Trades"); 
+            TradesArchive = TradesAndOrdersArch.GetCollection<Trade>("Trades");
         }
 
         private async Task DownloadAllOrdersAndTrades()
@@ -285,7 +284,6 @@ namespace SharpTrader.BrokersApi.Binance
 
         private async Task SynchSymbolOrders(string sym)
         {
-
             var lastOrder = Orders.Find(o => o.Symbol == sym)?.OrderBy(o => o.OrderId).LastOrDefault();
             long start = (lastOrder != null) ? lastOrder.OrderId + 1 : 0;
             bool finish = false;
@@ -370,10 +368,6 @@ namespace SharpTrader.BrokersApi.Binance
 
         }
 
-
-
-
-
         private void RemoveOpenOrder(Order order)
         {
             OpenOrdersArchive.Delete(order.Id);
@@ -389,21 +383,22 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 var resp = await Client.GetCurrentOpenOrders(new CurrentOpenOrdersRequest() { Symbol = null });
                 var allOpen = resp.Select(o => new Order(o));
-                Order[] toClose;
+                Order[] ordersClosed;
                 lock (LockOrdersTrades)
                 {
                     foreach (var newOrder in allOpen)
                         OrdersActiveInsertOrUpdate(newOrder);
 
-                    toClose = OpenOrders.Where(oo => !allOpen.Any(no => no.Id == oo.Id)).ToArray();
-                    foreach (var orderToClose in toClose)
+                    ordersClosed = OpenOrders.Where(oo => !allOpen.Any(no => no.Id == oo.Id)).ToArray();
+                    foreach (var orderToClose in ordersClosed)
                         RemoveOpenOrder(orderToClose);
                 }
 
-                foreach (var ord in toClose)
+                foreach (var ord in ordersClosed)
                 {
                     if (ord.Status <= OrderStatus.PartiallyFilled)
                     {
+                        //the order is out of synch as we think it's still open but was actually closed
                         var orderUpdated =
                             new Order(await Client.QueryOrder(new QueryOrderRequest() { OrderId = ord.OrderId, Symbol = ord.Symbol }));
                         ord.Update(orderUpdated);
@@ -615,12 +610,14 @@ namespace SharpTrader.BrokersApi.Binance
                 if (oldOpen != null)
                 {
                     oldOpen.Update(newOrder);
-                    OpenOrdersArchive.Upsert(newOrder);
+
                     if (oldOpen.Status > OrderStatus.PartiallyFilled)
                     {
                         OpenOrders.Remove(newOrder);
                         OpenOrdersArchive.Delete(newOrder.Id);
                     }
+                    else
+                        OpenOrdersArchive.Upsert(newOrder);
                 }
                 else if (newOrder.Status <= OrderStatus.PartiallyFilled)
                 {
@@ -773,8 +770,11 @@ namespace SharpTrader.BrokersApi.Binance
                 OrdersUpdateOrInsert(result);
                 OrdersActiveInsertOrUpdate(result);
                 //try to return the order instance from openoders instead of the new created one
-                var theOrder = OpenOrders.FirstOrDefault(o => o.Id == id) ?? result;
-                return new Request<IOrder>(RequestStatus.Completed, theOrder);
+                lock (LockOrdersTrades)
+                {
+                    var theOrder = OpenOrders.FirstOrDefault(o => o.Id == id) ?? result;
+                    return new Request<IOrder>(RequestStatus.Completed, theOrder);
+                }
             }
             catch (Exception ex)
             {
@@ -1153,10 +1153,17 @@ namespace SharpTrader.BrokersApi.Binance
 
             Order BsonToOrder(BsonValue value)
             {
-                var order = OpenOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
-                if (order == null)
-                    order = Orders.FindById(value["_id"].AsString);
-                return order;
+                lock (LockOrdersTrades)
+                {
+                    var order = OpenOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
+                    if (order == null)
+                    {
+                        order = Orders.FindById(value["_id"].AsString);
+                        if (order != null)
+                            OpenOrders.Add(order);
+                    }
+                    return order;
+                }
             }
 
             BsonValue SerializeTrade(Trade trade)
@@ -1166,7 +1173,8 @@ namespace SharpTrader.BrokersApi.Binance
 
             Trade DeserializeTrade(BsonValue value)
             {
-                return Trades.FindById(value["_id"].AsString);
+                lock (LockOrdersTrades)
+                    return Trades.FindById(value["_id"].AsString);
             }
 
             mapper.RegisterType<Order>(OrderToBson, BsonToOrder);

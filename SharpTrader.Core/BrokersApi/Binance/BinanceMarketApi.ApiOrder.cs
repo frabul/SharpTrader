@@ -139,5 +139,10 @@ namespace SharpTrader.BrokersApi.Binance
             this.Status = order.Status;
             this.Filled = order.Filled;
         }
+
+        public override int GetHashCode()
+        {
+            return this.Id.GetHashCode();
+        }
     }
 }
