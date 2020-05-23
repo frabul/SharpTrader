@@ -243,7 +243,23 @@ namespace SharpTrader.AlgoFramework
 
         public override string ToString()
         {
-            return $"oper {{Id: {Id}, Symbol: {Symbol.Key}, Type: {this.Type}}}";
+            return ToString("");
+        }
+        public   string ToString(string format)
+        {
+            if( format == "c")
+            {
+                return $"{{ Id: {Id} {Symbol.Key} {CreationTime:dd-MM-yyyy hh:mm:ss}," + 
+                    $" EP: {this.AverageEntryPrice:0.########}," +
+                    $" TP: {Signal.PriceTarget:0.########}," +
+                    $" EP: {this.AverageExitPrice:0.########}," +
+                    $" QA: {this.QuoteAmountInvested:0.########}," +
+                    $" QRA:{this.QuoteAmountRemaining:0.########} }}";
+            }
+            else
+            {
+                return $"{{ Id: {Id} -  Symbol: {Symbol.Key} }}";
+            } 
         }
 
         public void ScheduleClose(DateTime deadTime)

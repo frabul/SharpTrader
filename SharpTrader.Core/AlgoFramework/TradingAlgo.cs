@@ -113,8 +113,10 @@ namespace SharpTrader.AlgoFramework
             var changes = await SymbolsFilter.UpdateAsync(slice);
             if (changes != SelectedSymbolsChanges.None)
             {
+                var selectedForOperationsActive = this.ActiveOperations.Select(ao => ao.Symbol).GroupBy(ao => ao.Key).Select(g => g.First()).ToList();
                 //release feeds of unused symbols
-                foreach (var sym in changes.RemovedSymbols)
+                var removedSymbolsWithoutActiveOperations = changes.RemovedSymbols.Where(rs => !selectedForOperationsActive.Any(aos => aos.Key == rs.Key));
+                foreach (var sym in removedSymbolsWithoutActiveOperations)
                 {
                     SymbolData symbolData = GetSymbolData(sym);
                     symbolData.IsSelectedForTrading = false;
@@ -128,10 +130,19 @@ namespace SharpTrader.AlgoFramework
                 {
                     SymbolData symbolData = GetSymbolData(sym);
                     symbolData.IsSelectedForTrading = true;
-                    symbolData.Feed = await this.GetSymbolFeed(sym.Key);
-                    symbolData.Feed.OnData -= Feed_OnData;
-                    symbolData.Feed.OnData += Feed_OnData;
+
                 }
+                foreach (var sym in changes.AddedSymbols.Concat(selectedForOperationsActive))
+                {
+                    SymbolData symbolData = GetSymbolData(sym);
+                    if (symbolData.Feed == null)
+                    {
+                        symbolData.Feed = await this.GetSymbolFeed(sym.Key);
+                        symbolData.Feed.OnData -= Feed_OnData;
+                        symbolData.Feed.OnData += Feed_OnData;
+                    }
+                }
+                    
 
                 if (Sentry != null)
                     await Sentry.OnSymbolsChanged(changes);
@@ -145,6 +156,8 @@ namespace SharpTrader.AlgoFramework
                 if (RiskManager != null)
                     RiskManager.OnSymbolsChanged(changes);
             }
+            //we should also add feeds for symbols that have open orders
+
 
             // register trades with their linked operations
             Operation[] oldOperations = null;
@@ -156,21 +169,24 @@ namespace SharpTrader.AlgoFramework
                 if (activeOp != null)
                 {
                     activeOp.AddTrade(trade);
-                    Logger.Info($"New trade {trade.ToString()} added to operation {activeOp.ToString()}");
+                    Logger.Info($"New trade for operation {activeOp.ToString()}: {trade.ToString()}");
                 }
                 else
                 {
                     //let's search in closed operations
-                    oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(2)).ToArray();
+                    oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray();
                     var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
 
                     if (oldOp != null)
                     {
+                        Logger.Info($"New trade for 'old' operation {activeOp}: {trade.ToString()}");
                         oldOp.AddTrade(trade);
                         //check if it got resumed by this new trade
                         if (!oldOp.IsClosed)
+                        {
                             this.ResumeOperation(oldOp);
-                        Logger.Info($"New trade {trade.ToString()} added to old operation {activeOp.ToString()}");
+                            Logger.Info($"Resuming 'old' operation {activeOp}.");
+                        }
                     }
                     else
                         Logger.Info($"New trade {trade.ToString()} without any associated operation");
@@ -192,7 +208,7 @@ namespace SharpTrader.AlgoFramework
             List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
             foreach (var op in operationsToClose)
             {
-                Logger.Info($"Closing operation {op}.");
+                Logger.Info($"Closing operation {op.ToString("c")}.");
                 op.Close();
                 _ActiveOperations.Remove(op);
                 if (this.Config.SaveData || op.AmountInvested > 0)
@@ -209,8 +225,8 @@ namespace SharpTrader.AlgoFramework
             this.Db?.Commit();
 
             //add new operations that have been created 
-            foreach (var op in slice.NewOperations) 
-                AddActiveOperation(op); 
+            foreach (var op in slice.NewOperations)
+                AddActiveOperation(op);
 
             //manage orders
             if (Executor != null)
@@ -238,10 +254,10 @@ namespace SharpTrader.AlgoFramework
         private void ResumeOperation(Operation op)
         {
             Logger.Info($"Resuming operation {op}.");
-            AddActiveOperation(op); 
-            var removed = this._ClosedOperations.Remove(op); 
-            if (this.Config.SaveData) 
-                DbClosedOperations.Delete(op.Id); 
+            AddActiveOperation(op);
+            var removed = this._ClosedOperations.Remove(op);
+            if (this.Config.SaveData)
+                DbClosedOperations.Delete(op.Id);
         }
         public string GetNewOperationId()
         {
@@ -335,6 +351,6 @@ namespace SharpTrader.AlgoFramework
             IsTradingStopped = true;
             //close all entry orders
             return this.Executor.CancelEntryOrders();
-        } 
+        }
     }
 }

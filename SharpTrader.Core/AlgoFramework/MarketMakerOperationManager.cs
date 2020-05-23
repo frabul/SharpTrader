@@ -257,25 +257,25 @@ namespace SharpTrader.AlgoFramework
                     {
                         //todo - right now we assume that if order is successful then the operation is liquidate but should we wait to have the trade too?
                         self.myOpData.CurrentExitOrder = marketTrans.Result;
-                        await CloseQueueAsync(op, TimeSpan.FromMinutes(5));
+                        await CloseQueueAsync(op, TimeSpan.FromMinutes(2));
                         terminate = true;
                     }
                     else
                     {
-                        Logger.Error($"Error liquidating operation {op.Id} - symbol {op.Symbol.Key} - amount:{adj.amount} - price: {adj.price}");
+                        Logger.Error($"Error liquidating operation {op} - symbol {op.Symbol.Key} - amount:{adj.amount} - price: {adj.price}");
                         terminate = false;
                     }
                 }
                 else
                 {
-                    Logger.Info($"Closing operation {op.Id} because amount remaining is too low - symbol {op.Symbol.Key} - amount remaining:{op.AmountRemaining}  ");
-                    await this.CloseQueueAsync(op, TimeSpan.FromMinutes(3));
+                    Logger.Info($"Queue for close {op.ToString("c")} \n    because amount remaining is too low");
+                    await this.CloseQueueAsync(op, TimeSpan.FromMinutes(2));
                     terminate = true;
                 }
             }
             else
             {
-                await CloseQueueAsync(op, TimeSpan.FromMinutes(5));
+                await CloseQueueAsync(op, TimeSpan.FromMinutes(2.5));
                 terminate = true;
             }
             return terminate;
@@ -308,8 +308,8 @@ namespace SharpTrader.AlgoFramework
                     myOpData.ExitManager = null;
 
                     //put in close queue
-                    Logger.Info($"Putting operation {self.Op} in close queue because amount remaining is 0 and entry expired.");
-                    await CloseQueueAsync(self.Op, TimeSpan.FromMinutes(5));
+                    Logger.Info($"Queue for close {self.Op.ToString("c")}\n    because amount remaining is 0 and entry expired.");
+                    await CloseQueueAsync(self.Op, TimeSpan.FromMinutes(2.5));
                 }
                 else
                 {
@@ -417,7 +417,8 @@ namespace SharpTrader.AlgoFramework
                         myOpData.CurrentExitOrder = null;
                         self.Next = OpenExitOrder;
                         self.Time = Algo.Time + DelayAfterOrderClosed;
-                        if (Algo.BackTesting)
+                        //if (Algo.BackTesting)
+                        //we want to reopen exit order immediatly
                             await self.Next(self);
                     }
                     else
@@ -470,7 +471,7 @@ namespace SharpTrader.AlgoFramework
                         adjusted = ClampOrderAmount(symData, op.EntryTradeDirection, adjusted);
                         if (adjusted.amount / originalAmount > 0.1m)
                         {
-                            Logger.Info($"Setting Entry for {op} - amount: {adjusted.amount} - price: {adjusted.price} - {Algo.Time}");
+                            Logger.Info($"{Algo.Time} - Setting Entry for {op} - amount: {adjusted.amount:0.######} - price: {adjusted.price:0.######}");
                             //Debug.Assert(op.AmountInvested == 0);
                             var req =
                                 await Algo.Market.LimitOrderAsync(
