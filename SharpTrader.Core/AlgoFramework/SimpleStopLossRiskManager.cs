@@ -47,7 +47,7 @@ namespace SharpTrader.AlgoFramework
                 set { highestPrice = value; _IsChanged = true; }
             }
 
-            public bool IsChanged => _IsChanged;
+            [BsonIgnore]public bool IsChanged => _IsChanged;
 
             public void AcceptChanges()
             {
@@ -61,10 +61,7 @@ namespace SharpTrader.AlgoFramework
 
 
         public override void RegisterSerializationHandlers(BsonMapper mapper)
-        {
-            BsonMapper defaultMapper = new BsonMapper();
-            mapper.RegisterType<MyOperationData>(o => defaultMapper.Serialize(o), bson => mapper.Deserialize<MyOperationData>(bson));
-            mapper.RegisterType<MySymbolData>(o => defaultMapper.Serialize(o), bson => mapper.Deserialize<MySymbolData>(bson));
+        { 
         }
 
 

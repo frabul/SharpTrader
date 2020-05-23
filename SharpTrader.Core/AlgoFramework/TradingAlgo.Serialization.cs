@@ -204,5 +204,16 @@ namespace SharpTrader.AlgoFramework
             foreach (var op in DbActiveOperations.FindAll().ToArray())
                 this.AddActiveOperation(op);
         }
+
+
+        public Operation[] GetOperations(DateTime dateTime)
+        {
+            lock (Db)
+            {
+                var l1 = this.DbClosedOperations.Find(op => op.CreationTime > dateTime);
+                var l2 = this.DbClosedOperations.Find(op => op.CreationTime > dateTime);
+                return l1.Concat(l2).ToArray();
+            }
+        }
     }
 }

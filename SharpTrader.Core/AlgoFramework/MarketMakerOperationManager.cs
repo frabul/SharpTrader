@@ -16,7 +16,7 @@ namespace SharpTrader.AlgoFramework
         //todo avoid problems due to unsynched info about trades
         //todo ogni volta che viene cancellato un ordine si deve aspettare del tempo prima di crearne uno nuovo
         NLog.Logger Logger;
-      
+
         public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(5);
         public class MyOperationData : IChangeTracking
         {
@@ -25,7 +25,7 @@ namespace SharpTrader.AlgoFramework
             private IOrder currentEntryOrder;
 
             public HashSet<string> AllEntries { get; set; } = new HashSet<string>();
-            public HashSet<string> AllExits { get; set; } = new HashSet<string>(); 
+            public HashSet<string> AllExits { get; set; } = new HashSet<string>();
 
             public IOrder CurrentEntryOrder
             {
@@ -140,7 +140,7 @@ namespace SharpTrader.AlgoFramework
         private void InitOpTasks(Operation op, MyOperationData myOpData)
         {
             if (myOpData.Initialized)
-                return; 
+                return;
 
             op.OnResumed += (o) => InitOpTasks(o, o.ExecutorData as MyOperationData);
 
@@ -321,7 +321,7 @@ namespace SharpTrader.AlgoFramework
 
             //if signal exit is expired 
             //      then we must exit any pending order and liquidate everything with a market order
-            if (op.IsExitExpired(symData.Feed.Time))
+            if (op.IsExitExpired(Algo.Time))
             {
                 //stop entries and exits
                 myOpData.EntryManager = null;
@@ -400,30 +400,37 @@ namespace SharpTrader.AlgoFramework
                 return true;
 
             Debug.Assert(myOpData.CurrentExitOrder != null);
-            //check if we need to change order in case that the amount invested was increased
-            var currentExitOrder = myOpData.CurrentExitOrder;
-            var tradableAmout  = ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)).amount + (currentExitOrder.Amount - currentExitOrder.Filled); 
-            var wrongAmout = Math.Abs(tradableAmout - (currentExitOrder.Amount - currentExitOrder.Filled)) > tradableAmout * 0.10m;
-            var wrongPrice = Math.Abs(currentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m;
-             
-            if (wrongPrice || wrongAmout || Algo.Time > op.Signal.ExpireDate)
+            if (myOpData.CurrentExitOrder != null && !myOpData.CurrentExitOrder.IsClosed)
             {
-                Logger.Info($"Cancelling exit order for operation {op} - wrongAmout: {wrongAmout} - wrongPrice: {wrongPrice} ");
-                var requestResult = await this.CloseExitOrder(op, myOpData);
-                if (requestResult)
-                {
-                    myOpData.CurrentExitOrder = null;
-                    self.Next = OpenExitOrder;
-                    self.Time = Algo.Time + DelayAfterOrderClosed;
-                    if (Algo.BackTesting)
-                        await self.Next(self);
-                }
-                else
-                {
-                    //retry in 20 seconds
-                    self.Time = Algo.Time + TimeSpan.FromSeconds(20);
-                }
+                //check if we need to change order in case that the amount invested was increased
+                var currentExitOrder = myOpData.CurrentExitOrder;
+                var tradableAmout = ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)).amount + (currentExitOrder.Amount - currentExitOrder.Filled);
+                var wrongAmout = Math.Abs(tradableAmout - (currentExitOrder.Amount - currentExitOrder.Filled)) > tradableAmout * 0.10m;
+                var wrongPrice = Math.Abs(currentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m;
 
+                if (wrongPrice || wrongAmout || Algo.Time > op.Signal.ExpireDate)
+                {
+                    Logger.Info($"Cancelling exit order for operation {op} - wrongAmout: {wrongAmout} - wrongPrice: {wrongPrice} ");
+                    var requestResult = await this.CloseExitOrder(op, myOpData);
+                    if (requestResult)
+                    {
+                        myOpData.CurrentExitOrder = null;
+                        self.Next = OpenExitOrder;
+                        self.Time = Algo.Time + DelayAfterOrderClosed;
+                        if (Algo.BackTesting)
+                            await self.Next(self);
+                    }
+                    else
+                    {
+                        //retry in 20 seconds
+                        self.Time = Algo.Time + TimeSpan.FromSeconds(20);
+                    }
+
+                }
+            }
+            else
+            {
+                myOpData.CurrentExitOrder = null;
             }
 
             if (myOpData.CurrentExitOrder == null)

@@ -51,7 +51,7 @@ namespace SharpTrader.AlgoFramework
         public DateTime Time => Market.Time;
         public DateTime NextUpdateTime { get; private set; } = DateTime.MinValue;
         public TimeSpan Resolution { get; set; } = TimeSpan.FromSeconds(10);
-        public bool IsTradingStopped { get; private set; } = false;
+        public bool IsTradingStopped { get; private set; } = true;
         public bool IsPlottingEnabled { get; set; } = false;
 
         public TradingAlgo(IMarketApi marketApi, Configuration config)
