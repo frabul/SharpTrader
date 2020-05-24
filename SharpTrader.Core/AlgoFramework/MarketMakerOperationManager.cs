@@ -402,12 +402,17 @@ namespace SharpTrader.AlgoFramework
             Debug.Assert(myOpData.CurrentExitOrder != null);
             if (myOpData.CurrentExitOrder != null && !myOpData.CurrentExitOrder.IsClosed)
             {
-                //check if we need to change order in case that the amount invested was increased
-                var currentExitOrder = myOpData.CurrentExitOrder;
-                var tradableAmout = ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)).amount + (currentExitOrder.Amount - currentExitOrder.Filled);
-                var wrongAmout = Math.Abs(tradableAmout - (currentExitOrder.Amount - currentExitOrder.Filled)) > tradableAmout * 0.10m;
-                var wrongPrice = Math.Abs(currentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m;
-
+                //check if we need to change order in case that the amount invested was increased 
+                var amountInOrder = myOpData.CurrentExitOrder.Amount - myOpData.CurrentExitOrder.Filled;
+                var availableForTrading =
+                    ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)).amount //free to trade
+                                            + amountInOrder;                      //amount derived from cancelling the order
+                // we want to trade amount remaining as max 
+                var amountToTrade = Math.Min(op.AmountRemaining, availableForTrading);
+                //check if amount is wrong
+                var wrongAmout = Math.Abs(amountToTrade - amountInOrder) > amountToTrade * 0.10m;
+                //check if order price is wrong
+                var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m; 
                 if (wrongPrice || wrongAmout || Algo.Time > op.Signal.ExpireDate)
                 {
                     Logger.Info($"Cancelling exit order for operation {op} - wrongAmout: {wrongAmout} - wrongPrice: {wrongPrice} ");
@@ -419,7 +424,7 @@ namespace SharpTrader.AlgoFramework
                         self.Time = Algo.Time + DelayAfterOrderClosed;
                         //if (Algo.BackTesting)
                         //we want to reopen exit order immediatly
-                            await self.Next(self);
+                        await self.Next(self);
                     }
                     else
                     {

@@ -47,7 +47,7 @@ namespace SharpTrader.AlgoFramework
                 set { highestPrice = value; _IsChanged = true; }
             }
 
-            [BsonIgnore]public bool IsChanged => _IsChanged;
+            [BsonIgnore] public bool IsChanged => _IsChanged;
 
             public void AcceptChanges()
             {
@@ -61,7 +61,7 @@ namespace SharpTrader.AlgoFramework
 
 
         public override void RegisterSerializationHandlers(BsonMapper mapper)
-        { 
+        {
         }
 
 
@@ -201,8 +201,10 @@ namespace SharpTrader.AlgoFramework
             public IOrder LastExit { get; set; }
         }
         public decimal StopLoss { get; private set; }
+        private NLog.Logger Logger;
         public SimpleStopLossRiskManager(decimal stopLoss)
         {
+            Logger = NLog.LogManager.GetCurrentClassLogger();
             StopLoss = stopLoss;
         }
 
@@ -222,7 +224,6 @@ namespace SharpTrader.AlgoFramework
                 //---
                 if (op.AmountRemaining > 0 && !op.RiskManaged)
                 {
-
                     //get gain percent
                     if (op.Type == OperationType.BuyThenSell)
                     {
@@ -248,31 +249,67 @@ namespace SharpTrader.AlgoFramework
                     else
                         throw new NotSupportedException();
 
-                    //add trades correlated to this order
-                    foreach (ITrade trade in slice.SymbolsData[op.Symbol.Key].Trades)
+                    if (op.AmountRemaining > 0)
                     {
-                        if (trade.Direction == orderDirection)
-                            op.AddExit(trade);
+                        Logger.Info($"StopLoss reached for operation {op.ToString("c")}...liquidating");
+                        //--- liquidate operation funds ---
+                        await Algo.Executor.CancelAllOrders(op);
+
+                        var symData = Algo.SymbolsData[op.Symbol];
+                        var adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget);
+                        adj = ClampOrderAmount(symData, op.ExitTradeDirection, adj);
+                        var request = await Algo.Market.MarketOrderAsync(op.Symbol.Key, orderDirection, adj.amount, op.GetNewOrderId());
+                        if (request.IsSuccessful)
+                        {
+                            //expect trade that will close the operation
+                            //(op.RiskManagerData as RMData).LastExit = request.Result;
+                        }
                         else
-                            op.AddEntry(trade);
-                    }
-
-                    //--- liquidate operation funds ---
-                    await Algo.Executor.CancelAllOrders(op);
-                    var request = await Algo.Market.MarketOrderAsync(op.Symbol.Key, orderDirection, op.AmountRemaining, op.GetNewOrderId());
-
-                    if (request.IsSuccessful)
-                    {
-                        //expect trade that will close the operation
-                        (op.RiskManagerData as RMData).LastExit = request.Result;
+                        {
+                            Logger.Error($"Unable to to liquidate operation {op}: {request.ErrorInfo}");
+                        }
                     }
                     else
                     {
-                        //todo log error
+                        if (!(op.IsClosing || op.IsClosed))
+                        {
+                            Logger.Info($"Queueing for close operation {op.ToString("c")}");
+                            op.ScheduleClose(Algo.Time.AddMinutes(3));
+                        }
+
                     }
                 }
             }
         }
+
+        private (decimal price, decimal amount) ClampOrderAmount(SymbolData symData, TradeDirection tradeDirection, (decimal price, decimal amount) adj)
+        {
+            if (adj.amount > 0)
+            {
+                if (tradeDirection == TradeDirection.Buy)
+                {
+                    var freeAmount = Algo.Market.GetFreeBalance(symData.Symbol.QuoteAsset);
+                    if (adj.amount * adj.price > freeAmount)
+                    {
+                        adj.amount = freeAmount / adj.price;
+                        if (adj.amount > 0)
+                            adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(adj.amount, adj.price);
+                    }
+                }
+                else
+                {
+                    var freeAmount = Algo.Market.GetFreeBalance(symData.Symbol.Asset);
+                    if (adj.amount > freeAmount)
+                    {
+                        adj.amount = freeAmount;
+                        if (adj.amount > 0)
+                            adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(adj.amount, adj.price);
+                    }
+                }
+            }
+            return adj;
+        }
+
     }
 
 }

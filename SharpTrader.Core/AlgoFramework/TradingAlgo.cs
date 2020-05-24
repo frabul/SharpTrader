@@ -322,6 +322,9 @@ namespace SharpTrader.AlgoFramework
         {
             if (Time >= NextUpdateTime)
             {
+                if (Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
+                    Logger.Warn($"OnTick duration longer than expected. Expected {Resolution} - real {Time - NextUpdateTime + Resolution }");
+
                 TimeSlice curSlice;
                 lock (WorkingSlice)
                 {

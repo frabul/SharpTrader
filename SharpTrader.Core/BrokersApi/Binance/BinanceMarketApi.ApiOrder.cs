@@ -136,6 +136,8 @@ namespace SharpTrader.BrokersApi.Binance
 
         internal void Update(Order order)
         {
+            this.Amount = order.Amount;
+            this.Filled = order.Filled;
             this.Status = order.Status;
             this.Filled = order.Filled;
         }
