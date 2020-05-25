@@ -62,6 +62,11 @@ namespace SharpTrader.AlgoFramework
             {
                 _IsChanged = false;
             }
+
+            public MyOperationData()
+            {
+
+            }
         }
         public decimal EntryDistantThreshold { get; private set; }
 

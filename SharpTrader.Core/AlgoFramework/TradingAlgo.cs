@@ -125,7 +125,7 @@ namespace SharpTrader.AlgoFramework
                     symbolData.Feed = null;
                 }
 
-                //add feeds for added symbols
+                //add feeds for added symbols and those that have open operations
                 foreach (var sym in changes.AddedSymbols)
                 {
                     SymbolData symbolData = GetSymbolData(sym);
@@ -142,7 +142,7 @@ namespace SharpTrader.AlgoFramework
                         symbolData.Feed.OnData += Feed_OnData;
                     }
                 }
-                    
+
 
                 if (Sentry != null)
                     await Sentry.OnSymbolsChanged(changes);
@@ -156,8 +156,6 @@ namespace SharpTrader.AlgoFramework
                 if (RiskManager != null)
                     RiskManager.OnSymbolsChanged(changes);
             }
-            //we should also add feeds for symbols that have open orders
-
 
             // register trades with their linked operations
             Operation[] oldOperations = null;
@@ -300,17 +298,17 @@ namespace SharpTrader.AlgoFramework
         {
             throw new NotImplementedException();
         }
-
+        private object WorkingSliceLock = new object();
         private void Feed_OnData(ISymbolFeed symFeed, IBaseData dataRecord)
         {
             //todo bisogna accertartci che i dati che riceviamo sono del giusto timeframe!
-            lock (WorkingSlice)
+            lock (WorkingSliceLock)
                 WorkingSlice.Add(symFeed.Symbol, dataRecord);
         }
 
         private void Market_OnNewTrade(IMarketApi market, ITrade trade)
         {
-            lock (WorkingSlice)
+            lock (WorkingSliceLock)
                 WorkingSlice.Add(SymbolsData[trade.Symbol].Symbol, trade);
         }
 
@@ -326,7 +324,7 @@ namespace SharpTrader.AlgoFramework
                     Logger.Warn($"OnTick duration longer than expected. Expected {Resolution} - real {Time - NextUpdateTime + Resolution }");
 
                 TimeSlice curSlice;
-                lock (WorkingSlice)
+                lock (WorkingSliceLock)
                 {
                     NextUpdateTime = Time + Resolution;
 

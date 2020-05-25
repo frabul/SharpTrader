@@ -979,7 +979,7 @@ namespace SharpTrader.BrokersApi.Binance
                             Type = be.Enums.OrderType.Market,
                             Quantity = (decimal)amount / 1.00000000000000m,
                             NewClientOrderId = clientOrderId,
-                            NewOrderResponseType = NewOrderResponseType.Result 
+                            NewOrderResponseType = NewOrderResponseType.Result
                         });
 
                 var newApiOrder = new Order(ord);
@@ -1111,18 +1111,20 @@ namespace SharpTrader.BrokersApi.Binance
 
         public void RegisterSerializationHandlers(BsonMapper mapper)
         {
+            BsonMapper defaultMapper = new BsonMapper();
             //this implementation is only for testing as the simulator doesn't save it's state
             Order BsonToOrder(BsonValue value)
             {
                 lock (LockOrdersTrades)
                 {
+
                     var order = OpenOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
                     if (order == null)
-                    {
                         order = Orders.FindById(value["_id"].AsString);
-                        if (order != null)
-                            OpenOrders.Add(order);
-                    }
+                    if (order == null)
+                        order = defaultMapper.Deserialize<Order>(value);
+                    if (order != null)
+                        OpenOrders.Add(order);
                     return order;
                 }
             }
