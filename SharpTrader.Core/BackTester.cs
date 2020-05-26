@@ -20,7 +20,7 @@ namespace SharpTrader
             public string DataDir { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
             public string HistoryDb { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
             public bool PlottingEnabled = false;
-            public bool PlotResults = true;
+            public bool PlotResults = false;
             public string AlgoClass;
             public DateTime StartTime { get; set; }
             public DateTime EndTime { get; set; }

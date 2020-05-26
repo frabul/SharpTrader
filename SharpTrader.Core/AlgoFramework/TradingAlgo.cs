@@ -69,21 +69,23 @@ namespace SharpTrader.AlgoFramework
                 this.ConfigureSerialization();
                 this.LoadNonVolatileVars();
             }
-            //on restart there is the possibility that we missed some trades, let's reload the last trades
-            var req = await Market.GetLastTradesAsync(Market.Time - TimeSpan.FromHours(24));
-            if (req.IsSuccessful)
+            if (!BackTesting)
             {
-                foreach (var trade in req.Result)
-                    if (SymbolsData.ContainsKey(trade.Symbol))
-                        this.WorkingSlice.Add(SymbolsData[trade.Symbol].Symbol, trade);
-                    else
-                        Logger.Error($"Symbol data not found for trade {trade} during initialize.");
+                //on restart there is the possibility that we missed some trades, let's reload the last trades
+                var req = await Market.GetLastTradesAsync(Market.Time - TimeSpan.FromHours(24));
+                if (req.IsSuccessful)
+                {
+                    foreach (var trade in req.Result)
+                        if (SymbolsData.ContainsKey(trade.Symbol))
+                            this.WorkingSlice.Add(SymbolsData[trade.Symbol].Symbol, trade);
+                        else
+                            Logger.Error($"Symbol data not found for trade {trade} during initialize.");
+                }
+                else
+                {
+                    Logger.Error("GetLastTrades failed during initialize");
+                }
             }
-            else
-            {
-                Logger.Error("GetLastTrades failed during initialize");
-            }
-
             //call on initialize
             await this.OnInitialize();
         }
@@ -320,8 +322,11 @@ namespace SharpTrader.AlgoFramework
         {
             if (Time >= NextUpdateTime)
             {
-                if (Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
-                    Logger.Warn($"OnTick duration longer than expected. Expected {Resolution} - real {Time - NextUpdateTime + Resolution }");
+                if (!BackTesting)
+                {
+                    if (Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
+                        Logger.Warn($"OnTick duration longer than expected. Expected {Resolution} - real {Time - NextUpdateTime + Resolution }");
+                }
 
                 TimeSlice curSlice;
                 lock (WorkingSliceLock)
