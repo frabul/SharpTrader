@@ -147,7 +147,12 @@ namespace SharpTrader.AlgoFramework
             if (myOpData.Initialized)
                 return;
 
-            op.OnResumed += (o) => InitOpTasks(o, o.ExecutorData as MyOperationData);
+            op.OnResumed += (o) =>
+            {
+                var mydata = (o.ExecutorData as MyOperationData);
+                mydata.Initialized = false;
+                InitOpTasks(o, mydata);
+            };
 
             myOpData.Initialized = true;
 
@@ -195,10 +200,6 @@ namespace SharpTrader.AlgoFramework
                 if (!op.IsClosed && !op.IsClosing && !op.RiskManaged)
                 {
                     //if operation is not closed or closing we must assure that there are the tasks to manage it 
-                    if (Algo.Time >= new DateTime(2019, 11, 06, 5, 30, 00))
-                    {
-
-                    }
                     if (myOpData.OperationManager != null && await myOpData.OperationManager.Next(myOpData.OperationManager))
                         myOpData.OperationManager = null;
                     if (myOpData.EntryManager != null && await myOpData.EntryManager.Next(myOpData.EntryManager))
@@ -417,7 +418,7 @@ namespace SharpTrader.AlgoFramework
                 //check if amount is wrong
                 var wrongAmout = Math.Abs(amountToTrade - amountInOrder) > amountToTrade * 0.10m;
                 //check if order price is wrong
-                var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m; 
+                var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m;
                 if (wrongPrice || wrongAmout || Algo.Time > op.Signal.ExpireDate)
                 {
                     Logger.Info($"Cancelling exit order for operation {op} - wrongAmout: {wrongAmout} - wrongPrice: {wrongPrice} ");
