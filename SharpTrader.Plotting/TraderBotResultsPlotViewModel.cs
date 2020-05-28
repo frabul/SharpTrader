@@ -25,9 +25,9 @@ namespace SharpTrader.Plotting
 {
     public class PlottingHelper
     {
+        static volatile bool ok = false;
         public static void Show(PlotHelper plot)
-        {
-            bool ok = false;
+        {  
             TraderBotResultsPlotViewModel vm = null;
             Thread newWindowThread = new Thread(new ThreadStart(() =>
             {
@@ -55,9 +55,7 @@ namespace SharpTrader.Plotting
                 {
                 }
 
-            }));
-
-
+            })); 
             newWindowThread.SetApartmentState(ApartmentState.STA);
             // Make the thread a background thread
             newWindowThread.IsBackground = true;
@@ -258,9 +256,9 @@ namespace SharpTrader.Plotting
 
             //---------- ADJUST X to show 100 candles
           
-                PlotViewModel.Axes[0].Minimum = Drawer.InitialView.start.ToAxisDouble();
-                PlotViewModel.Axes[0].Maximum = Drawer.InitialView.end.ToAxisDouble();
-                PlotViewModel.Axes[0].Reset();
+            PlotViewModel.Axes[0].Minimum = Drawer.InitialView.start.ToAxisDouble();
+            PlotViewModel.Axes[0].Maximum = Drawer.InitialView.end.ToAxisDouble();
+            PlotViewModel.Axes[0].Reset();
         
 
             //--------- ADJUST Y
