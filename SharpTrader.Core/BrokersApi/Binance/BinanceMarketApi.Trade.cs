@@ -61,7 +61,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         public override string ToString()
         {
-            return $"Trade{{ Id: {Id} - {Symbol}, Direction:{Direction}, Time:{Time} - Price:{this.Price:0.######} - QAmount:{this.Amount*Price:0.######} }}";
+            return $"Trade{{ Id: {Id} - {Symbol}, Direction:{Direction}, Time:{Time} - Price:{this.Price:0.########} - QAmount:{this.Amount*Price:0.######} }}";
         }
         public override int GetHashCode()
         {

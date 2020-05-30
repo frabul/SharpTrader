@@ -18,7 +18,7 @@ namespace SharpTrader.AlgoFramework
 
     public class Operation : IChangeTracking
     {
-        
+
         public event Action<Operation, ITrade> OnNewTrade;
         public event Action<Operation> OnClosing;
         public event Action<Operation> OnClosed;
@@ -91,7 +91,7 @@ namespace SharpTrader.AlgoFramework
         public IEnumerable<ITrade> Entries
         {
             get => _Entries; private set
-            { 
+            {
                 foreach (var trade in value)
                     _Entries.Add(trade);
             }
@@ -105,7 +105,7 @@ namespace SharpTrader.AlgoFramework
             get => _Exits;
             private set
             {
-                
+
                 foreach (var trade in value)
                     _Exits.Add(trade);
             }
@@ -245,21 +245,28 @@ namespace SharpTrader.AlgoFramework
         {
             return ToString("");
         }
-        public   string ToString(string format)
+        public string ToString(string format)
         {
-            if( format == "c")
+            if (format == "c")
             {
-                return $"{{ Id: {Id} {Symbol.Key} {CreationTime:dd-MM-yyyy hh:mm:ss}," + 
+                var ar = " AR%: -";
+                var gainprc = "";
+                if (AmountInvested > 0 && AmountRemaining / AmountInvested < 0.05m)
+                    gainprc = $", G%: {(this.AverageExitPrice - this.AverageEntryPrice) / this.AverageEntryPrice: 0.###}";
+
+                if (AmountInvested > 0)
+                    ar = $" AR %: {this.AmountRemaining / this.AmountInvested:0.###}";
+                return $"{{ Id: {Id} {Symbol.Key} {CreationTime:dd-MM-yyyy hh:mm:ss}," +
                     $" EP: {this.AverageEntryPrice:0.########}," +
                     $" TP: {Signal.PriceTarget:0.########}," +
                     $" EP: {this.AverageExitPrice:0.########}," +
-                    $" QA: {this.QuoteAmountInvested:0.########}," +
-                    $" QRA:{this.QuoteAmountRemaining:0.########} }}";
+                    $" QA: {this.QuoteAmountInvested:0.######}," +
+                    ar + gainprc + " }";
             }
             else
             {
                 return $"{{ Id: {Id} -  Symbol: {Symbol.Key} }}";
-            } 
+            }
         }
 
         public void ScheduleClose(DateTime deadTime)

@@ -111,7 +111,7 @@ namespace SharpTrader.Plotting
 
             CreateAxes();
             Candles = new CandleStickSeries();
-            Candles.TrackerFormatString = "{0}\n{1}: {2}\nHigh: {3:0.#####}\nLow: {4:0.#####}\nOpen: {5:0.#####}\nClose: {6:0.#####}";
+            Candles.TrackerFormatString = "{0}\n{1}: {2}\nHigh: {3:0.########}\nLow: {4:0.########}\nOpen: {5:0.########}\nClose: {6:0.########}";
 
             Volumes = new VolumeSeries()
             {

@@ -484,7 +484,7 @@ namespace SharpTrader.AlgoFramework
                         adjusted = ClampOrderAmount(symData, op.EntryTradeDirection, adjusted);
                         if (adjusted.amount / originalAmount > 0.1m)
                         {
-                            Logger.Info($"{Algo.Time} - Setting Entry for {op} - amount: {adjusted.amount:0.######} - price: {adjusted.price:0.######}");
+                            Logger.Info($"{Algo.Time} - Setting Entry for {op} - amount: {adjusted.amount:0.########} - price: {adjusted.price:0.########}");
                             //Debug.Assert(op.AmountInvested == 0);
                             var req =
                                 await Algo.Market.LimitOrderAsync(
@@ -525,8 +525,11 @@ namespace SharpTrader.AlgoFramework
             if (myOpData.CurrentEntryOrder != null)
             {
                 //var badAmout = Math.Abs(LastEntryOrder.Amount - orderAmount) / orderAmount > 0.20m; 
-                var badPrice = Math.Abs(myOpData.CurrentEntryOrder.Price - op.Signal.PriceEntry) / op.Signal.PriceEntry > 0.005m;
+                var amount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
+                var priceAdjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(amount, op.Signal.PriceEntry);
+                var badPrice = Math.Abs(myOpData.CurrentEntryOrder.Price - priceAdjusted.price) / priceAdjusted.price > 0.006m;
                 var entryExpired = op.IsEntryExpired(Algo.Time);
+
                 if (entryDistant || badPrice || entryExpired) //N.B. also when signal entry is not valid we keep monitoring as it could be updated
                 {
                     //if the price or amount is wrong we try closing the order 
