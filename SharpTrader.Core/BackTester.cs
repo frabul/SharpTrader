@@ -78,7 +78,7 @@ namespace SharpTrader
             algoConfig = null;
             try
             {
-                algoConfig = JsonConvert.DeserializeObject(  config.AlgoConfig.ToString(), configClass);
+                algoConfig = JsonConvert.DeserializeObject(config.AlgoConfig.ToString(), configClass);
             }
             catch (Exception ex)
             {

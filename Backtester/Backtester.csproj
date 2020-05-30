@@ -56,6 +56,10 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\SharpTraderBots\SharpTrader.Bots.csproj">
+      <Project>{5ef889ed-d02a-450d-87e1-63dd42056db8}</Project>
+      <Name>SharpTrader.Bots</Name>
+    </ProjectReference>
     <ProjectReference Include="..\SharpTrader.Core\SharpTrader.Core.csproj">
       <Project>{320B1902-461A-4B88-8852-D881DC4E5293}</Project>
       <Name>SharpTrader.Core</Name>

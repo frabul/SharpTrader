@@ -142,18 +142,20 @@ namespace SharpTrader.AlgoFramework
             return myOpData;
         }
 
+
         private void InitOpTasks(Operation op, MyOperationData myOpData)
         {
             if (myOpData.Initialized)
                 return;
-
-            op.OnResumed += (o) =>
+            void OnOpResumed(Operation o)
             {
                 var mydata = (o.ExecutorData as MyOperationData);
                 mydata.Initialized = false;
                 InitOpTasks(o, mydata);
-            };
-
+            }
+            op.OnResumed -= OnOpResumed;
+            op.OnResumed += OnOpResumed;
+             
             myOpData.Initialized = true;
 
             var symData = Algo.SymbolsData[op.Symbol.Key];
@@ -562,7 +564,7 @@ namespace SharpTrader.AlgoFramework
                     var freeAmount = Algo.Market.GetFreeBalance(symData.Symbol.QuoteAsset);
                     if (adj.amount * adj.price > freeAmount)
                     {
-                        adj.amount = freeAmount / adj.price;
+                        adj.amount = 0.99m * freeAmount / adj.price;
                         if (adj.amount > 0)
                             adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(adj.amount, adj.price);
                     }

@@ -15,23 +15,23 @@ namespace BacktesterProgram
     {
         static void ShowPlot(PlotHelper plot)
         {
-            PlottingHelper.Show(plot); 
+            PlottingHelper.Show(plot);
             Console.ReadLine();
         }
-
+        static Type dummy;
         static void Main(string[] args)
         {
-            if(args.Length < 1)
+            if (args.Length < 1)
             {
+                dummy = typeof(SharpTrader.Algos.HighPassMeanReversionAlgo2);
                 throw new Exception("Missing argument: config file (json)");
             }
 
             var json = File.ReadAllText(args[0]);
             var config = JsonConvert.DeserializeObject<BackTester.Configuration>(json);
-              
             BackTester tester = new BackTester(config);
             tester.ShowPlotCallback = ShowPlot;
-            tester.Start(); 
+            tester.Start();
             Console.ReadLine();
         }
     }

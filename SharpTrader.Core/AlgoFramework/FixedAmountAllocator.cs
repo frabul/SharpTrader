@@ -8,22 +8,17 @@ namespace SharpTrader.AlgoFramework
     public class FixedAmountAllocator : FundsAllocator
     {
         private List<Signal> PendingSignals = new List<Signal>(); 
-        public TimeSpan CoolDown = TimeSpan.FromMinutes(30);
-        public bool ProportinalToProfit = true;
+        public TimeSpan CoolDown { get; private set; } = TimeSpan.FromMinutes(30);
+        public bool ProportionalToProfit { get; set; } = false;
         public decimal TargetProfit { get; set; } = 0.05m;
         public int MaxActiveOperationsPerSymbol { get; set; } = 1;
-        public FixedAmountAllocator(AssetAmount amount, decimal maxInvestedPerSymbol, decimal maxInvested)
-        {
-            MaxInvested = maxInvested;
-            MaxInvestedPerSymbol = maxInvestedPerSymbol;
-            Amount = amount;
-        }
+        public decimal MaxInvested { get; set; } = 0;
+        public decimal MaxInvestedPerSymbol { get; set; } = 0;
+        public AssetAmount Amount { get; set; }  
 
-        public decimal MaxInvested { get; set; }
-
-        public decimal MaxInvestedPerSymbol { get; set; }
-
-        public AssetAmount Amount { get; set; }
+        public FixedAmountAllocator( )
+        { 
+        } 
 
         public override void Update(TimeSlice slice)
         {
@@ -53,7 +48,7 @@ namespace SharpTrader.AlgoFramework
                 foreach (Signal signal in slice.NewSignals)
                 {
                     var newAmount = Amount.Amount;
-                    if (ProportinalToProfit)
+                    if (ProportionalToProfit)
                     {
                         var profit = Math.Abs(signal.PriceTarget - signal.PriceEntry) / signal.PriceEntry;
                         newAmount = newAmount * TargetProfit / profit;

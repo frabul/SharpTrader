@@ -64,11 +64,10 @@ namespace SharpTrader
             var backTester = new BackTester(backtesterConfig)
             {
                 ShowPlotCallback = ShowPlotCallback,
-                Logger = this.Logger,
+                Logger = this.Logger, 
+                
             };
-            backTester.Start();
-
-
+            backTester.Start(); 
         }
     }
 }
