@@ -138,7 +138,6 @@ namespace SharpTrader.BrokersApi.Binance
                     {
                         try
                         {
-                            await SynchBalance();
                             //we first synch open orders 
                             await SynchOpenOrders();
                             //synch last trades 
@@ -164,7 +163,7 @@ namespace SharpTrader.BrokersApi.Binance
                             {
                                 //first synch server time then balance then restart timer
                                 if (!publicOnly)
-                                    await ServerTimeSynch();
+                                    await SynchBalance();
                                 await ServerTimeSynch();
                             }
                             catch { }

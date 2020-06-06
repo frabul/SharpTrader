@@ -258,15 +258,26 @@ namespace SharpTrader.AlgoFramework
                         var symData = Algo.SymbolsData[op.Symbol];
                         var adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget);
                         adj = ClampOrderAmount(symData, op.ExitTradeDirection, adj);
-                        var request = await Algo.Market.MarketOrderAsync(op.Symbol.Key, orderDirection, adj.amount, op.GetNewOrderId());
-                        if (request.IsSuccessful)
+                        if (adj.amount > 0)
                         {
-                            //expect trade that will close the operation
-                            //(op.RiskManagerData as RMData).LastExit = request.Result;
+                            var request = await Algo.Market.MarketOrderAsync(op.Symbol.Key, orderDirection, adj.amount, op.GetNewOrderId());
+                            if (request.IsSuccessful)
+                            {
+                                //expect trade that will close the operation
+                                //(op.RiskManagerData as RMData).LastExit = request.Result;
+                            }
+                            else
+                            {
+                                Logger.Error($"Unable to to liquidate operation {op}: {request.ErrorInfo}");
+                            }
                         }
-                        else
+                        else if( op.AmountRemaining / op.AmountInvested < 0.05m)
                         {
-                            Logger.Error($"Unable to to liquidate operation {op}: {request.ErrorInfo}");
+                            if (!(op.IsClosing || op.IsClosed))
+                            {
+                                Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low.");
+                                op.ScheduleClose(Algo.Time.AddMinutes(3));
+                            }
                         }
                     }
                     else

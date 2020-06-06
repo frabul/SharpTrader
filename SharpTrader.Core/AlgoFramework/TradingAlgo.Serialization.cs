@@ -69,6 +69,8 @@ namespace SharpTrader.AlgoFramework
     }
     public abstract partial class TradingAlgo
     {
+        private object DbLock = new object();
+        private LiteDatabase Db;
         private ILiteCollection<Operation> DbClosedOperations;
         private ILiteCollection<Operation> DbActiveOperations;
 
@@ -126,92 +128,98 @@ namespace SharpTrader.AlgoFramework
 
         public void SaveNonVolatileVars()
         {
-            //save my internal state
-            BsonDocument states = new BsonDocument();
-            states["_id"] = "TradingAlgoState";
-            states["State"] = Db.Mapper.Serialize(State);
+            lock (DbLock)
+            {
+                //save my internal state
+                BsonDocument states = new BsonDocument();
+                states["_id"] = "TradingAlgoState";
+                states["State"] = Db.Mapper.Serialize(State);
 
-            //Save derived state  
-            states["DerivedClassState"] = Db.Mapper.Serialize(GetState());
+                //Save derived state  
+                states["DerivedClassState"] = Db.Mapper.Serialize(GetState());
 
-            //save module states 
-            states["Sentry"] = Db.Mapper.Serialize(Sentry.GetState());
-            states["Allocator"] = Db.Mapper.Serialize(Allocator.GetState());
-            states["Executor"] = Db.Mapper.Serialize(Executor.GetState());
-            states["RiskManager"] = Db.Mapper.Serialize(RiskManager.GetState());
+                //save module states 
+                states["Sentry"] = Db.Mapper.Serialize(Sentry.GetState());
+                states["Allocator"] = Db.Mapper.Serialize(Allocator.GetState());
+                states["Executor"] = Db.Mapper.Serialize(Executor.GetState());
+                states["RiskManager"] = Db.Mapper.Serialize(RiskManager.GetState());
 
-            Db.GetCollection("State").Upsert(states);
+                Db.GetCollection("State").Upsert(states);
 
-            foreach (var symData in SymbolsData.Values)
-                Db.GetCollection<SymbolData>("SymbolsData").Upsert(symData);
+                foreach (var symData in SymbolsData.Values)
+                    Db.GetCollection<SymbolData>("SymbolsData").Upsert(symData);
 
-            Db.BeginTrans();
-            foreach (var op in ActiveOperations.Where(op => op.IsChanged))
-                DbActiveOperations.Upsert(op);
-            foreach (var op in ClosedOperations.Where(op => op.IsChanged))
-                DbClosedOperations.Upsert(op);
-            Db.Commit();
+                Db.BeginTrans();
+                foreach (var op in ActiveOperations.Where(op => op.IsChanged))
+                    DbActiveOperations.Upsert(op);
+                foreach (var op in ClosedOperations.Where(op => op.IsChanged))
+                    DbClosedOperations.Upsert(op);
+                Db.Commit();
 
-            Db.Checkpoint();
+                Db.Checkpoint();
+            } 
         }
 
         public void LoadNonVolatileVars()
         {
-            //reload my internal state
-            BsonDocument states = Db.GetCollection("State").FindById("TradingAlgoState");
-            if (states != null)
+            lock (DbLock)
             {
-                State = Db.Mapper.Deserialize<NonVolatileVars>(states["State"]);
-
-                //reload derived class state
-                this.RestoreState(Db.Mapper.Deserialize<object>(states["DerivedClassState"]));
-
-                //reload modules state
-                Sentry.RestoreState(Db.Mapper.Deserialize<object>(states["Sentry"]));
-                Allocator.RestoreState(Db.Mapper.Deserialize<object>(states["Allocator"]));
-                Executor.RestoreState(Db.Mapper.Deserialize<object>(states["Executor"]));
-                RiskManager.RestoreState(Db.Mapper.Deserialize<object>(states["RiskManager"]));
-            }
-
-
-
-            //rebuild symbols data
-            foreach (var symData in Db.GetCollection<SymbolData>("SymbolsData").FindAll())
-                _SymbolsData[symData.Id] = symData;
-
-            if (Db.UserVersion < 4)
-            {
-
-                foreach (var op in DbClosedOperations.FindAll().ToArray())
+                //reload my internal state
+                BsonDocument states = Db.GetCollection("State").FindById("TradingAlgoState");
+                if (states != null)
                 {
-                    op.Recalculate();
-                    DbClosedOperations.Upsert(op);
+                    State = Db.Mapper.Deserialize<NonVolatileVars>(states["State"]);
+
+                    //reload derived class state
+                    this.RestoreState(Db.Mapper.Deserialize<object>(states["DerivedClassState"]));
+
+                    //reload modules state
+                    Sentry.RestoreState(Db.Mapper.Deserialize<object>(states["Sentry"]));
+                    Allocator.RestoreState(Db.Mapper.Deserialize<object>(states["Allocator"]));
+                    Executor.RestoreState(Db.Mapper.Deserialize<object>(states["Executor"]));
+                    RiskManager.RestoreState(Db.Mapper.Deserialize<object>(states["RiskManager"]));
                 }
 
+
+
+                //rebuild symbols data
+                foreach (var symData in Db.GetCollection<SymbolData>("SymbolsData").FindAll())
+                    _SymbolsData[symData.Id] = symData;
+
+                if (Db.UserVersion < 4)
+                {
+
+                    foreach (var op in DbClosedOperations.FindAll().ToArray())
+                    {
+                        op.Recalculate();
+                        DbClosedOperations.Upsert(op);
+                    }
+
+                    foreach (var op in DbActiveOperations.FindAll().ToArray())
+                    {
+                        op.Recalculate();
+                        DbActiveOperations.Upsert(op);
+                    }
+
+                    Db.UserVersion = 4;
+                    Db.Checkpoint();
+                    Db.Rebuild();
+                }
+
+                //rebuild operations 
+                //closed operations are not loaded in current session   
                 foreach (var op in DbActiveOperations.FindAll().ToArray())
-                {
-                    op.Recalculate();
-                    DbActiveOperations.Upsert(op);
-                }
-
-                Db.UserVersion = 4;
-                Db.Checkpoint();
-                Db.Rebuild();
-            }
-
-            //rebuild operations 
-            //closed operations are not loaded in current session   
-            foreach (var op in DbActiveOperations.FindAll().ToArray())
-                this.AddActiveOperation(op);
+                    this.AddActiveOperation(op);
+            } 
         }
 
 
         public Operation[] GetOperations(DateTime dateTime)
         {
-            lock (Db)
+            lock (DbLock)
             {
                 var l1 = this.DbClosedOperations.Find(op => op.CreationTime > dateTime);
-                var l2 = this.DbClosedOperations.Find(op => op.CreationTime > dateTime);
+                var l2 = this.DbActiveOperations.Find(op => op.CreationTime > dateTime);
                 return l1.Concat(l2).ToArray();
             }
         }

@@ -32,7 +32,7 @@ namespace SharpTrader.AlgoFramework
         private HashSet<Operation> _ClosedOperations = new HashSet<Operation>();
         private NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private Configuration Config;
-        private LiteDatabase Db;
+
         private NonVolatileVars State = new NonVolatileVars();
 
         public string Name => Config.Name;
@@ -173,8 +173,11 @@ namespace SharpTrader.AlgoFramework
                 }
                 else
                 {
-                    //let's search in closed operations
-                    oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray();
+                    lock (DbLock)
+                    {
+                        //let's search in closed operations
+                        oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray();
+                    }
                     var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
 
                     if (oldOp != null)
@@ -190,6 +193,7 @@ namespace SharpTrader.AlgoFramework
                     }
                     else
                         Logger.Info($"New trade {trade.ToString()} without any associated operation");
+
                 }
             }
             await OnUpdate(slice);
@@ -201,28 +205,32 @@ namespace SharpTrader.AlgoFramework
             //create operations
             if (Allocator != null)
                 Allocator.Update(slice);
-
-            this.Db?.BeginTrans();
-
-            //close operations that have been in close queue for enough time
-            List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
-            foreach (var op in operationsToClose)
+            lock (DbLock)
             {
-                Logger.Info($"Closing operation {op.ToString("c")}.");
-                op.Close();
-                _ActiveOperations.Remove(op);
-                if (this.Config.SaveData || op.AmountInvested > 0)
-                    this._ClosedOperations.Add(op);
-                this.SymbolsData[op.Symbol.Key].CloseOperation(op);
-
-                if (this.Config.SaveData)
+                this.Db?.BeginTrans();
+                //close operations that have been in close queue for enough time
+                List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
+                foreach (var op in operationsToClose)
                 {
-                    //update database 
-                    DbActiveOperations.Delete(op.Id);
-                    DbClosedOperations.Upsert(op);
+                    Logger.Info($"Closing operation {op.ToString("c")}.");
+                    op.Close();
+                    _ActiveOperations.Remove(op);
+                    if (this.Config.SaveData || op.AmountInvested > 0)
+                        this._ClosedOperations.Add(op);
+                    this.SymbolsData[op.Symbol.Key].CloseOperation(op);
+
+                    if (this.Config.SaveData)
+                        lock (DbLock)
+                        {
+                            //update database 
+                            DbActiveOperations.Delete(op.Id);
+                            DbClosedOperations.Upsert(op);
+                        }
                 }
+                this.Db?.Commit();
             }
-            this.Db?.Commit();
+
+
 
             //add new operations that have been created 
             foreach (var op in slice.NewOperations)
@@ -248,7 +256,8 @@ namespace SharpTrader.AlgoFramework
             var symData = GetSymbolData(op.Symbol);
             symData.AddActiveOperation(op);
             if (this.Config.SaveData)
-                DbActiveOperations.Upsert(op);
+                lock (DbLock)
+                    DbActiveOperations.Upsert(op);
         }
 
         private void ResumeOperation(Operation op)
@@ -257,7 +266,8 @@ namespace SharpTrader.AlgoFramework
             AddActiveOperation(op);
             var removed = this._ClosedOperations.Remove(op);
             if (this.Config.SaveData)
-                DbClosedOperations.Delete(op.Id);
+                lock (DbLock)
+                    DbClosedOperations.Delete(op.Id);
         }
         public string GetNewOperationId()
         {
