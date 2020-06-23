@@ -87,7 +87,19 @@ namespace SharpTrader.AlgoFramework
 
             //---- add mapper for SymbolInfo
             mapper.Entity<SymbolInfo>().Ctor(
-                bson => Market.GetSymbols().FirstOrDefault(s => s.Key == bson["Key"].AsString));
+                bson =>
+                    {
+                        var sym = Market.GetSymbols().FirstOrDefault(s => s.Key == bson["Key"].AsString);
+                        if (sym == null)
+                        {
+                            sym = new SymbolInfo();
+                            var entityMapper = mapper.BuildEntityMapper(typeof(SymbolInfo));
+                            mapper.PopulateObjectProperties(entityMapper, sym, bson);
+                        }
+                        return sym;
+                    }
+
+                    );
             //---- add mapper for signals
             Signal deserializeSignal(BsonValue bson)
             {
@@ -157,7 +169,7 @@ namespace SharpTrader.AlgoFramework
                 Db.Commit();
 
                 Db.Checkpoint();
-            } 
+            }
         }
 
         public void LoadNonVolatileVars()
@@ -210,7 +222,7 @@ namespace SharpTrader.AlgoFramework
                 //closed operations are not loaded in current session   
                 foreach (var op in DbActiveOperations.FindAll().ToArray())
                     this.AddActiveOperation(op);
-            } 
+            }
         }
 
 
