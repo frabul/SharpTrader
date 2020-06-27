@@ -1115,8 +1115,7 @@ namespace SharpTrader.BrokersApi.Binance
             Order BsonToOrder(BsonValue value)
             {
                 lock (LockOrdersTrades)
-                {
-
+                { 
                     var order = OpenOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
                     if (order == null)
                         order = Orders.FindById(value["_id"].AsString);
@@ -1131,8 +1130,12 @@ namespace SharpTrader.BrokersApi.Binance
 
             Trade DeserializeTrade(BsonValue value)
             {
+                Trade result = null;
                 lock (LockOrdersTrades)
-                    return Trades.FindById(value["_id"].AsString);
+                    result = Trades.FindById(value["_id"].AsString);
+                if(result == null )
+                    result = defaultMapper.Deserialize<Trade>(value);
+                return result;
             }
             mapper.Entity<Trade>().Ctor(DeserializeTrade);
         }
