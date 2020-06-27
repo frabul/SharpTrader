@@ -10,6 +10,13 @@ namespace SharpTrader.AlgoFramework
     { 
         public event Action<Signal> OnModify;
         private volatile bool _IsChanged = true;
+        /// <summary>
+        /// Constructor used by serialization library
+        /// </summary>
+        public Signal()
+        {
+
+        }
         public Signal(string id, SymbolInfo symbol, SignalKind kind, DateTime creationTime)
         {
             Id = id;

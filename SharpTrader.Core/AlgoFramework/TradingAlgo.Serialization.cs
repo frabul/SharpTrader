@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 
 namespace SharpTrader.AlgoFramework
@@ -128,6 +129,28 @@ namespace SharpTrader.AlgoFramework
             DbClosedOperations.EnsureIndex(oper => oper.CreationTime);
             DbActiveOperations = this.Db.GetCollection<Operation>("ActiveOperations");
             DbActiveOperations.EnsureIndex(oper => oper.Id);
+
+            //purge old operations that never got to active state
+            Logger.Info("Purgin old operations and rebuilding database.");
+            var purgeLimit = this.Time - TimeSpan.FromDays(7);
+            List<string> operationsToRemove = new List<string>();
+            foreach (var oper in this.Db.GetCollection("ClosedOperations").FindAll())
+            {
+                var isOld = oper["CreationTime"].AsDateTime < purgeLimit;
+                var entryZero = oper["AmountInvested"].AsDecimal <= 0 && oper["AmountLiquidated"].AsDecimal <= 0;
+                if (isOld && entryZero)
+                    operationsToRemove.Add(oper["_id"].AsString);
+            }
+            Db.BeginTrans();
+            foreach (var opId in operationsToRemove)
+            {
+                DbClosedOperations.Delete(opId);
+            }
+
+            Db.Commit();
+            Db.Checkpoint();
+            Db.Rebuild();
+            Logger.Info("Rebuld completed.");
         }
         /// <summary>
         /// This function should provide and object that is going to be saved for reload after reset
@@ -225,14 +248,13 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-
-        public Operation[] GetOperations(DateTime dateTime)
+        public BsonDocument[] QueryOperations(Expression<Func<BsonDocument, bool>> predicate)
         {
             lock (DbLock)
             {
-                var l1 = this.DbClosedOperations.Find(op => op.CreationTime > dateTime);
-                var l2 = this.DbActiveOperations.Find(op => op.CreationTime > dateTime);
-                return l1.Concat(l2).ToArray();
+                var l1 = this.Db.GetCollection("ClosedOperations").Find(predicate).ToList();
+                var l2 = this.Db.GetCollection("ActiveOperations").Find(predicate).ToList();
+				return l1.Concat(l2).ToArray();
             }
         }
     }
