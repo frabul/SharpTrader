@@ -303,7 +303,8 @@ namespace SharpTrader.AlgoFramework
             //if operation is closing or closed we terminate the task chain
             if (op.IsClosing || op.IsClosed)
             {
-                Debug.Assert(op.AmountRemaining == 0);
+                if (op.AmountRemaining > 0)
+                    Logger.Warn("op is not closing but amountremaining is > 0");
                 return true;
             }
 
@@ -357,7 +358,8 @@ namespace SharpTrader.AlgoFramework
 
             if (op.IsClosing || op.IsClosed)
             {
-                Debug.Assert(op.AmountRemaining == 0, "op is not closed but amountremaining is > 0");
+                if(op.AmountRemaining > 0)
+                    Logger.Warn("op is not closing but amountremaining is > 0");
                 return true;
             }
 
@@ -468,7 +470,8 @@ namespace SharpTrader.AlgoFramework
 
             if (op.IsClosing || op.IsClosed)
             {
-                Debug.Assert(op.AmountRemaining == 0);
+                if (op.AmountRemaining > 0)
+                    Logger.Warn("op is not closing but amountremaining is > 0");
                 return true;
             }
 
@@ -479,7 +482,7 @@ namespace SharpTrader.AlgoFramework
                     ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / (decimal)symData.Feed.Bid < EntryNearThreshold :
                     (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry < EntryNearThreshold;
 
-                if (entryNear && !Algo.IsTradingStopped)
+                if (entryNear && !Algo.EntriesSuspended)
                 {
                     var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
                     var stillToBuy = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed) - op.AmountInvested;
@@ -519,6 +522,9 @@ namespace SharpTrader.AlgoFramework
             var myOpData = self.myOpData;
             Operation op = self.Op;
             SymbolData symData = self.SymbolData;
+
+            if (op.IsClosing || op.IsClosed)
+                return false;
 
             //----------------------- manage entry orders -------------------------------- 
             //  open entry if we got near the target price

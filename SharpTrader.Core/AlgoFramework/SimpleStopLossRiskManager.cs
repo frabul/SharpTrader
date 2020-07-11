@@ -271,7 +271,7 @@ namespace SharpTrader.AlgoFramework
                                 Logger.Error($"Unable to to liquidate operation {op}: {request.ErrorInfo}");
                             }
                         }
-                        else if( op.AmountRemaining / op.AmountInvested < 0.05m)
+                        else if( op.AmountRemaining / op.AmountInvested < 0.07m) //todo gestire meglio
                         {
                             if (!(op.IsClosing || op.IsClosed))
                             {

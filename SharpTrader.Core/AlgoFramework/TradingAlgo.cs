@@ -22,9 +22,11 @@ namespace SharpTrader.AlgoFramework
         {
             public long TotalOperations { get; set; }
             public long TotalSignals { get; set; }
+            public bool EntriesSuspendedByUser { get; set; }
         }
 
         //todo the main components should be allowed to be set only during Initialize 
+        private NonVolatileVars State = new NonVolatileVars();
         private Dictionary<string, SymbolData> _SymbolsData = new Dictionary<string, SymbolData>();
         private TimeSlice WorkingSlice = new TimeSlice();
         private TimeSlice OldSlice = new TimeSlice();
@@ -32,8 +34,8 @@ namespace SharpTrader.AlgoFramework
         private HashSet<Operation> _ClosedOperations = new HashSet<Operation>();
         private NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private Configuration Config;
-
-        private NonVolatileVars State = new NonVolatileVars();
+        private object WorkingSliceLock = new object();
+        private bool EntriesStopppedByStrategy = false;
 
         public string Name => Config.Name;
         public string MyDataDir => Path.Combine(Config.DataDir, Config.Name);
@@ -50,8 +52,9 @@ namespace SharpTrader.AlgoFramework
         public DateTime LastUpdate { get; set; }
         public DateTime Time => Market.Time;
         public DateTime NextUpdateTime { get; private set; } = DateTime.MinValue;
-        public TimeSpan Resolution { get; set; } = TimeSpan.FromSeconds(10);
-        public bool IsTradingStopped { get; private set; } = true;
+        public TimeSpan Resolution { get; set; } = TimeSpan.FromSeconds(10);  
+   
+        public bool EntriesSuspended => State.EntriesSuspendedByUser || EntriesStopppedByStrategy;
         public bool IsPlottingEnabled { get; set; } = false;
 
         public TradingAlgo(IMarketApi marketApi, Configuration config)
@@ -144,8 +147,7 @@ namespace SharpTrader.AlgoFramework
                         symbolData.Feed.OnData += Feed_OnData;
                     }
                 }
-
-
+                 
                 if (Sentry != null)
                     await Sentry.OnSymbolsChanged(changes);
 
@@ -230,8 +232,6 @@ namespace SharpTrader.AlgoFramework
                 this.Db?.Commit();
             }
 
-
-
             //add new operations that have been created 
             foreach (var op in slice.NewOperations)
                 AddActiveOperation(op);
@@ -269,6 +269,7 @@ namespace SharpTrader.AlgoFramework
                 lock (DbLock)
                     DbClosedOperations.Delete(op.Id);
         }
+
         public string GetNewOperationId()
         {
             return (State.TotalOperations++).ToString();
@@ -279,10 +280,11 @@ namespace SharpTrader.AlgoFramework
             return (State.TotalSignals++).ToString();
         }
 
-        public async Task Stop()
+        public async Task RequestStopEntries()
         {
-            await this.StopEntries();
+            this.State.EntriesSuspendedByUser = true;
             await this.Executor.CancelEntryOrders();
+            this.SaveNonVolatileVars();
         }
 
         private SymbolData GetSymbolData(SymbolInfo sym)
@@ -303,14 +305,24 @@ namespace SharpTrader.AlgoFramework
 
         public void ForceCloseOperation(string id)
         {
-            throw new NotImplementedException();
+            lock (DbLock)
+            {
+                var oper = this._ActiveOperations.FirstOrDefault(op => op.Id == id);
+                if (oper != null && !oper.IsClosing)
+                    oper.ScheduleClose(Market.Time.AddSeconds(30));
+            }
         }
 
-        public Task LiquidateOperation(string v)
+        public void ForceLiquidateOpetion(string id)
         {
-            throw new NotImplementedException();
+            lock (DbLock)
+            {
+                var oper = this._ActiveOperations.FirstOrDefault(op => op.Id == id);
+                if (oper != null)
+                    oper.RequestLiquidation();
+            }
         }
-        private object WorkingSliceLock = new object();
+
         private void Feed_OnData(ISymbolFeed symFeed, IBaseData dataRecord)
         {
             //todo bisogna accertartci che i dati che riceviamo sono del giusto timeframe!
@@ -328,6 +340,7 @@ namespace SharpTrader.AlgoFramework
         {
             return Market.GetSymbolFeedAsync(symbolKey);
         }
+
         public override Task OnTickAsync()
         {
             if (Time >= NextUpdateTime)
@@ -354,17 +367,20 @@ namespace SharpTrader.AlgoFramework
             else
                 return Task.CompletedTask;
         }
+
         public void ReleaseFeed(ISymbolFeed feed)
         {
             Market.DisposeFeed(feed);
         }
+
         public void ResumeEntries()
         {
-            IsTradingStopped = false;
+            EntriesStopppedByStrategy = false;
         }
+
         public Task StopEntries()
         {
-            IsTradingStopped = true;
+            EntriesStopppedByStrategy = true;
             //close all entry orders
             return this.Executor.CancelEntryOrders();
         }

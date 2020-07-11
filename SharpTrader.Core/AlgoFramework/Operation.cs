@@ -75,7 +75,7 @@ namespace SharpTrader.AlgoFramework
         public DateTime CloseDeadTime { get; private set; } = DateTime.MaxValue;
         public DateTime LastInvestmentTime { get; private set; }
         public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
-
+        public bool LiquidationRequested { get; private set; }
         /// <summary>
         /// All trades associated with this operation
         /// </summary> 
@@ -90,12 +90,15 @@ namespace SharpTrader.AlgoFramework
         /// </summary>
         public IEnumerable<ITrade> Entries
         {
-            get => _Entries; private set
+
+            get => _Entries;
+            //private setter used by serialization
+            private set
             {
                 foreach (var trade in value)
                     _Entries.Add(trade);
             }
-        }//private setter used by serialization
+        }
 
         /// <summaropera
         /// Trades that were meant as exits
@@ -103,14 +106,14 @@ namespace SharpTrader.AlgoFramework
         public IEnumerable<ITrade> Exits
         {
             get => _Exits;
+            //private setter used by serialization
             private set
             {
 
                 foreach (var trade in value)
                     _Exits.Add(trade);
             }
-        }//private setter used by serialization
-
+        }
 
         public Operation()
         {
@@ -241,6 +244,12 @@ namespace SharpTrader.AlgoFramework
                 throw new Exception("Unknown trade direction");
         }
 
+        internal void RequestLiquidation()
+        { 
+            this.LiquidationRequested = true;
+            this.SetChanged();
+        }
+
         public override string ToString()
         {
             return ToString("");
@@ -252,11 +261,11 @@ namespace SharpTrader.AlgoFramework
                 var ar = " AR%: -";
                 var gainprc = "";
                 if (AmountInvested > 0 && AmountRemaining / AmountInvested < 0.05m)
-                    gainprc = $", G%: {(this.AverageExitPrice - this.AverageEntryPrice) / this.AverageEntryPrice: 0.###}";
+                    gainprc = $", G%: {(this.AverageExitPrice - this.AverageEntryPrice) * 100 / this.AverageEntryPrice: 0.###}";
 
                 if (AmountInvested > 0)
-                    ar = $" AR %: {this.AmountRemaining / this.AmountInvested:0.###}";
-                return $"{{ Id: {Id} {Symbol.Key} {CreationTime:dd-MM-yyyy hh:mm:ss}," +
+                    ar = $" AR%: {this.AmountRemaining * 100 / this.AmountInvested:0.###}";
+                return $"{{ Id: {Id} {Symbol.Key} {CreationTime:dd-MM-yyyy HH:mm:ss}," +
                     $" EP: {this.AverageEntryPrice:0.########}," +
                     $" TP: {Signal.PriceTarget:0.########}," +
                     $" EP: {this.AverageExitPrice:0.########}," +
@@ -308,12 +317,11 @@ namespace SharpTrader.AlgoFramework
             _IsChanged = true;
         }
 
-
-
         public override int GetHashCode()
         {
             return this.Id.GetHashCode();
         }
+
         class EntriesEqualityComparer : IEqualityComparer<ITrade>, IEqualityComparer<IOrder>
         {
             public bool Equals(ITrade x, ITrade y) => x.Id == y.Id;
@@ -326,5 +334,7 @@ namespace SharpTrader.AlgoFramework
 
             public static EntriesEqualityComparer Instance { get; } = new EntriesEqualityComparer();
         }
+
+
     }
 }

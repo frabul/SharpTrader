@@ -68,7 +68,7 @@ namespace SharpTrader.AlgoFramework
         }
 
     }
-    public abstract partial class TradingAlgo
+    public abstract partial class TradingAlgo : TraderBot
     {
         private object DbLock = new object();
         private LiteDatabase Db;
@@ -78,9 +78,8 @@ namespace SharpTrader.AlgoFramework
         private List<Signal> SignalsDeserialized = new List<Signal>();
         public void ConfigureSerialization()
         {
-            BsonMapperCustom mapper = new BsonMapperCustom();
+            BsonMapperCustom mapper = new BsonMapperCustom(); 
 
-            //todo register mapper for custom components
             Market.RegisterSerializationHandlers(mapper);
             this.Executor?.RegisterSerializationHandlers(mapper);
             this.RiskManager?.RegisterSerializationHandlers(mapper);
@@ -166,20 +165,20 @@ namespace SharpTrader.AlgoFramework
             lock (DbLock)
             {
                 //save my internal state
-                BsonDocument states = new BsonDocument();
-                states["_id"] = "TradingAlgoState";
-                states["State"] = Db.Mapper.Serialize(State);
+                BsonDocument state = new BsonDocument();
+                state["_id"] = "TradingAlgoState";
+                state["State"] = Db.Mapper.Serialize(State);
 
                 //Save derived state  
-                states["DerivedClassState"] = Db.Mapper.Serialize(GetState());
+                state["DerivedClassState"] = Db.Mapper.Serialize(GetState());
 
                 //save module states 
-                states["Sentry"] = Db.Mapper.Serialize(Sentry.GetState());
-                states["Allocator"] = Db.Mapper.Serialize(Allocator.GetState());
-                states["Executor"] = Db.Mapper.Serialize(Executor.GetState());
-                states["RiskManager"] = Db.Mapper.Serialize(RiskManager.GetState());
+                state["Sentry"] = Db.Mapper.Serialize(Sentry.GetState());
+                state["Allocator"] = Db.Mapper.Serialize(Allocator.GetState());
+                state["Executor"] = Db.Mapper.Serialize(Executor.GetState());
+                state["RiskManager"] = Db.Mapper.Serialize(RiskManager.GetState());
 
-                Db.GetCollection("State").Upsert(states);
+                Db.GetCollection("State").Upsert(state);
 
                 foreach (var symData in SymbolsData.Values)
                     Db.GetCollection<SymbolData>("SymbolsData").Upsert(symData);
