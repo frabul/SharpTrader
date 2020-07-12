@@ -253,35 +253,17 @@ namespace SharpTrader.AlgoFramework
             bool terminate = false;
             if (op.AmountRemaining > 0)
             {
-                Logger.Info($"Liquidating operation {self.Op} because: " + self.LiquidateReason);
-                var marketTrans = await Algo.Market.MarketOrderAsync(op.Symbol.Key, op.ExitTradeDirection, op.AmountRemaining, clientOrderId: op.GetNewOrderId());
-
-                //-------- 
-                var adj = self.SymbolData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget);
-                adj = ClampOrderAmount(self.SymbolData, op.ExitTradeDirection, adj);
-                if (adj.amount > 0)
-                {
-                    //immediatly liquidate everything with a market order 
-                    Logger.Info($"Try market exit amount:{adj.amount} - price: {adj.price}.");
-                    var request =
-                        await Algo.Market.LimitOrderAsync(
-                            op.Symbol.Key, op.ExitTradeDirection, adj.amount, adj.price, op.GetNewOrderId());
-                    if (request.IsSuccessful)
-                    {
-                        //todo - right now we assume that if order is successful then the operation is liquidate but should we wait to have the trade too?
-                        self.myOpData.CurrentExitOrder = marketTrans.Result;
-                        await CloseQueueAsync(op, TimeSpan.FromMinutes(2));
-                        terminate = true;
-                    }
-                    else
-                    {
-                        Logger.Error($"Error liquidating operation {op} - symbol {op.Symbol.Key} - amount:{adj.amount} - price: {adj.price}");
-                        terminate = false;
-                    }
+                //immediatly liquidate everything with a market order 
+                var lr = await Algo.TryLiquidateOperation(op, self.LiquidateReason); 
+                if (lr.order != null)
+                { 
+                    self.myOpData.CurrentExitOrder = lr.order;
+                    await CloseQueueAsync(op, TimeSpan.FromMinutes(2));
+                    terminate = true; 
                 }
-                else
+                else if(lr.amountRemainingLow)
                 {
-                    Logger.Info($"Queue for close {op.ToString("c")} \n    because amount remaining is too low");
+                    Logger.Info($"Queue for close {op.ToString("c")} because amount remaining is too low");
                     await this.CloseQueueAsync(op, TimeSpan.FromMinutes(2));
                     terminate = true;
                 }
@@ -358,7 +340,7 @@ namespace SharpTrader.AlgoFramework
 
             if (op.IsClosing || op.IsClosed)
             {
-                if(op.AmountRemaining > 0)
+                if (op.AmountRemaining > 0)
                     Logger.Warn("op is not closing but amountremaining is > 0");
                 return true;
             }
@@ -375,7 +357,7 @@ namespace SharpTrader.AlgoFramework
                         //create a limit order 
                         if (adj.amount > 0)
                         {
-                            adj = ClampOrderAmount(symData, op.ExitTradeDirection, adj);
+                            adj = Algo.ClampOrderAmount(symData, op.ExitTradeDirection, adj);
                             if (adj.amount > 0)
                             {
                                 //Debug.Assert(adj.amount == op.AmountRemaining);
@@ -420,7 +402,7 @@ namespace SharpTrader.AlgoFramework
                 //check if we need to change order in case that the amount invested was increased 
                 var amountInOrder = myOpData.CurrentExitOrder.Amount - myOpData.CurrentExitOrder.Filled;
                 var availableForTrading =
-                    ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)).amount //free to trade
+                    Algo.ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)).amount //free to trade
                                             + amountInOrder;                      //amount derived from cancelling the order
                 // we want to trade amount remaining as max 
                 var amountToTrade = Math.Min(op.AmountRemaining, availableForTrading);
@@ -489,7 +471,7 @@ namespace SharpTrader.AlgoFramework
                     if (stillToBuy / originalAmount > 0.2m)
                     {
                         var adjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(stillToBuy, op.Signal.PriceEntry);
-                        adjusted = ClampOrderAmount(symData, op.EntryTradeDirection, adjusted);
+                        adjusted = Algo.ClampOrderAmount(symData, op.EntryTradeDirection, adjusted);
                         if (adjusted.amount / originalAmount > 0.1m)
                         {
                             Logger.Info($"{Algo.Time} - Setting Entry for {op} - amount: {adjusted.amount:0.########} - price: {adjusted.price:0.########}");
@@ -567,34 +549,6 @@ namespace SharpTrader.AlgoFramework
             //    myOpData.ScheduledTasks[i].Next = new DeferredTaskDelegate((o) => Task.FromResult(true));
             //    myOpData.ScheduledTasks[i].Time = DateTime.MinValue;
             //}
-        }
-
-        private (decimal price, decimal amount) ClampOrderAmount(SymbolData symData, TradeDirection tradeDirection, (decimal price, decimal amount) adj)
-        {
-            if (adj.amount > 0)
-            {
-                if (tradeDirection == TradeDirection.Buy)
-                {
-                    var freeAmount = Algo.Market.GetFreeBalance(symData.Symbol.QuoteAsset);
-                    if (adj.amount * adj.price > freeAmount)
-                    {
-                        adj.amount = 0.99m * freeAmount / adj.price;
-                        if (adj.amount > 0)
-                            adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(adj.amount, adj.price);
-                    }
-                }
-                else
-                {
-                    var freeAmount = Algo.Market.GetFreeBalance(symData.Symbol.Asset);
-                    if (adj.amount > freeAmount)
-                    {
-                        adj.amount = freeAmount;
-                        if (adj.amount > 0)
-                            adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(adj.amount, adj.price);
-                    }
-                }
-            }
-            return adj;
         }
 
         private async Task<bool> CloseOrder(IOrder order, Operation op)

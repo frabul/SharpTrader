@@ -75,7 +75,7 @@ namespace SharpTrader.AlgoFramework
         public DateTime CloseDeadTime { get; private set; } = DateTime.MaxValue;
         public DateTime LastInvestmentTime { get; private set; }
         public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
-        public bool LiquidationRequested { get; private set; }
+    
         /// <summary>
         /// All trades associated with this operation
         /// </summary> 
@@ -244,12 +244,7 @@ namespace SharpTrader.AlgoFramework
                 throw new Exception("Unknown trade direction");
         }
 
-        internal void RequestLiquidation()
-        { 
-            this.LiquidationRequested = true;
-            this.SetChanged();
-        }
-
+     
         public override string ToString()
         {
             return ToString("");
@@ -298,13 +293,14 @@ namespace SharpTrader.AlgoFramework
 
         public void Resume()
         {
-            if (IsClosing)
+            if (IsClosing || IsClosed)
             {
                 IsClosing = false;
+                this.IsClosed = false;
                 CloseDeadTime = DateTime.MaxValue;
                 this.SetChanged();
                 OnResumed?.Invoke(this);
-            }
+            } 
         }
 
         public void AcceptChanges()

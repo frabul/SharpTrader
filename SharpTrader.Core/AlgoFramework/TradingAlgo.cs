@@ -52,8 +52,8 @@ namespace SharpTrader.AlgoFramework
         public DateTime LastUpdate { get; set; }
         public DateTime Time => Market.Time;
         public DateTime NextUpdateTime { get; private set; } = DateTime.MinValue;
-        public TimeSpan Resolution { get; set; } = TimeSpan.FromSeconds(10);  
-   
+        public TimeSpan Resolution { get; set; } = TimeSpan.FromSeconds(10);
+
         public bool EntriesSuspended => State.EntriesSuspendedByUser || EntriesStopppedByStrategy;
         public bool IsPlottingEnabled { get; set; } = false;
 
@@ -147,7 +147,7 @@ namespace SharpTrader.AlgoFramework
                         symbolData.Feed.OnData += Feed_OnData;
                     }
                 }
-                 
+
                 if (Sentry != null)
                     await Sentry.OnSymbolsChanged(changes);
 
@@ -244,6 +244,19 @@ namespace SharpTrader.AlgoFramework
             if (RiskManager != null)
                 await RiskManager.Update(slice);
 
+            while (Commands.Count > 0)
+            {
+                try
+                {
+                    if (Commands.TryDequeue(out Command command))
+                        await command.Run();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"Error while running command: {ex.Message}.");
+                }
+            }
+
             if (Config.SaveData)
             {
                 SaveNonVolatileVars();
@@ -263,6 +276,7 @@ namespace SharpTrader.AlgoFramework
         private void ResumeOperation(Operation op)
         {
             Logger.Info($"Resuming operation {op}.");
+            op.Resume();
             AddActiveOperation(op);
             var removed = this._ClosedOperations.Remove(op);
             if (this.Config.SaveData)
@@ -280,12 +294,7 @@ namespace SharpTrader.AlgoFramework
             return (State.TotalSignals++).ToString();
         }
 
-        public async Task RequestStopEntries()
-        {
-            this.State.EntriesSuspendedByUser = true;
-            await this.Executor.CancelEntryOrders();
-            this.SaveNonVolatileVars();
-        }
+   
 
         private SymbolData GetSymbolData(SymbolInfo sym)
         {
@@ -303,25 +312,6 @@ namespace SharpTrader.AlgoFramework
             ShowPlotCallback?.Invoke(plot);
         }
 
-        public void ForceCloseOperation(string id)
-        {
-            lock (DbLock)
-            {
-                var oper = this._ActiveOperations.FirstOrDefault(op => op.Id == id);
-                if (oper != null && !oper.IsClosing)
-                    oper.ScheduleClose(Market.Time.AddSeconds(30));
-            }
-        }
-
-        public void ForceLiquidateOpetion(string id)
-        {
-            lock (DbLock)
-            {
-                var oper = this._ActiveOperations.FirstOrDefault(op => op.Id == id);
-                if (oper != null)
-                    oper.RequestLiquidation();
-            }
-        }
 
         private void Feed_OnData(ISymbolFeed symFeed, IBaseData dataRecord)
         {
@@ -385,4 +375,5 @@ namespace SharpTrader.AlgoFramework
             return this.Executor.CancelEntryOrders();
         }
     }
+
 }
