@@ -78,17 +78,24 @@ namespace SharpTrader.AlgoFramework
             return cmd.GetResult();
         }
 
+        public Task RequestCancelEntryOrders()
+        {
+            return this.Executor.CancelEntryOrders();
+        }
+
         public async Task RequestStopEntries()
         {
             this.State.EntriesSuspendedByUser = true;
             await this.Executor.CancelEntryOrders();
             this.SaveNonVolatileVars();
         }
+
         public void RequestResumeEntries()
         {
             this.State.EntriesSuspendedByUser = false;
             this.SaveNonVolatileVars();
         }
+
     }
     abstract class Command
     {

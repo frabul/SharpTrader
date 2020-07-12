@@ -294,8 +294,6 @@ namespace SharpTrader.AlgoFramework
             return (State.TotalSignals++).ToString();
         }
 
-   
-
         private SymbolData GetSymbolData(SymbolInfo sym)
         {
             SymbolData symbolData;
