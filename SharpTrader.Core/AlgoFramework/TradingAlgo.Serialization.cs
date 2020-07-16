@@ -1,6 +1,7 @@
 ﻿using LiteDB;
 using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
@@ -72,29 +73,30 @@ namespace SharpTrader.AlgoFramework
     {
         private object DbLock = new object();
         private LiteDatabase Db;
+        private BsonMapperCustom DbMapper;
         private ILiteCollection<Operation> DbClosedOperations;
         private ILiteCollection<Operation> DbActiveOperations;
 
         private List<Signal> SignalsDeserialized = new List<Signal>();
         public void ConfigureSerialization()
         {
-            BsonMapperCustom mapper = new BsonMapperCustom(); 
+            DbMapper = new BsonMapperCustom();
 
-            Market.RegisterSerializationHandlers(mapper);
-            this.Executor?.RegisterSerializationHandlers(mapper);
-            this.RiskManager?.RegisterSerializationHandlers(mapper);
-            this.Sentry?.RegisterSerializationHandlers(mapper);
+            Market.RegisterSerializationHandlers(DbMapper);
+            this.Executor?.RegisterSerializationHandlers(DbMapper);
+            this.RiskManager?.RegisterSerializationHandlers(DbMapper);
+            this.Sentry?.RegisterSerializationHandlers(DbMapper);
 
             //---- add mapper for SymbolInfo
-            mapper.Entity<SymbolInfo>().Ctor(
+            DbMapper.Entity<SymbolInfo>().Ctor(
                 bson =>
                     {
                         var sym = Market.GetSymbols().FirstOrDefault(s => s.Key == bson["Key"].AsString);
                         if (sym == null)
                         {
                             sym = new SymbolInfo();
-                            var entityMapper = mapper.BuildEntityMapper(typeof(SymbolInfo));
-                            mapper.PopulateObjectProperties(entityMapper, sym, bson);
+                            var entityMapper = DbMapper.BuildEntityMapper(typeof(SymbolInfo));
+                            DbMapper.PopulateObjectProperties(entityMapper, sym, bson);
                         }
                         return sym;
                     }
@@ -113,7 +115,7 @@ namespace SharpTrader.AlgoFramework
                 }
                 return signal;
             }
-            mapper.Entity<Signal>().Ctor(deserializeSignal);
+            DbMapper.Entity<Signal>().Ctor(deserializeSignal);
 
 
             //build db path
@@ -122,7 +124,7 @@ namespace SharpTrader.AlgoFramework
                 Directory.CreateDirectory(MyDataDir);
 
             //init db 
-            this.Db = new LiteDatabase(dbPath, mapper);
+            this.Db = new LiteDatabase(dbPath, DbMapper);
             this.Db.Pragma("UTC_DATE", true);
             DbClosedOperations = this.Db.GetCollection<Operation>("ClosedOperations");
             DbClosedOperations.EnsureIndex(oper => oper.CreationTime);
@@ -140,6 +142,8 @@ namespace SharpTrader.AlgoFramework
                 if (isOld && entryZero)
                     operationsToRemove.Add(oper["_id"].AsString);
             }
+
+
             Db.BeginTrans();
             foreach (var opId in operationsToRemove)
             {
@@ -253,8 +257,23 @@ namespace SharpTrader.AlgoFramework
             {
                 var l1 = this.Db.GetCollection("ClosedOperations").Find(predicate).ToList();
                 var l2 = this.Db.GetCollection("ActiveOperations").Find(predicate).ToList();
-				return l1.Concat(l2).ToArray();
+                return l1.Concat(l2).ToArray();
             }
+        }
+        public Operation[] QueryOperations(Expression<Func<Operation, bool>> predicate)
+        {
+            lock (DbLock)
+            {
+                var l1 = this.DbClosedOperations.Find(predicate).ToList();
+                var l2 = this.DbActiveOperations.Find(predicate).ToList();
+                return l1.Concat(l2).ToArray();
+            }
+        }
+
+        private BsonMapperCustom NaiveMapper = new BsonMapperCustom();
+        public Operation OperationFromBson(BsonDocument operBson)
+        {
+            return NaiveMapper.Deserialize<Operation>(operBson);
         }
     }
 }
