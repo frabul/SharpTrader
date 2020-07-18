@@ -286,7 +286,10 @@ namespace SharpTrader.AlgoFramework
 
         public string GetNewOperationId()
         {
-            return (State.TotalOperations++).ToString();
+            if(Name.Length > 7)
+                return this.Name.Substring(0,7) +(State.TotalOperations++).ToString();
+            else
+                return this.Name.Substring(0, 7) + (State.TotalOperations++).ToString(); 
         }
 
         public string GetNewSignalId()
