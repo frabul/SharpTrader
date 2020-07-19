@@ -11,6 +11,7 @@ using BinanceExchange.API.Enums;
 using BinanceExchange.API.Models.Response.Error;
 using System.Diagnostics;
 using BinanceExchange.API.Models.Response;
+using System.Threading;
 
 namespace SharpTrader.BrokersApi.Binance
 {
@@ -21,6 +22,9 @@ namespace SharpTrader.BrokersApi.Binance
         private BinanceClient Client;
         private HistoricalRateDataBase HistoryDB;
         private string DataDir;
+        private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
+       
+
         public int ConcurrencyCount { get; set; } = 10;
         public BinanceDataDownloader(string dataDir, double rateLimitFactor = 0.6f)
         {
@@ -82,10 +86,14 @@ namespace SharpTrader.BrokersApi.Binance
                 System.Threading.Thread.Sleep(1);
         }
 
+        
         public async Task DownloadHistoryAsync(string symbol, DateTime fromTime, TimeSpan redownloadStart)
         {
+            //we must assure that there is only one downloading action ongoing for each symbol!
+            var semaphore = GetSemaphore(symbol);
             try
             {
+                await semaphore.WaitAsync();
                 Console.WriteLine($"Downloading {symbol} history ");
                 DateTime endTime = DateTime.UtcNow.Subtract(TimeSpan.FromSeconds(60));
                  
@@ -138,6 +146,10 @@ namespace SharpTrader.BrokersApi.Binance
                 else
                     msg += ex.Message;
                 Console.WriteLine(msg);
+            }
+            finally
+            {
+                semaphore.Release();
             }
         }
 
@@ -220,6 +232,11 @@ namespace SharpTrader.BrokersApi.Binance
             System.IO.File.WriteAllText(DataDir + "BinanceSymbolsTable.json", json);
         }
 
-
+        private SemaphoreSlim GetSemaphore(string symbol)
+        {
+            if (!Semaphores.ContainsKey(symbol))
+                Semaphores.Add(symbol, new SemaphoreSlim(1, 1));
+            return Semaphores[symbol];
+        }
     }
 }

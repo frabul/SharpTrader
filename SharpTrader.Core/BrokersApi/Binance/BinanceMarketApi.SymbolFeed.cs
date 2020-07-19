@@ -6,8 +6,10 @@ using BinanceExchange.API.Websockets;
 using LiteDB;
 using NLog;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 
@@ -26,6 +28,7 @@ namespace SharpTrader.BrokersApi.Binance
         private DateTime LastKlineWarn = DateTime.Now;
         private DateTime LastDepthWarn = DateTime.Now;
         private BinanceKline FormingCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
+        private static Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private volatile bool HistoryInitialized = false;
         private HistoryInfo HistoryInfo;
 
@@ -91,7 +94,7 @@ namespace SharpTrader.BrokersApi.Binance
                 catch
                 {
 
-                } 
+                }
                 await Task.Delay(2500);
             }
 
@@ -114,7 +117,6 @@ namespace SharpTrader.BrokersApi.Binance
             try
             {
                 WebSocketClient.SubscribePartialDepthStream(this.Symbol.Key.ToLower(), PartialDepthLevels.Five, HandlePartialDepthUpdate);
-
             }
             catch (Exception ex)
             {
@@ -193,27 +195,44 @@ namespace SharpTrader.BrokersApi.Binance
 
         public async Task<TimeSerie<ITradeBar>> GetHistoryNavigator(TimeSpan resolution, DateTime historyStartTime)
         {
+
             if (historyStartTime > this.Time)
                 throw new InvalidOperationException("Requested future quotes");
             if (resolution != TimeSpan.FromMinutes(1))
                 throw new NotSupportedException("Binance symbol history only supports resolution 1 minute");
 
-            //download missing data to hist db   
-            if (!HistoryInitialized)
-            {
-                Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
-                var downloader = new BinanceDataDownloader(HistoryDb, Client);
-                await downloader.DownloadHistoryAsync(Symbol.Key, historyStartTime, TimeSpan.FromHours(6));
-            }
-            //--- get the data from db
-            HistoryInfo = new HistoryInfo(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
-            ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(HistoryInfo, historyStartTime, DateTime.MaxValue);
-            //HistoryDb.CloseFile(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
-
             var history = new TimeSerie<ITradeBar>();
-            while (symbolHistory.Ticks.MoveNext())
-                history.AddRecord(symbolHistory.Ticks.Current, true);
-            HistoryInitialized = true;
+            var sem = GetSemaphore();
+            await sem.WaitAsync();
+            try
+            {
+                //download missing data to hist db   
+                //todo move this part to history db
+                if (!HistoryInitialized)
+                {
+                    Console.WriteLine($"Downloading history for the requested symbol: {Symbol}");
+                    var downloader = new BinanceDataDownloader(HistoryDb, Client);
+                    await downloader.DownloadHistoryAsync(Symbol.Key, historyStartTime, TimeSpan.FromHours(6));
+                }
+
+                //--- get the data from db
+                HistoryInfo = new HistoryInfo(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
+                ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(HistoryInfo, historyStartTime, DateTime.MaxValue);
+                
+                //HistoryDb.CloseFile(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
+                
+                while (symbolHistory.Ticks.MoveNext())
+                    history.AddRecord(symbolHistory.Ticks.Current, true);
+                HistoryInitialized = true;
+            }
+            catch(Exception ex)
+            {
+                Logger.Error("Exception during SymbolFeed.GetHistoryNavigator: {0}", ex.Message);
+            }
+            finally
+            {
+                sem.Release();
+            }
             return history;
         }
 
@@ -230,6 +249,14 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 Logger.Error("Exeption during SymbolFeed.Dispose: " + ex.Message);
             }
+        }
+
+
+        private SemaphoreSlim GetSemaphore()
+        {
+            if (!Semaphores.ContainsKey(this.Symbol.Key))
+                Semaphores.Add(this.Symbol, new SemaphoreSlim(1, 1));
+            return Semaphores[this.Symbol];
         }
 
         decimal NearestRoundHigher(decimal x, decimal precision)
