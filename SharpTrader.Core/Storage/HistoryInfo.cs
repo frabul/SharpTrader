@@ -2,7 +2,7 @@
 
 namespace SharpTrader.Storage
 {
-    public class HistoryInfo
+    public class SymbolHistoryId
     {
         public string symbol { get; private set; }
         public string market { get; private set; }
@@ -13,7 +13,7 @@ namespace SharpTrader.Storage
         {
             mask = $"{this.market}_{this.symbol}_{(int)this.Timeframe.TotalMilliseconds}";
         }
-        public HistoryInfo(string market, string symbol, TimeSpan frame)
+        public SymbolHistoryId(string market, string symbol, TimeSpan frame)
         {
             this.market = market;
             this.symbol = symbol;

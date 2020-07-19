@@ -6,11 +6,20 @@ namespace SharpTrader.Storage
     class SymbolHistoryRawExt : SymbolHistoryRaw
     {
         [ProtoIgnore]
-        public DateTime StartOfData { get; set; }
-        public DateTime EndOfData { get; set; }
-        internal bool HistoryInfoEquals(HistoryInfo histInfo)
+        public DateTime StartOfData { get; set; } = DateTime.MaxValue;
+        public DateTime EndOfData { get; set; } = DateTime.MinValue;
+        internal bool HistoryInfoEquals(SymbolHistoryId histInfo)
         {
             return this.Market == histInfo.market && this.Symbol == histInfo.symbol && this.Timeframe == histInfo.Timeframe;
+        }
+
+        public void UpdateBars(ITradeBar bar)
+        {
+            if (this.EndOfData < bar.Time)
+                this.EndOfData = bar.Time;
+
+            if (this.StartOfData > bar.Time)
+                this.StartOfData = bar.Time;
         }
     }
 }

@@ -9,6 +9,7 @@ using BinanceExchange.API.Websockets;
 using LiteDB;
 using Newtonsoft.Json.Linq;
 using NLog;
+using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

@@ -12,6 +12,7 @@ using BinanceExchange.API.Models.Response.Error;
 using System.Diagnostics;
 using BinanceExchange.API.Models.Response;
 using System.Threading;
+using SharpTrader.Storage;
 
 namespace SharpTrader.BrokersApi.Binance
 {
@@ -23,7 +24,7 @@ namespace SharpTrader.BrokersApi.Binance
         private HistoricalRateDataBase HistoryDB;
         private string DataDir;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
-       
+
 
         public int ConcurrencyCount { get; set; } = 10;
         public BinanceDataDownloader(string dataDir, double rateLimitFactor = 0.6f)
@@ -86,7 +87,7 @@ namespace SharpTrader.BrokersApi.Binance
                 System.Threading.Thread.Sleep(1);
         }
 
-        
+
         public async Task DownloadHistoryAsync(string symbol, DateTime fromTime, TimeSpan redownloadStart)
         {
             //we must assure that there is only one downloading action ongoing for each symbol!
@@ -96,7 +97,7 @@ namespace SharpTrader.BrokersApi.Binance
                 await semaphore.WaitAsync();
                 Console.WriteLine($"Downloading {symbol} history ");
                 DateTime endTime = DateTime.UtcNow.Subtract(TimeSpan.FromSeconds(60));
-                 
+
                 //we need to convert all in UTC time 
                 var startTime = fromTime; //  
                 var epoch = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
@@ -104,38 +105,62 @@ namespace SharpTrader.BrokersApi.Binance
                     startTime = epoch;
 
                 //try to get the first candle - use these functions for performance improvement
-                (var firstKnowCandle, var lastKnownCandle) = HistoryDB.GetFirstAndLastCandles(new HistoryInfo(MarketName, symbol, TimeSpan.FromSeconds(60)));
-                if (firstKnowCandle != null && lastKnownCandle != null)
+                var metaData = HistoryDB.GetMetaData(new SymbolHistoryId(MarketName, symbol, TimeSpan.FromSeconds(60)));
+
+                if (metaData.FirstBar != null && metaData.LastBar != null)
                 {
-                    //if startTime is after the first tick then we start downloading from the last tick to avoid holes
-                    if (startTime > firstKnowCandle.OpenTime)
-                        startTime = new DateTime(lastKnownCandle.OpenTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
+                  
+                    if (startTime > metaData.FirstBar.OpenTime)
+                    {
+                        //if startTime is after the first recorded bar then 
+                        // then we can start downloading from last recorded bar  
+                        if (endTime <= metaData.LastBar.Time)
+                            endTime = startTime;
+                        startTime = new DateTime(metaData.LastBar.OpenTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
+
+                    } 
                     else
                     {
-                        //start time is earlier than first known candle.. we start download from first candle on server
-                        var firstAvailable = (await Client.GetKlinesCandlesticks(
-                            new GetKlinesCandlesticksRequest
-                            {
-                                Symbol = symbol,
-                                StartTime = startTime,
-                                Interval = KlineInterval.OneMinute,
-                                EndTime = startTime.AddYears(3),
-                                Limit = 10
-                            })).FirstOrDefault();
+                        if (metaData.FirstKnownData == null)
+                        {
+                            //start time is earlier than first known candle.. we start download from first candle on server
+                            var firstAvailable = (await Client.GetKlinesCandlesticks(
+                                new GetKlinesCandlesticksRequest
+                                {
+                                    Symbol = symbol,
+                                    StartTime = startTime,
+                                    Interval = KlineInterval.OneMinute,
+                                    EndTime = startTime.AddYears(3),
+                                    Limit = 10
+                                })).FirstOrDefault();
+                            HistoryDB.UpdateFirstKnownData(metaData.Info, firstAvailable);
+                        }
+
                         //if we already downloaded the first available we can start download from the last known
-                        if (firstAvailable != null && firstAvailable.CloseTime.AddSeconds(1) >= firstKnowCandle.OpenTime)
-                            startTime = new DateTime(lastKnownCandle.Time.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
-                        //otherwise we leave start time as it is to avoid creating holes ( //todo optimize adding end time = firstKnowCandle.OpenTme )
+                        //otherwise we leave start time as it is to avoid creating holes 
+                        if (metaData.FirstKnownData.CloseTime.AddSeconds(1) >= metaData.FirstBar.OpenTime)
+                        {
+                            startTime = new DateTime(metaData.LastBar.Time.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
+                        }
+
+                        // avoid downloading again some data if possible
+                        if (endTime <= metaData.LastBar.Time)
+                            endTime = metaData.FirstBar.Time;
                     }
                 }
 
-                var candlesDownloaded = await DownloadCandles(symbol, startTime, endTime);
-                //---
-                HistoryDB.AddCandlesticks(MarketName, symbol, candlesDownloaded);
-                var histInfo = new HistoryInfo(MarketName, symbol, TimeSpan.FromSeconds(60));
-                HistoryDB.ValidateData(histInfo);
-                histInfo.Timeframe = candlesDownloaded.First().Timeframe;
-                HistoryDB.SaveAndClose(histInfo);
+                //download and add bars if needed
+                if( endTime > startTime)
+                {
+                    var candlesDownloaded = await DownloadCandles(symbol, startTime, endTime);
+                    //---
+                    HistoryDB.AddCandlesticks(MarketName, symbol, candlesDownloaded);
+                    var histInfo = new SymbolHistoryId(MarketName, symbol, TimeSpan.FromSeconds(60));
+                    HistoryDB.ValidateData(histInfo);
+                    histInfo.Timeframe = candlesDownloaded.First().Timeframe;
+                    HistoryDB.SaveAndClose(histInfo);
+                }
+                
                 Console.WriteLine($"{symbol} history downloaded");
             }
             catch (Exception ex)

@@ -2,7 +2,7 @@
 
 namespace SharpTrader.Storage
 {
-    class HistoryFileInfo : HistoryInfo
+    class HistoryFileInfo : SymbolHistoryId
     {
         public DateTime StartDate;
         public string FilePath;
@@ -15,7 +15,7 @@ namespace SharpTrader.Storage
         {
             this.StartDate = date;
         }
-        public bool Equals(HistoryInfo info)
+        public bool Equals(SymbolHistoryId info)
         {
             return this.market == info.market && this.symbol == info.symbol && this.Timeframe == info.Timeframe;
         }

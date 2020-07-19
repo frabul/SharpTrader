@@ -11,12 +11,10 @@ namespace SharpTrader.Storage
         public SymbolHistoryRaw()
         {
         }
-        internal bool Equals(HistoryInfo info)
+        internal bool Equals(SymbolHistoryId info)
         {
             return info.market == Market && info.symbol == Symbol && info.Timeframe == Timeframe;
-        }
-        [ProtoIgnore]
-        public readonly object Locker = new object();
+        } 
         [ProtoMember(6)]
         public virtual string FileName { get; set; }
         [ProtoMember(1)]
@@ -41,5 +39,6 @@ namespace SharpTrader.Storage
         }
         [ProtoMember(5)]
         public virtual double Spread { get; set; }
+ 
     }
 }

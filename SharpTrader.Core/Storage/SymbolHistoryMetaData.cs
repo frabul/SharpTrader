@@ -1,24 +1,115 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using LiteDB;
 
 namespace SharpTrader.Storage
 {
-    class SymbolHistoryMetaData
+    public class SymbolHistoryMetaData
     {
         [BsonId]
-        public string Id { get; }
-        public HistoryInfo Info { get; }
-        public List<HistoryFileInfo> Chunks { get; }
-        public List<DateRange> CoveredRanges { get; }
-        public ITradeBar FirstBar { get; set; }
-        public ITradeBar LastBar { get; set; }
+        public string Id { get; protected set; }
+        public SymbolHistoryId Info { get; protected set; }
+        public List<DateRange> GapsConfirmed { get; protected set; }
+        public List<DateRange> GapsUnconfirmed { get; protected set; }
+        /// <summary>
+        /// First absolute data for this symbol
+        /// </summary>
+        public ITradeBar FirstKnownData { get; protected set; }
+        /// <summary>
+        /// First bar recorded in database
+        /// </summary>
+        public ITradeBar FirstBar { get; protected set; }
+        /// <summary>
+        /// Last bar recorded in database
+        /// </summary>
+        public ITradeBar LastBar { get; protected set; }
+    }
 
-        public SymbolHistoryMetaData(HistoryFileInfo histInfo)
+    class SymbolHistoryMetaDataInternal : SymbolHistoryMetaData
+    {
+        public List<HistoryFileInfo> Chunks { get; set; }
+        [BsonIgnore]
+        public SymbolHistoryRawExt Ticks { get; set; }
+        [BsonIgnore]
+        public object Locker { get; } = new object();
+
+        public SymbolHistoryMetaDataInternal(SymbolHistoryId histInfo)
         {
             Info = histInfo;
             Id = histInfo.GetKey();
             Chunks = new List<HistoryFileInfo>();
-            CoveredRanges = new List<DateRange>();
+            GapsConfirmed = new List<DateRange>();
+            GapsUnconfirmed = new List<DateRange>();
+            Ticks = new SymbolHistoryRawExt
+            {
+                Ticks = new List<Candlestick>(),
+                FileName = histInfo.GetKey(),
+                Market = histInfo.market,
+                Spread = 0,
+                Symbol = histInfo.symbol,
+                Timeframe = histInfo.Timeframe
+            };
+
         }
+        /// <summary>
+        /// Constructor used by serialization
+        /// </summary>
+        public SymbolHistoryMetaDataInternal( )
+        {
+
+        }
+        public void UpdateBars(ITradeBar bar)
+        {
+            if (this.LastBar.Time < bar.Time)
+                this.LastBar = bar;
+
+            if (this.FirstBar.Time > bar.Time)
+                this.FirstBar = bar;
+        }
+
+        public void AddBars(IEnumerable<Candlestick> candles)
+        {
+            lock (this.Locker)
+            {
+                var data = this.Ticks;
+                foreach (var c in candles)
+                {
+                    this.UpdateBars(c);
+                    data.UpdateBars(c);
+                    ITradeBar lastCandle = data.Ticks.Count > 0 ? data.Ticks[data.Ticks.Count - 1] : null;
+                    if (c.Timeframe != data.Timeframe)
+                    {
+                        //throw new InvalidOperationException("Bad timeframe for candle");
+                        Console.WriteLine("Bad timeframe for candle");
+                    }
+                    else
+                    {
+                        //if this candle open is preceding last candle open we need to insert it in sorted fashion
+                        var toAdd = c; //new Candlestick(c);
+                        if (lastCandle?.OpenTime > toAdd.OpenTime)
+                        {
+                            int i = data.Ticks.BinarySearch(toAdd, CandlestickTimeComparer.Instance);
+                            int index = i;
+                            if (i > -1)
+                                data.Ticks[index] = toAdd;
+                            else
+                            {
+                                index = ~i;
+                                data.Ticks.Insert(index, toAdd);
+                            }
+                            if (index > 0)
+                                Debug.Assert(data.Ticks[index].OpenTime >= data.Ticks[index - 1].OpenTime);
+                            if (index + 1 < data.Ticks.Count)
+                                Debug.Assert(data.Ticks[index].OpenTime <= data.Ticks[index + 1].OpenTime);
+
+                        }
+                        else
+                            data.Ticks.Add(toAdd);
+                    }
+                }
+            }
+        }
+
     }
 }

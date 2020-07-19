@@ -2,7 +2,7 @@
 
 namespace SharpTrader.Storage
 {
-    class DateRange
+    public class DateRange
     {
         public DateTime start;
         public DateTime end;

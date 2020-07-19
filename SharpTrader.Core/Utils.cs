@@ -43,6 +43,7 @@ namespace SharpTrader
    
     public class CandlestickTimeComparer : IComparer<ITradeBar>
     {
+        public static CandlestickTimeComparer Instance { get; } = new CandlestickTimeComparer();
         public int Compare(ITradeBar x, ITradeBar y)
         {
            

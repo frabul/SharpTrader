@@ -5,6 +5,7 @@ using BinanceExchange.API.Models.WebSocket;
 using BinanceExchange.API.Websockets;
 using LiteDB;
 using NLog;
+using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -30,7 +31,7 @@ namespace SharpTrader.BrokersApi.Binance
         private BinanceKline FormingCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
         private static Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private volatile bool HistoryInitialized = false;
-        private HistoryInfo HistoryInfo;
+        private SymbolHistoryId HistoryInfo;
 
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
         public SymbolInfo Symbol { get; private set; }
@@ -216,16 +217,16 @@ namespace SharpTrader.BrokersApi.Binance
                 }
 
                 //--- get the data from db
-                HistoryInfo = new HistoryInfo(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
+                HistoryInfo = new SymbolHistoryId(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
                 ISymbolHistory symbolHistory = HistoryDb.GetSymbolHistory(HistoryInfo, historyStartTime, DateTime.MaxValue);
-                
+
                 //HistoryDb.CloseFile(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
-                
+
                 while (symbolHistory.Ticks.MoveNext())
                     history.AddRecord(symbolHistory.Ticks.Current, true);
                 HistoryInitialized = true;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error("Exception during SymbolFeed.GetHistoryNavigator: {0}", ex.Message);
             }
@@ -238,7 +239,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         public void Dispose()
         {
-            HistoryDb.CloseFile(HistoryInfo);
+            HistoryDb.SaveAndClose(HistoryInfo, false);
             this.Disposed = true;
             try
             {
