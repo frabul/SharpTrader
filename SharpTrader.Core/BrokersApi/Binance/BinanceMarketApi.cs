@@ -221,7 +221,9 @@ namespace SharpTrader.BrokersApi.Binance
 
             //----
             TradesAndOrdersArch = new LiteDatabase(OperationsArchivePath);
+            TradesAndOrdersArch.Pragma("UTC_DATE", true);
             TradesAndOrdersDb = new LiteDatabase(OperationsDbPath);
+            TradesAndOrdersArch.Pragma("UTC_DATE", true);
 
             var dbs = new[] { TradesAndOrdersDb, TradesAndOrdersArch };
             foreach (var db in dbs)
