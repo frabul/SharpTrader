@@ -21,7 +21,7 @@ namespace SharpTrader.BrokersApi.Binance
         private const string MarketName = "Binance";
 
         private BinanceClient Client;
-        private HistoricalRateDataBase HistoryDB;
+        private TradeBarsRepository HistoryDB;
         private string DataDir;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
 
@@ -33,20 +33,20 @@ namespace SharpTrader.BrokersApi.Binance
 
             Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
 
-            HistoryDB = new HistoricalRateDataBase(DataDir);
+            HistoryDB = new TradeBarsRepository(DataDir);
 
             //HistoryDB.FixDatabase((symbol, startTime, endTime) => DownloadCandles(symbol, startTime, endTime).Result.ToArray());
             //HistoryDB.FixDatabase(null);
         }
 
 
-        public BinanceDataDownloader(HistoricalRateDataBase db, double rateLimitFactor = 0.6f)
+        public BinanceDataDownloader(TradeBarsRepository db, double rateLimitFactor = 0.6f)
         {
             Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
             HistoryDB = db;
         }
 
-        public BinanceDataDownloader(HistoricalRateDataBase db, BinanceClient cli)
+        public BinanceDataDownloader(TradeBarsRepository db, BinanceClient cli)
         {
             Client = cli;
             HistoryDB = db;

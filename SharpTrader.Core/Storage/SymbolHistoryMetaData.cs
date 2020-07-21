@@ -15,7 +15,7 @@ namespace SharpTrader.Storage
         /// <summary>
         /// First absolute data for this symbol
         /// </summary>
-        public ITradeBar FirstKnownData { get; protected set; }
+        public ITradeBar FirstKnownData { get; internal set; }
         /// <summary>
         /// First bar recorded in database
         /// </summary>

@@ -43,7 +43,7 @@ namespace SharpTrader.BrokersApi.Binance
         private ILiteCollection<Trade> Trades;
         private ILiteCollection<Order> OrdersArchive;
         private ILiteCollection<Trade> TradesArchive;
-        private HistoricalRateDataBase HistoryDb;
+        private TradeBarsRepository HistoryDb;
         private BinanceWebSocketClient WSClient;
         private CombinedWebSocketClient CombinedWebSocketClient;
         private ExchangeInfoResponse ExchangeInfo;
@@ -81,7 +81,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
-        public BinanceMarketApi(string apiKey, string apiSecret, HistoricalRateDataBase historyDb, double rateLimitFactor = 1)
+        public BinanceMarketApi(string apiKey, string apiSecret, TradeBarsRepository historyDb, double rateLimitFactor = 1)
         {
             Logger = LogManager.GetLogger("BinanceMarketApi");
             Logger.Info("starting initialization...");

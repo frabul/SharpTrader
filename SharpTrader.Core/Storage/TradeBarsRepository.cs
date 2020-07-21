@@ -13,20 +13,22 @@ using BinanceExchange.API.Models.Response;
 namespace SharpTrader.Storage
 {
     //TODO make thread safe
-    public class HistoricalRateDataBase
+    public class TradeBarsRepository
     {
         private static readonly CandlestickTimeComparer<Candlestick> CandlestickTimeComparer = new CandlestickTimeComparer<Candlestick>();
         private string DataDir;
 
-        private LiteDB.LiteDatabase Db;
-        private LiteDB.ILiteCollection<SymbolHistoryMetaDataInternal> DbSymbolsMetaData;
+        private LiteDatabase Db;
+        private ILiteCollection<SymbolHistoryMetaDataInternal> DbSymbolsMetaData;
         private Dictionary<string, SymbolHistoryMetaDataInternal> SymbolsMetaData;
 
-        public HistoricalRateDataBase(string dataDir)
+        public TradeBarsRepository(string dataDir)
         {
             DataDir = Path.Combine(dataDir, "RatesDB");
             if (!Directory.Exists(DataDir))
                 Directory.CreateDirectory(DataDir);
+
+            Init();
         }
 
         public SymbolHistoryMetaData GetMetaData(SymbolHistoryId historyInfo) => GetMetaDataInternal(historyInfo);
@@ -122,16 +124,7 @@ namespace SharpTrader.Storage
             //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
             meta.AddBars(candles);
         }
-
-
-        private List<HistoryFileInfo> GetHistoryFiles(SymbolHistoryId info)
-        {
-            if (SymbolsMetaData.TryGetValue(info.GetKey(), out var metaData))
-                return metaData.Chunks.ToList();
-            else
-                return new List<HistoryFileInfo>(0);
-        }
-
+         
         private HistoryFileInfo GetFileInfo(string filePath)
         {
             HistoryFileInfo ret = null;
@@ -156,14 +149,16 @@ namespace SharpTrader.Storage
             return ret;
         }
 
-        internal void UpdateFirstKnownData(SymbolHistoryId info, KlineCandleStickResponse firstAvailable)
+        internal void UpdateFirstKnownData(SymbolHistoryId info, ITradeBar firstAvailable)
         {
-            throw new NotImplementedException();
+            var data = GetMetaDataInternal(info);
+            data.FirstKnownData = firstAvailable;
         }
 
         private void Init()
         {
-            Db = new LiteDB.LiteDatabase(Path.Combine(this.DataDir, "MetaData.db"));
+            Db = new LiteDB.LiteDatabase(Path.Combine(this.DataDir, "Database.db"));
+            Db.Pragma("UTC_DATE", true);
             DbSymbolsMetaData = Db.GetCollection<SymbolHistoryMetaDataInternal>("SymbolsMetaData");
             if (SymbolsMetaData.Count() == 0)
             {

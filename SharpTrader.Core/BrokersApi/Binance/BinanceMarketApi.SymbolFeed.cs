@@ -22,7 +22,7 @@ namespace SharpTrader.BrokersApi.Binance
         private NLog.Logger Logger;
         private BinanceClient Client;
         private CombinedWebSocketClient WebSocketClient;
-        private HistoricalRateDataBase HistoryDb;
+        private TradeBarsRepository HistoryDb;
         private Task HearthBeatTask;
         private Stopwatch KlineWatchdog = new Stopwatch();
         private Stopwatch DepthWatchdog = new Stopwatch();
@@ -43,7 +43,7 @@ namespace SharpTrader.BrokersApi.Binance
         public double Volume24H { get; private set; }
         public bool Disposed { get; private set; }
 
-        public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, HistoricalRateDataBase hist, string market, SymbolInfo symbol, DateTime timeNow)
+        public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, TradeBarsRepository hist, string market, SymbolInfo symbol, DateTime timeNow)
         {
             HistoryDb = hist;
             this.Client = client;
