@@ -2,6 +2,7 @@
 using BinanceExchange.API.Models.WebSocket;
 using BinanceExchange.API.Websockets;
 using SharpTrader.BrokersApi.Binance;
+using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,9 +16,8 @@ namespace SharpTrader.Tests
     public class TestCombinedWebSocketClient
     {
         public static void Run()
-        {
-            HistoricalRateDataBase histDb = new HistoricalRateDataBase(".\\Data2");
-            BinanceMarketApi api = new BinanceMarketApi(null, null, histDb);
+        { 
+            BinanceMarketApi api = new BinanceMarketApi(null, null, ".\\Data2");
 
 
             CombinedWebSocketClient cli = new CombinedWebSocketClient();

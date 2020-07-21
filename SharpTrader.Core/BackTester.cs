@@ -3,6 +3,7 @@ using Newtonsoft.Json.Linq;
 using SharpTrader.AlgoFramework;
 using SharpTrader.Indicators;
 using SharpTrader.MarketSimulator;
+using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -58,7 +59,7 @@ namespace SharpTrader
             if (Logger == null)
                 Logger = NLog.LogManager.GetLogger("BackTester_" + Config.SessionName);
 
-            var HistoryDB = new HistoricalRateDataBase(Config.HistoryDb);
+            var HistoryDB = new TradeBarsRepository(Config.HistoryDb);
             this.MarketSimulator = new MultiMarketSimulator(Config.DataDir, HistoryDB, Config.StartTime, Config.EndTime);
             MarketSimulator.Deposit(Config.Market, Config.StartingBalance.Asset, Config.StartingBalance.Amount);
 

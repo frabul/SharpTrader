@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpTrader.Storage;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,7 +13,7 @@ namespace SharpTrader.MarketSimulator
         private static string ConfigFile = "MarketsSimulator.json";
         private Market[] _Markets;
 
-        private HistoricalRateDataBase HistoryDb;
+        private TradeBarsRepository HistoryDb;
         private Configuration Config;
         private TimeSpan Resolution = TimeSpan.FromSeconds(60);
         public IEnumerable<IMarketApi> Markets => _Markets;
@@ -20,7 +21,7 @@ namespace SharpTrader.MarketSimulator
         public DateTime EndTime { get; private set; }
         public DateTime Time { get; private set; }
 
-        public MultiMarketSimulator(string dataDirectory, Configuration config, HistoricalRateDataBase historyDb, DateTime simulationStartTime, DateTime endTime)
+        public MultiMarketSimulator(string dataDirectory, Configuration config, TradeBarsRepository historyDb, DateTime simulationStartTime, DateTime endTime)
         {
             this.Time = simulationStartTime;
             StartTime = simulationStartTime;
@@ -37,7 +38,7 @@ namespace SharpTrader.MarketSimulator
             }
         }
 
-        public MultiMarketSimulator(string dataDirectory, HistoricalRateDataBase historyDb, DateTime simulationStartTime, DateTime endTime)
+        public MultiMarketSimulator(string dataDirectory, TradeBarsRepository historyDb, DateTime simulationStartTime, DateTime endTime)
         {
             //let's make the start and end times a multiple of Resolution timespan
             //var startTimeTicks = simulationStartTime.Ticks - simulationStartTime.Ticks % Resolution.Ticks;
@@ -126,7 +127,7 @@ namespace SharpTrader.MarketSimulator
         {
             if (feed.DataSource == null)
             {
-                var histInfo = new HistoryInfo(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
+                var histInfo = new SymbolHistoryId(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
                 feed.DataSource = this.HistoryDb.GetSymbolHistory(histInfo, StartTime, EndTime);
                 //this.HistoryDb.CloseFile(histInfo);
             }

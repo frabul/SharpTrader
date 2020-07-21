@@ -9,6 +9,7 @@ using BinanceExchange.API.Websockets;
 using LiteDB;
 using Newtonsoft.Json.Linq;
 using NLog;
+using SharpTrader.Core.BrokersApi.Binance;
 using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
@@ -43,7 +44,7 @@ namespace SharpTrader.BrokersApi.Binance
         private ILiteCollection<Trade> Trades;
         private ILiteCollection<Order> OrdersArchive;
         private ILiteCollection<Trade> TradesArchive;
-        private TradeBarsRepository HistoryDb;
+        private BinanceTradeBarsRepository HistoryDb;
         private BinanceWebSocketClient WSClient;
         private CombinedWebSocketClient CombinedWebSocketClient;
         private ExchangeInfoResponse ExchangeInfo;
@@ -81,21 +82,20 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
-        public BinanceMarketApi(string apiKey, string apiSecret, TradeBarsRepository historyDb, double rateLimitFactor = 1)
+        public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1)
         {
             Logger = LogManager.GetLogger("BinanceMarketApi");
-            Logger.Info("starting initialization...");
-            this.HistoryDb = historyDb;
+            Logger.Info("starting initialization..."); 
             OperationsDbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
             OperationsArchivePath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd_archive.db");
-            InitializeOperationsDb();
-
+            InitializeOperationsDb(); 
             Client = new BinanceClient(new ClientConfiguration()
             {
                 ApiKey = apiKey ?? "null",
                 SecretKey = apiSecret ?? "null",
                 RateLimitFactor = rateLimitFactor
             });
+            this.HistoryDb = new BinanceTradeBarsRepository(dataDir, Client);
         }
 
         public async Task Initialize(bool resynchTradesAndOrders = false, bool publicOnly = false)

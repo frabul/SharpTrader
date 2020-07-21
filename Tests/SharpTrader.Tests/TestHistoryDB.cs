@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpTrader.Storage;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,13 +10,13 @@ namespace SharpTrader.Tests
     public class TestHistoryDB
     {
         private const string MarketName = "Binance";
-        private HistoricalRateDataBase HistoryDB;
+        private TradeBarsRepository HistoryDB;
 
         private const string DataDir = ".\\Data\\";
 
         public void Test()
         {
-            HistoryDB = new HistoricalRateDataBase(DataDir);
+            HistoryDB = new TradeBarsRepository(DataDir);
 
             foreach (var histInfo in HistoryDB.ListAvailableData())
             {
@@ -28,7 +29,7 @@ namespace SharpTrader.Tests
                 Console.WriteLine($"Validate after shuffle {histInfo.market} - {histInfo.symbol} - {histInfo.Timeframe}  ");
                 HistoryDB.Delete(histInfo.market, histInfo.symbol, histInfo.Timeframe);
                 Shuffle(candles);
-                HistoryDB.AddCandlesticks(histInfo.market, histInfo.symbol, candles);
+                HistoryDB.AddCandlesticks(histInfo, candles);
                 HistoryDB.ValidateData(histInfo);
                 HistoryDB.SaveAndClose(histInfo);
             }

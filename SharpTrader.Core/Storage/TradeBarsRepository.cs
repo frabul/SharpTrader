@@ -30,7 +30,7 @@ namespace SharpTrader.Storage
 
             Init();
         }
-
+         
         public SymbolHistoryMetaData GetMetaData(SymbolHistoryId historyInfo) => GetMetaDataInternal(historyInfo);
         private SymbolHistoryMetaDataInternal GetMetaDataInternal(SymbolHistoryId historyInfo)
         {
@@ -114,17 +114,17 @@ namespace SharpTrader.Storage
             }
         }
 
-        public void AddCandlesticks(string market, string symbol, IEnumerable<Candlestick> candles)
-        {
-            var hinfo = new SymbolHistoryId(market, symbol, candles.First().Timeframe);
-            var sdata = GetHistoryRaw(hinfo, candles.First().OpenTime, DateTime.MaxValue);
-            var meta = GetMetaDataInternal(hinfo);
+        public void AddCandlesticks(SymbolHistoryId symId, IEnumerable<Candlestick> candles)
+        { 
+            //load all available data in date rage
+            var sdata = GetHistoryRaw(symId, candles.First().OpenTime, DateTime.MaxValue);
+            var meta = GetMetaDataInternal(symId);
             //add data 
             //Debug.Assert(sdata.Ticks.Count > 0);
             //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
             meta.AddBars(candles);
         }
-         
+
         private HistoryFileInfo GetFileInfo(string filePath)
         {
             HistoryFileInfo ret = null;
@@ -291,14 +291,14 @@ namespace SharpTrader.Storage
         public void FixDatabase(Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
         {
             foreach (var fi in ListAvailableData())
-                FixSymbolHistory(fi, downloadCandlesCallback);
+                FixSymbolHistory(fi, DateTime.MinValue, DateTime.MaxValue, downloadCandlesCallback);
         }
-        public void FixSymbolHistory(SymbolHistoryId histInfo, Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
+        public void FixSymbolHistory(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime, Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
         {
             int duplicates = 0;
             int matchErrors = 0;
             Console.WriteLine($"Checking {histInfo.symbol} history data ");
-            var hist = GetHistoryRaw(histInfo, new DateTime(2019, 01, 01), DateTime.MaxValue);
+            var hist = GetHistoryRaw(histInfo, fromTime, toTime);
             var meta = GetMetaDataInternal(histInfo);
             lock (meta.Locker)
             {
@@ -371,6 +371,9 @@ namespace SharpTrader.Storage
                 }
             }
         }
+
+
+       
 
     }
 }
