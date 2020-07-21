@@ -78,6 +78,8 @@ namespace SharpTrader.AlgoFramework
         private ILiteCollection<Operation> DbActiveOperations;
 
         private List<Signal> SignalsDeserialized = new List<Signal>();
+        private BsonMapperCustom NaiveMapper = new BsonMapperCustom();
+        private EntityMapper symInfoEntityMapper;
         public void ConfigureSerialization()
         {
             DbMapper = new BsonMapperCustom();
@@ -95,8 +97,8 @@ namespace SharpTrader.AlgoFramework
                         if (sym == null)
                         {
                             sym = new SymbolInfo();
-                            var entityMapper = DbMapper.BuildEntityMapper(typeof(SymbolInfo));
-                            DbMapper.PopulateObjectProperties(entityMapper, sym, bson);
+                            symInfoEntityMapper = DbMapper.BuildEntityMapper(typeof(SymbolInfo));
+                            DbMapper.PopulateObjectProperties(symInfoEntityMapper, sym, bson);
                         }
                         return sym;
                     }
@@ -270,7 +272,10 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-        private BsonMapperCustom NaiveMapper = new BsonMapperCustom();
+        /// <summary>
+        /// Deserialize an operation from bson document without keeping references ( all of the referenced objects are clones )
+        /// for performance reasons
+        /// </summary> 
         public Operation OperationFromBson(BsonDocument operBson)
         {
             return NaiveMapper.Deserialize<Operation>(operBson);

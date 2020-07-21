@@ -3,14 +3,14 @@ using ProtoBuf;
 
 namespace SharpTrader.Storage
 {
-    class SymbolHistoryRawExt : SymbolHistoryRaw
+    public class SymbolHistoryRawExt : SymbolHistoryRaw
     {
         [ProtoIgnore]
         public DateTime StartOfData { get; set; } = DateTime.MaxValue;
         public DateTime EndOfData { get; set; } = DateTime.MinValue;
         internal bool HistoryInfoEquals(SymbolHistoryId histInfo)
         {
-            return this.Market == histInfo.market && this.Symbol == histInfo.symbol && this.Timeframe == histInfo.Timeframe;
+            return this.Market == histInfo.Market && this.Symbol == histInfo.Symbol && this.Timeframe == histInfo.Timeframe;
         }
 
         public void UpdateBars(ITradeBar bar)

@@ -63,7 +63,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             if (fromTime < epoch)
                 fromTime = epoch;
 
-            var sem = GetSemaphore(histInfo.symbol);
+            var sem = GetSemaphore(histInfo.Symbol);
 
             try
             {
@@ -80,8 +80,8 @@ namespace SharpTrader.Core.BrokersApi.Binance
                         {
                             if (oldTicks.Time - lastTime > histInfo.Timeframe)
                             {
-                                Logger.Debug($"Hole found in {histInfo.symbol} history from {lastTime} to {hist.Ticks.NextTickTime}.");
-                                var candles = await DownloadCandles(histInfo.symbol, lastTime, oldTicks.Current.CloseTime);
+                                Logger.Debug($"Hole found in {histInfo.Symbol} history from {lastTime} to {hist.Ticks.NextTickTime}.");
+                                var candles = await DownloadCandles(histInfo.Symbol, lastTime, oldTicks.Current.CloseTime);
                                 this.AddCandlesticks(histInfo, candles);
                             }
                             lastTime = oldTicks.Current.CloseTime;
@@ -89,7 +89,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                         else
                         {
                             //there isn't any other tick, all remaining data needs to be downloaded 
-                            var candles = await DownloadCandles(histInfo.symbol, lastTime, toTime);
+                            var candles = await DownloadCandles(histInfo.Symbol, lastTime, toTime);
                             this.AddCandlesticks(histInfo, candles);
                             lastTime = toTime;
                         }
@@ -98,7 +98,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Fatal Exception while download history for symbol {0}: {1}", histInfo.symbol, ex.Message);
+                Logger.Error("Fatal Exception while download history for symbol {0}: {1}", histInfo.Symbol, ex.Message);
             }
             finally
             {

@@ -9,11 +9,14 @@ namespace SharpTrader
     [ProtoContract]
     public class Candlestick : ITradeBar
     {
+        private DateTime openTime;
+        private DateTime closeTime;
+
         [ProtoMember(1)]
-        public virtual DateTime OpenTime { get; set; }
+        public virtual DateTime OpenTime { get => openTime; set => openTime = value.Kind == DateTimeKind.Unspecified ? new DateTime(value.Ticks, DateTimeKind.Utc) : value; }
 
         [ProtoMember(2)]
-        public virtual DateTime CloseTime { get; set; }
+        public virtual DateTime CloseTime { get => closeTime; set => closeTime = value.Kind == DateTimeKind.Unspecified ? new DateTime(value.Ticks, DateTimeKind.Utc) : value; }
 
         [ProtoMember(3)]
         public virtual double Open { get; set; }

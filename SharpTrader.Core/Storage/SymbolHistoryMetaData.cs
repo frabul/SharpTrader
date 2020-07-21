@@ -26,13 +26,15 @@ namespace SharpTrader.Storage
         public ITradeBar LastBar { get; protected set; }
     }
 
-    class SymbolHistoryMetaDataInternal : SymbolHistoryMetaData
+    public class SymbolHistoryMetaDataInternal : SymbolHistoryMetaData
     {
-        public List<HistoryFileInfo> Chunks { get; set; }
         [BsonIgnore]
         public SymbolHistoryRawExt Ticks { get; set; }
         [BsonIgnore]
         public object Locker { get; } = new object();
+
+        public List<HistoryFileInfo> Chunks { get; set; }
+       
 
         public SymbolHistoryMetaDataInternal(SymbolHistoryId histInfo)
         {
@@ -45,9 +47,9 @@ namespace SharpTrader.Storage
             {
                 Ticks = new List<Candlestick>(),
                 FileName = histInfo.GetKey(),
-                Market = histInfo.market,
+                Market = histInfo.Market,
                 Spread = 0,
-                Symbol = histInfo.symbol,
+                Symbol = histInfo.Symbol,
                 Timeframe = histInfo.Timeframe
             };
 
@@ -61,10 +63,10 @@ namespace SharpTrader.Storage
         }
         public void UpdateBars(ITradeBar bar)
         {
-            if (this.LastBar.Time < bar.Time)
+            if (LastBar == null || this.LastBar.Time < bar.Time)
                 this.LastBar = bar;
 
-            if (this.FirstBar.Time > bar.Time)
+            if (FirstBar == null || this.FirstBar.Time > bar.Time)
                 this.FirstBar = bar;
         }
 

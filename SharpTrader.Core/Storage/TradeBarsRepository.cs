@@ -9,6 +9,7 @@ using System.Globalization;
 using System.Diagnostics;
 using LiteDB;
 using BinanceExchange.API.Models.Response;
+using System.Runtime.InteropServices;
 
 namespace SharpTrader.Storage
 {
@@ -30,7 +31,7 @@ namespace SharpTrader.Storage
 
             Init();
         }
-         
+
         public SymbolHistoryMetaData GetMetaData(SymbolHistoryId historyInfo) => GetMetaDataInternal(historyInfo);
         private SymbolHistoryMetaDataInternal GetMetaDataInternal(SymbolHistoryId historyInfo)
         {
@@ -68,8 +69,20 @@ namespace SharpTrader.Storage
             List<DateRange> missingData = new List<DateRange>();
             lock (meta.Locker)
             {
+                if (meta.Ticks?.Ticks == null)
+                {
+                    meta.Ticks = new SymbolHistoryRawExt()
+                    {
+                        FileName = historyInfo.GetKey(),
+                        Market = historyInfo.Market,
+                        Spread = 0,
+                        Symbol = historyInfo.Symbol,
+                        Ticks = new List<Candlestick>(),
+                        Timeframe = historyInfo.Timeframe
+                    };
+                }
                 //check if we already have some records and load them   
-                if (meta.Ticks.Ticks.Count == 0)
+                if (meta.Ticks.Ticks.Count < 1)
                 {
                     missingData.Add(new DateRange(startOfData, endOfData));
                 }
@@ -90,7 +103,7 @@ namespace SharpTrader.Storage
                 {
                     if (finfo != null)
                     {
-                        var rightFile = historyInfo.GetKey() == finfo.GetKey();
+                        var rightFile = historyInfo.GetKey() == finfo.HistoryId.GetKey();
                         var dateInRange = missingData.Any(dr => finfo.StartDate >= dr.start && finfo.StartDate < dr.end);
                         if (rightFile && dateInRange)
                         {
@@ -115,7 +128,7 @@ namespace SharpTrader.Storage
         }
 
         public void AddCandlesticks(SymbolHistoryId symId, IEnumerable<Candlestick> candles)
-        { 
+        {
             //load all available data in date rage
             var sdata = GetHistoryRaw(symId, candles.First().OpenTime, DateTime.MaxValue);
             var meta = GetMetaDataInternal(symId);
@@ -138,7 +151,8 @@ namespace SharpTrader.Storage
                     var symbol = parts[1];
                     var time = TimeSpan.FromMilliseconds(int.Parse(parts[2]));
                     var date = DateTime.ParseExact(parts[3], "yyyyMM", CultureInfo.InvariantCulture);
-                    ret = new HistoryFileInfo(filePath, market, symbol, time, date);
+                    var symId = new SymbolHistoryId(market, symbol, time);
+                    ret = new HistoryFileInfo(filePath, symId, date);
                 }
             }
             catch (Exception _ex)
@@ -159,8 +173,10 @@ namespace SharpTrader.Storage
         {
             Db = new LiteDB.LiteDatabase(Path.Combine(this.DataDir, "Database.db"));
             Db.Pragma("UTC_DATE", true);
+
             DbSymbolsMetaData = Db.GetCollection<SymbolHistoryMetaDataInternal>("SymbolsMetaData");
-            if (SymbolsMetaData.Count() == 0)
+
+            if (DbSymbolsMetaData.FindOne(e => true) == null)
             {
                 Update2();
             }
@@ -176,9 +192,9 @@ namespace SharpTrader.Storage
             {
                 var fileInfo = GetFileInfo(filePath);
                 //-- get metaData --
-                if (!data.ContainsKey(fileInfo.GetKey()))
-                    data.Add(fileInfo.GetKey(), new SymbolHistoryMetaDataInternal(fileInfo));
-                var symData = data[fileInfo.GetKey()];
+                if (!data.ContainsKey(fileInfo.HistoryId.GetKey()))
+                    data.Add(fileInfo.HistoryId.GetKey(), new SymbolHistoryMetaDataInternal(fileInfo.HistoryId));
+                var symData = data[fileInfo.HistoryId.GetKey()];
 
                 symData.Chunks.Add(fileInfo);
 
@@ -252,7 +268,8 @@ namespace SharpTrader.Storage
                     candlesOfMont.Add(new Candlestick(data.Ticks[i]));
                     i++;
                 }
-                HistoryFileInfo newInfo = new HistoryFileInfo(data.Market, data.Symbol, data.Timeframe, startDate);
+                var symId = new SymbolHistoryId(data.Market, data.Symbol, data.Timeframe);
+                HistoryFileInfo newInfo = new HistoryFileInfo(symId, startDate);
                 newInfo.FilePath = Path.Combine(DataDir, newInfo.GetFileName());
                 SymbolHistoryRaw sdata = new SymbolHistoryRaw()
                 {
@@ -297,7 +314,7 @@ namespace SharpTrader.Storage
         {
             int duplicates = 0;
             int matchErrors = 0;
-            Console.WriteLine($"Checking {histInfo.symbol} history data ");
+            Console.WriteLine($"Checking {histInfo.Symbol} history data ");
             var hist = GetHistoryRaw(histInfo, fromTime, toTime);
             var meta = GetMetaDataInternal(histInfo);
             lock (meta.Locker)
@@ -332,7 +349,7 @@ namespace SharpTrader.Storage
                                 //redownload data
                                 if (downloadCandlesCallback != null)
                                 {
-                                    var candlesToAdd = downloadCandlesCallback(histInfo.symbol, lastAdded().OpenTime, candleToAdd.OpenTime)
+                                    var candlesToAdd = downloadCandlesCallback(histInfo.Symbol, lastAdded().OpenTime, candleToAdd.OpenTime)
                                                         .Where(c => c.OpenTime > lastAdded().OpenTime)
                                                         .OrderBy(c => c.OpenTime).ToArray();
                                     newTicks.AddRange(candlesToAdd);
@@ -350,7 +367,7 @@ namespace SharpTrader.Storage
                 }
             }
 
-            Console.WriteLine($"   Fixing {histInfo.symbol} completed: duplicates {duplicates} - matchErrors {matchErrors}");
+            Console.WriteLine($"   Fixing {histInfo.Symbol} completed: duplicates {duplicates} - matchErrors {matchErrors}");
         }
 
         public void ValidateData(SymbolHistoryId finfo)
@@ -365,7 +382,7 @@ namespace SharpTrader.Storage
                     {
                         if (ticks[i].OpenTime < ticks[i - 1].OpenTime)
                         {
-                            Console.WriteLine($"{finfo.market} - {finfo.symbol} - {finfo.Timeframe} -> bad data at {i}");
+                            Console.WriteLine($"{finfo.Market} - {finfo.Symbol} - {finfo.Timeframe} -> bad data at {i}");
                         }
                     }
                 }
@@ -373,7 +390,7 @@ namespace SharpTrader.Storage
         }
 
 
-       
+
 
     }
 }

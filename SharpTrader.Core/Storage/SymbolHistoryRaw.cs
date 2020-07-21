@@ -5,7 +5,7 @@ using ProtoBuf;
 namespace SharpTrader.Storage
 {
     [ProtoContract]
-    class SymbolHistoryRaw
+    public class SymbolHistoryRaw
     {
         private List<Candlestick> _Ticks;
         public SymbolHistoryRaw()
@@ -13,7 +13,7 @@ namespace SharpTrader.Storage
         }
         internal bool Equals(SymbolHistoryId info)
         {
-            return info.market == Market && info.symbol == Symbol && info.Timeframe == Timeframe;
+            return info.Market == Market && info.Symbol == Symbol && info.Timeframe == Timeframe;
         } 
         [ProtoMember(6)]
         public virtual string FileName { get; set; }

@@ -24,10 +24,10 @@ namespace SharpTrader.Tests
                 List<Candlestick> candles = new List<Candlestick>();
                 while (data.Ticks.MoveNext())
                     candles.Add(new Candlestick(data.Ticks.Current));
-                Console.WriteLine($"Validate before shuffle  {histInfo.market} - {histInfo.symbol} - {histInfo.Timeframe} ");
+                Console.WriteLine($"Validate before shuffle  {histInfo.Market} - {histInfo.Symbol} - {histInfo.Timeframe} ");
                 HistoryDB.ValidateData(histInfo);
-                Console.WriteLine($"Validate after shuffle {histInfo.market} - {histInfo.symbol} - {histInfo.Timeframe}  ");
-                HistoryDB.Delete(histInfo.market, histInfo.symbol, histInfo.Timeframe);
+                Console.WriteLine($"Validate after shuffle {histInfo.Market} - {histInfo.Symbol} - {histInfo.Timeframe}  ");
+                HistoryDB.Delete(histInfo.Market, histInfo.Symbol, histInfo.Timeframe);
                 Shuffle(candles);
                 HistoryDB.AddCandlesticks(histInfo, candles);
                 HistoryDB.ValidateData(histInfo);
