@@ -20,9 +20,11 @@ namespace SharpTrader.Core.BrokersApi.Binance
         private BinanceClient Client;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private readonly string MarketName = "Binance";
+        private SemaphoreSlim DownloadCandlesSemaphore = new SemaphoreSlim(1, 1);
 
         public BinanceTradeBarsRepository(string dataDir, BinanceClient cli) : base(dataDir)
         {
+            Client = cli;
         }
 
         //--------------------------------------------
@@ -30,8 +32,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         {
             Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
         }
-
-
+         
         public void SynchSymbolsTable(string DataDir)
         {
             Dictionary<string, SymbolInfo> dict = new Dictionary<string, SymbolInfo>();
@@ -63,38 +64,38 @@ namespace SharpTrader.Core.BrokersApi.Binance
             if (fromTime < epoch)
                 fromTime = epoch;
 
-            var sem = GetSemaphore(histInfo.Symbol);
-
+            await DownloadCandlesSemaphore.WaitAsync();
+            var sem = GetSemaphore(histInfo.Symbol); 
             try
             {
                 await sem.WaitAsync();
                 var hist = this.GetSymbolHistory(histInfo, fromTime, toTime);
                 var oldTicks = hist.Ticks;
                 //first find next available data, if not found download everything
-                if (oldTicks.Count > 0)
+
+                DateTime lastTime = fromTime;
+                while (lastTime < toTime)
                 {
-                    DateTime lastTime = fromTime;
-                    while (lastTime < toTime)
+                    if (oldTicks.MoveNext())
                     {
-                        if (oldTicks.MoveNext())
+                        if (oldTicks.Time - lastTime > histInfo.Timeframe)
                         {
-                            if (oldTicks.Time - lastTime > histInfo.Timeframe)
-                            {
-                                Logger.Debug($"Hole found in {histInfo.Symbol} history from {lastTime} to {hist.Ticks.NextTickTime}.");
-                                var candles = await DownloadCandles(histInfo.Symbol, lastTime, oldTicks.Current.CloseTime);
-                                this.AddCandlesticks(histInfo, candles);
-                            }
-                            lastTime = oldTicks.Current.CloseTime;
-                        }
-                        else
-                        {
-                            //there isn't any other tick, all remaining data needs to be downloaded 
-                            var candles = await DownloadCandles(histInfo.Symbol, lastTime, toTime);
+                            Logger.Debug($"Hole found in {histInfo.Symbol} history from {lastTime} to {hist.Ticks.NextTickTime}.");
+                            var candles = await DownloadCandles(histInfo.Symbol, lastTime, oldTicks.Current.CloseTime);
                             this.AddCandlesticks(histInfo, candles);
-                            lastTime = toTime;
                         }
+                        lastTime = oldTicks.Current.CloseTime;
+                    }
+                    else
+                    {
+                        Logger.Debug($"Hole found in {histInfo.Symbol} history from {lastTime} to {toTime}.");
+                        //there isn't any other tick, all remaining data needs to be downloaded 
+                        var candles = await DownloadCandles(histInfo.Symbol, lastTime, toTime);
+                        this.AddCandlesticks(histInfo, candles);
+                        lastTime = toTime;
                     }
                 }
+
             }
             catch (Exception ex)
             {
@@ -102,53 +103,68 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
             finally
             {
+
+                DownloadCandlesSemaphore.Release();
                 sem.Release();
             }
         }
 
+      
         private async Task<List<Candlestick>> DownloadCandles(string symbol, DateTime startTime, DateTime endTime)
         {
-            bool noMoreData = false;
-            int zeroCount = 0;
             List<Candlestick> allCandles = new List<SharpTrader.Candlestick>();
-            while (!noMoreData && (allCandles.Count < 1 || allCandles.Last().CloseTime < endTime))
+            try
             {
-                //Console.WriteLine($"Downloading history for {symbol} - {startTime}");
-                try
+                bool noMoreData = false;
+                int zeroCount = 0;
+              
+                while (!noMoreData && (allCandles.Count < 1 || allCandles.Last().CloseTime < endTime))
                 {
-                    var candles = await Client.GetKlinesCandlesticks(new GetKlinesCandlesticksRequest
+                    //Console.WriteLine($"Downloading history for {symbol} - {startTime}");
+                    try
                     {
-                        Symbol = symbol,
-                        StartTime = startTime,
-                        Interval = KlineInterval.OneMinute,
-                        EndTime = endTime,
-                    });
+                        var candles = await Client.GetKlinesCandlesticks(new GetKlinesCandlesticksRequest
+                        {
+                            Symbol = symbol,
+                            StartTime = startTime,
+                            Interval = KlineInterval.OneMinute,
+                            EndTime = endTime,
+                        });
 
-                    var batch = candles.Select(KlineToCandlestick).ToList();
+                        var batch = candles.Select(KlineToCandlestick).ToList();
 
-                    allCandles.AddRange(batch);
+                        allCandles.AddRange(batch);
 
-                    //if we get no data for more than 3 requests then we can assume that there isn't any more data
-                    if (batch.Count < 1)
-                        zeroCount++;
-                    else
-                        zeroCount = 0;
-                    if (zeroCount > 1)
-                        noMoreData = true;
+                        //if we get no data for more than 3 requests then we can assume that there isn't any more data
+                        if (batch.Count < 1)
+                            zeroCount++;
+                        else
+                            zeroCount = 0;
+                        if (zeroCount > 1)
+                            noMoreData = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        var msg = $"Exception during {symbol} history download: ";
+                        if (ex is BinanceException binException)
+                            msg += binException.ErrorDetails;
+                        else
+                            msg += ex.Message;
+                        Console.WriteLine(msg);
+                        await Task.Delay(3000);
+                    }
+                    if (allCandles.Count > 1)
+                        startTime = new DateTime((allCandles[allCandles.Count - 1].CloseTime - TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
                 }
-                catch (Exception ex)
-                {
-                    var msg = $"Exception during {symbol} history download: ";
-                    if (ex is BinanceException binException)
-                        msg += binException.ErrorDetails;
-                    else
-                        msg += ex.Message;
-                    Console.WriteLine(msg);
-                    await Task.Delay(3000);
-                }
-                if (allCandles.Count > 1)
-                    startTime = new DateTime((allCandles[allCandles.Count - 1].CloseTime - TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
             }
+            catch
+            {
+
+            }
+            finally
+            {
+            }
+           
 
             return allCandles;
         }

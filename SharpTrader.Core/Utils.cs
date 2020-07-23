@@ -47,7 +47,7 @@ namespace SharpTrader
         public int Compare(ITradeBar x, ITradeBar y)
         {
            
-            return x.OpenTime.CompareTo(y);
+            return x.OpenTime.CompareTo(y.OpenTime);
             //return (int)(x.OpenTime.Ticks - y.OpenTime.Ticks);
             //var val = x.OpenTime.Ticks - y.OpenTime.Ticks;
             //if (val > int.MaxValue)

@@ -246,9 +246,12 @@ namespace SharpTrader.BrokersApi.Binance
 
         private SemaphoreSlim GetSemaphore()
         {
-            if (!Semaphores.ContainsKey(this.Symbol.Key))
-                Semaphores.Add(this.Symbol, new SemaphoreSlim(1, 1));
-            return Semaphores[this.Symbol];
+            lock (Semaphores)
+            {
+                if (!Semaphores.ContainsKey(this.Symbol.Key))
+                    Semaphores.Add(this.Symbol, new SemaphoreSlim(1, 1));
+                return Semaphores[this.Symbol];
+            } 
         }
 
         decimal NearestRoundHigher(decimal x, decimal precision)
