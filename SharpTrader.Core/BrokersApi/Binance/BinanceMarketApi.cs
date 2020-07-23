@@ -63,6 +63,7 @@ namespace SharpTrader.BrokersApi.Binance
         private MemoryCache Cache = new MemoryCache();
         private Task FastUpdatesTask;
         private Task OrdersAndTradesSynchTask;
+        public DateTime StartOperationDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         public BinanceClient Client { get; private set; }
 
         public string MarketName => "Binance";
@@ -446,20 +447,24 @@ namespace SharpTrader.BrokersApi.Binance
                         var trades = resp.Select(tr => new Trade(sym, tr));
                         foreach (var tr in trades)
                         {
-                            Order order;
-                            lock (LockOrdersTrades)
+                            //ignore trades older than the StartOfOperation
+                            if(tr.Time >= StartOperationDate)
                             {
-                                order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
+                                Order order;
+                                lock (LockOrdersTrades)
+                                {
+                                    order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
+                                    if (order == null)
+                                        order = OrdersArchive.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
+                                }
+                                // put out of lokc to prevent deadlock
                                 if (order == null)
-                                    order = OrdersArchive.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
-                            }
-                            // put out of lokc to prevent deadlock
-                            if (order == null)
-                                order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as Order;
-                            tr.ClientOrderId = order.ClientId;
+                                    order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as Order;
+                                tr.ClientOrderId = order.ClientId;
 
-                            lock (LockOrdersTrades)
-                                TradesUpdateOrInsert(tr);
+                                lock (LockOrdersTrades)
+                                    TradesUpdateOrInsert(tr);
+                            } 
                         }
                         //if has active orders we want it to continue updating when the active order becomes inactive
                         if (!hasActiveOrders)
@@ -635,7 +640,7 @@ namespace SharpTrader.BrokersApi.Binance
                 {
                     Trades.Insert(newTrade);
                     OnNewTrade?.Invoke(this, newTrade);
-                    Logger.Trace($"New trade {newTrade}");
+                    Logger.Debug($"New trade {newTrade}");
                 }
             }
 

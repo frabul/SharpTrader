@@ -194,7 +194,7 @@ namespace SharpTrader.AlgoFramework
                         }
                     }
                     else
-                        Logger.Info($"New trade {trade.ToString()} without any associated operation");
+                        Logger.Trace($"New trade {trade.ToString()} without any associated operation");
 
                 }
             }
@@ -287,9 +287,9 @@ namespace SharpTrader.AlgoFramework
         public string GetNewOperationId()
         {
             if (Name.Length > 6)
-                return this.Name.Substring(0, 6) + "." + (State.TotalOperations++).ToString();
+                return this.Name.Substring(0, 6) + "_" + (State.TotalOperations++).ToString();
             else
-                return this.Name + "." + (State.TotalOperations++).ToString();
+                return $"{this.Name}_{ State.TotalOperations++ }";
         }
 
         public string GetNewSignalId()
