@@ -19,12 +19,35 @@ namespace SharpTrader.Core.BrokersApi.Binance
         NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         private BinanceClient Client;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
+        private Dictionary<string, DateTime> LastHistoryRequest = new Dictionary<string, DateTime>();
         private readonly string MarketName = "Binance";
-        private SemaphoreSlim DownloadCandlesSemaphore = new SemaphoreSlim(1, 1);
+        private SemaphoreSlim DownloadCandlesSemaphore = new SemaphoreSlim(10, 10);
 
         public BinanceTradeBarsRepository(string dataDir, BinanceClient cli) : base(dataDir)
         {
             Client = cli;
+            _ = CheckClosing();
+        }
+
+        private async Task CheckClosing()
+        {
+            while (true)
+            {
+                lock (LastHistoryRequest)
+                {
+                    foreach (var kv in LastHistoryRequest.ToArray())
+                    {
+                        var key = kv.Key;
+                        var lastReq = kv.Value;
+                        if (DateTime.Now > lastReq.AddMinutes(5))
+                        {
+                            this.SaveAndClose(SymbolHistoryId.Parse(key), true);
+                            LastHistoryRequest.Remove(key);
+                        }    
+                    }
+                }
+                await Task.Delay(10000);
+            }
         }
 
         //--------------------------------------------
@@ -32,7 +55,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         {
             Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
         }
-         
+
         public void SynchSymbolsTable(string DataDir)
         {
             Dictionary<string, SymbolInfo> dict = new Dictionary<string, SymbolInfo>();
@@ -57,28 +80,29 @@ namespace SharpTrader.Core.BrokersApi.Binance
 
         public async Task AssureData(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime)
         {
-            if (toTime > DateTime.Now.AddYears(5))
-                toTime = DateTime.Now.AddYears(5);
+            if (toTime > DateTime.Now.AddYears(10))
+                toTime = DateTime.Now.AddYears(10);
+            toTime = new DateTime(toTime.Year, toTime.Month, toTime.Day, toTime.Hour, toTime.Minute, 0, DateTimeKind.Utc);
 
             var epoch = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
             if (fromTime < epoch)
                 fromTime = epoch;
 
             await DownloadCandlesSemaphore.WaitAsync();
-            var sem = GetSemaphore(histInfo.Symbol); 
+            var sem = GetSemaphore(histInfo.Symbol);
             try
             {
                 await sem.WaitAsync();
                 var hist = this.GetSymbolHistory(histInfo, fromTime, toTime);
                 var oldTicks = hist.Ticks;
-                //first find next available data, if not found download everything
 
+                //first find next available data, if not found download everything 
                 DateTime lastTime = fromTime;
                 while (lastTime < toTime)
                 {
                     if (oldTicks.MoveNext())
                     {
-                        if (oldTicks.Time - lastTime > histInfo.Timeframe)
+                        if (oldTicks.Time - lastTime > histInfo.Resolution)
                         {
                             Logger.Debug($"Hole found in {histInfo.Symbol} history from {lastTime} to {hist.Ticks.NextTickTime}.");
                             var candles = await DownloadCandles(histInfo.Symbol, lastTime, oldTicks.Current.CloseTime);
@@ -103,13 +127,11 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
             finally
             {
-
                 DownloadCandlesSemaphore.Release();
                 sem.Release();
             }
         }
 
-      
         private async Task<List<Candlestick>> DownloadCandles(string symbol, DateTime startTime, DateTime endTime)
         {
             List<Candlestick> allCandles = new List<SharpTrader.Candlestick>();
@@ -117,7 +139,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             {
                 bool noMoreData = false;
                 int zeroCount = 0;
-              
+
                 while (!noMoreData && (allCandles.Count < 1 || allCandles.Last().CloseTime < endTime))
                 {
                     //Console.WriteLine($"Downloading history for {symbol} - {startTime}");
@@ -164,7 +186,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             finally
             {
             }
-           
+
 
             return allCandles;
         }
@@ -191,7 +213,15 @@ namespace SharpTrader.Core.BrokersApi.Binance
             return Semaphores[symbol];
         }
 
+        public override ISymbolHistory GetSymbolHistory(SymbolHistoryId info, DateTime startOfData, DateTime endOfData)
+        {
+            lock (LastHistoryRequest)
+                LastHistoryRequest[info.Key] = DateTime.Now;
+            return base.GetSymbolHistory(info, startOfData, endOfData);
+        }
+
         public int ConcurrencyCount { get; set; } = 10;
+
         public void DownloadSymbols(Func<ExchangeInfoSymbol, bool> filter, TimeSpan redownloadSpan)
         {
             var exchangeInfo = Client.GetExchangeInfo().Result;
@@ -273,7 +303,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                                     EndTime = startTime.AddYears(3),
                                     Limit = 10
                                 })).FirstOrDefault();
-                            this.UpdateFirstKnownData(metaData.Info, KlineToCandlestick(firstAvailable));
+                            this.UpdateFirstKnownData(metaData.HistoryId, KlineToCandlestick(firstAvailable));
                         }
 
                         //if we already downloaded the first available we can start download from the last known

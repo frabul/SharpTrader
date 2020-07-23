@@ -82,11 +82,11 @@ namespace SharpTrader.AlgoFramework
                         if (SymbolsData.ContainsKey(trade.Symbol))
                             this.WorkingSlice.Add(SymbolsData[trade.Symbol].Symbol, trade);
                         else
-                            Logger.Error($"Symbol data not found for trade {trade} during initialize.");
+                            Logger.Error($"{Name} - Symbol data not found for trade {trade} during initialize.");
                 }
                 else
                 {
-                    Logger.Error("GetLastTrades failed during initialize");
+                    Logger.Error("{0} - GetLastTrades failed during initialize", Name);
                 }
             }
             //call on initialize
@@ -286,10 +286,10 @@ namespace SharpTrader.AlgoFramework
 
         public string GetNewOperationId()
         {
-            if(Name.Length > 7)
-                return this.Name.Substring(0,7) +(State.TotalOperations++).ToString();
+            if (Name.Length > 6)
+                return this.Name.Substring(0, 6) + "." + (State.TotalOperations++).ToString();
             else
-                return this.Name.Substring(0, 7) + (State.TotalOperations++).ToString(); 
+                return this.Name + "." + (State.TotalOperations++).ToString();
         }
 
         public string GetNewSignalId()
@@ -339,7 +339,7 @@ namespace SharpTrader.AlgoFramework
                 if (!BackTesting)
                 {
                     if (Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
-                        Logger.Warn($"OnTick duration longer than expected. Expected {Resolution} - real {Time - NextUpdateTime + Resolution }");
+                        Logger.Warn($"{Name} - OnTick duration longer than expected. Expected {Resolution} - real {Time - NextUpdateTime + Resolution }");
                 }
 
                 TimeSlice curSlice;

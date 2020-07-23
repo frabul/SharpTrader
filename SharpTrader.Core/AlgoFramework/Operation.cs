@@ -166,7 +166,7 @@ namespace SharpTrader.AlgoFramework
 
         public virtual string GetNewOrderId()
         {
-            var orderId = $"{this.Id}-{OrdersCount}";
+            var orderId = $"{this.Id}.{OrdersCount}";
             OrdersCount++;
             _IsChanged = true;
             return orderId;

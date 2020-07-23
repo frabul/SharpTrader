@@ -10,12 +10,14 @@ using System.Diagnostics;
 using LiteDB;
 using BinanceExchange.API.Models.Response;
 using System.Runtime.InteropServices;
+using NLog;
 
 namespace SharpTrader.Storage
 {
     //TODO make thread safe
     public class TradeBarsRepository
     {
+        private Logger Logger = LogManager.GetCurrentClassLogger();
         private static readonly CandlestickTimeComparer<Candlestick> CandlestickTimeComparer = new CandlestickTimeComparer<Candlestick>();
         private string DataDir;
 
@@ -37,19 +39,20 @@ namespace SharpTrader.Storage
         {
             lock (SymbolsMetaData)
             {
-                if (!SymbolsMetaData.TryGetValue(historyInfo.GetKey(), out var metaData))
+                if (!SymbolsMetaData.TryGetValue(historyInfo.Key, out var metaData))
                 {
                     metaData = new SymbolHistoryMetaDataInternal(historyInfo);
-                    SymbolsMetaData.Add(historyInfo.GetKey(), metaData);
+                    SymbolsMetaData.Add(historyInfo.Key, metaData);
                 }
                 return metaData;
             }
 
         }
-        public ISymbolHistory GetSymbolHistory(SymbolHistoryId info, DateTime startOfData, DateTime endOfData)
+        public virtual ISymbolHistory GetSymbolHistory(SymbolHistoryId info, DateTime startOfData, DateTime endOfData)
         {
-            var rawHist = GetHistoryRaw(info, startOfData, endOfData);
-            return new SymbolHistory(rawHist, startOfData, endOfData);
+            var meta = GetMetaDataInternal(info);
+            meta.LoadHistory(startOfData, endOfData);
+            return new SymbolHistory(meta.View, startOfData, endOfData);
         }
 
         public ISymbolHistory GetSymbolHistory(SymbolHistoryId info, DateTime startOfData)
@@ -62,106 +65,18 @@ namespace SharpTrader.Storage
             return GetSymbolHistory(info, DateTime.MinValue);
         }
 
-        private SymbolHistoryRaw GetHistoryRaw(SymbolHistoryId historyInfo, DateTime startOfData, DateTime endOfData)
-        {
-            var meta = GetMetaDataInternal(historyInfo);
-            startOfData = new DateTime(startOfData.Year, startOfData.Month, 1);
-            List<DateRange> missingData = new List<DateRange>();
-            lock (meta.Locker)
-            {
-                if (meta.Ticks?.Ticks == null)
-                {
-                    meta.Ticks = new SymbolHistoryRawExt()
-                    {
-                        FileName = historyInfo.GetKey(),
-                        Market = historyInfo.Market,
-                        Spread = 0,
-                        Symbol = historyInfo.Symbol,
-                        Ticks = new List<Candlestick>(),
-                        Timeframe = historyInfo.Timeframe
-                    };
-                }
-                //check if we already have some records and load them   
-                if (meta.Ticks.Ticks.Count < 1)
-                {
-                    missingData.Add(new DateRange(startOfData, endOfData));
-                }
-                else
-                {
-                    if (meta.Ticks.StartOfData > startOfData)
-                    {
-                        missingData.Add(new DateRange(startOfData, meta.Ticks.StartOfData));
-                    }
-                    if (endOfData > meta.Ticks.EndOfData)
-                    {
-                        missingData.Add(new DateRange(meta.Ticks.EndOfData, endOfData));
-                    }
-                }
-
-                //load missing data  
-                foreach (var finfo in meta.Chunks)
-                {
-                    if (finfo != null)
-                    {
-                        var rightFile = historyInfo.GetKey() == finfo.HistoryId.GetKey();
-                        var dateInRange = missingData.Any(dr => finfo.StartDate >= dr.start && finfo.StartDate < dr.end);
-                        if (rightFile && dateInRange)
-                        {
-                            try
-                            {
-                                using (var fs = File.Open(finfo.FilePath, FileMode.Open))
-                                {
-                                    SymbolHistoryRaw fdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
-                                    meta.AddBars(fdata.Ticks.Where(tick => tick.Time <= endOfData));
-                                }
-                            }
-                            catch
-                            {
-                                Console.WriteLine($"ERROR loading file {finfo.FilePath}");
-                            }
-                        }
-                    }
-                }
-
-                return meta.Ticks;
-            }
-        }
-
         public void AddCandlesticks(SymbolHistoryId symId, IEnumerable<Candlestick> candles)
         {
-            //load all available data in date rage
-            var sdata = GetHistoryRaw(symId, candles.First().OpenTime, DateTime.MaxValue);
+            //load all available data in date rage 
             var meta = GetMetaDataInternal(symId);
+            meta.LoadHistory(candles.First().OpenTime, DateTime.MaxValue);
             //add data 
             //Debug.Assert(sdata.Ticks.Count > 0);
             //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
             meta.AddBars(candles);
         }
 
-        private HistoryFileInfo GetFileInfo(string filePath)
-        {
-            HistoryFileInfo ret = null;
-            try
-            {
-                var fileName = Path.GetFileName(filePath);
-                string[] parts = fileName.Remove(fileName.Length - 4).Split('_');
-                if (parts.Length > 3)
-                {
-                    var market = parts[0];
-                    var symbol = parts[1];
-                    var time = TimeSpan.FromMilliseconds(int.Parse(parts[2]));
-                    var date = DateTime.ParseExact(parts[3], "yyyyMM", CultureInfo.InvariantCulture);
-                    var symId = new SymbolHistoryId(market, symbol, time);
-                    ret = new HistoryFileInfo(filePath, symId, date);
-                }
-            }
-            catch (Exception _ex)
-            {
-                Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
-            }
-            Debug.Assert(ret != null);
-            return ret;
-        }
+     
 
         internal void UpdateFirstKnownData(SymbolHistoryId info, ITradeBar firstAvailable)
         {
@@ -178,51 +93,78 @@ namespace SharpTrader.Storage
 
             if (DbSymbolsMetaData.FindOne(e => true) == null)
             {
+                Update1();
                 Update2();
             }
             SymbolsMetaData = DbSymbolsMetaData.FindAll().ToDictionary(md => md.Id);
         }
 
+        private void Update1()
+        {
+            //get a
+            var files = Directory.GetFiles(DataDir, "*.bin");
+            IEnumerable<IGrouping<string, string>> filesGrouped;
+            if (files.Length > 0)
+            {
+                files = files.Concat(Directory.GetFiles(DataDir, "*.bin2")).ToArray();
+                filesGrouped = files.GroupBy(f =>
+                                               {
+                                                   var info = HistoryChunkId.Parse(f);
+                                                   return info.HistoryId.Key;
+                                               }
+                                );
+                foreach (var group in filesGrouped)
+                {
+                    if (group.Count() > 1)
+                    { }
+                    var info = HistoryChunkId.Parse(group.First());
+                    var histMetadata = new SymbolHistoryMetaDataInternal(info.HistoryId);
+                    foreach (var fpath in group)
+                    {
+                        var fdata = HistoryChunk.Load(fpath);
+                        histMetadata.AddBars(fdata.Ticks);
+                        if (Path.GetExtension(fpath) == ".bin")
+                            File.Delete(fpath);
+                    }
+                    histMetadata.Save(DataDir);
+                }
+            }
+
+
+        }
         private void Update2()
         {
             var data = new Dictionary<string, SymbolHistoryMetaDataInternal>();
-            var files = Directory.GetFiles(DataDir, "*.bin");
+            var files = Directory.GetFiles(DataDir, "*.bin2");
 
             foreach (var filePath in files)
             {
-                var fileInfo = GetFileInfo(filePath);
+                var fileInfo = HistoryChunkId.Parse(filePath);
                 //-- get metaData --
-                if (!data.ContainsKey(fileInfo.HistoryId.GetKey()))
-                    data.Add(fileInfo.HistoryId.GetKey(), new SymbolHistoryMetaDataInternal(fileInfo.HistoryId));
-                var symData = data[fileInfo.HistoryId.GetKey()];
+                if (!data.ContainsKey(fileInfo.HistoryId.Key))
+                    data.Add(fileInfo.HistoryId.Key, new SymbolHistoryMetaDataInternal(fileInfo.HistoryId));
+                var symData = data[fileInfo.HistoryId.Key];
 
                 symData.Chunks.Add(fileInfo);
 
                 //update first and last tick time
-                using (var fs = File.Open(fileInfo.FilePath, FileMode.Open))
+                HistoryChunk fileData = HistoryChunk.Load(filePath);
+                if (fileData.Ticks.Count > 0)
                 {
-                    SymbolHistoryRaw fdata = Serializer.Deserialize<SymbolHistoryRaw>(fs);
-                    Debug.Assert(fdata.FileName == fileInfo.GetFileName());
-
-                    if (fdata.Ticks.Count > 0)
-                    {
-                        symData.UpdateBars(fdata.Ticks.First());
-                        symData.UpdateBars(fdata.Ticks.Last());
-                    }
+                    symData.UpdateBars(fileData.Ticks.First());
+                    symData.UpdateBars(fileData.Ticks.Last());
                 }
             }
-            foreach (var symData in data.Values)
-            {
-                symData.Chunks = symData.Chunks.OrderBy(f => f.StartDate).ToList();
-            }
+          
             var allData = data.Values.ToArray();
             DbSymbolsMetaData.InsertBulk(allData);
             Db.Checkpoint();
         }
 
+
         public SymbolHistoryId[] ListAvailableData()
         {
-            return SymbolsMetaData.Values.Select(md => md.Info).ToArray();
+            return SymbolsMetaData.Values.Select(md => md.HistoryId).ToArray();
         }
 
         public void SaveAll()
@@ -237,53 +179,19 @@ namespace SharpTrader.Storage
             var meta = GetMetaDataInternal(info);
             if (meta == null)
                 throw new Exception("symbol history not found");
-            lock (meta.Locker)
-            {
-                if (save)
-                    Save(meta);
-                meta.Ticks = null;
-            }
+
+            if (save)
+                Save(meta);
+            meta.View = null;
         }
 
         private void Save(SymbolHistoryMetaDataInternal sdata)
         {
-            lock (sdata.Locker)
+            lock (DbSymbolsMetaData)
             {
-                DbSymbolsMetaData.Upsert(sdata);
-                SaveTicks_Protobuf(sdata.Ticks);
+                sdata.Save(DataDir);
+                DbSymbolsMetaData.Upsert(sdata); 
             }
-        }
-
-        private void SaveTicks_Protobuf(SymbolHistoryRaw data)
-        {
-
-            int i = 0;
-            while (i < data.Ticks.Count)
-            {
-                DateTime startDate = new DateTime(data.Ticks[i].OpenTime.Year, data.Ticks[i].OpenTime.Month, 1);
-                DateTime endDate = startDate.AddMonths(1);
-                List<Candlestick> candlesOfMont = new List<Candlestick>();
-                while (i < data.Ticks.Count && data.Ticks[i].OpenTime < endDate)
-                {
-                    candlesOfMont.Add(new Candlestick(data.Ticks[i]));
-                    i++;
-                }
-                var symId = new SymbolHistoryId(data.Market, data.Symbol, data.Timeframe);
-                HistoryFileInfo newInfo = new HistoryFileInfo(symId, startDate);
-                newInfo.FilePath = Path.Combine(DataDir, newInfo.GetFileName());
-                SymbolHistoryRaw sdata = new SymbolHistoryRaw()
-                {
-                    FileName = newInfo.GetFileName(),
-                    Market = data.Market,
-                    Spread = data.Spread,
-                    Symbol = data.Symbol,
-                    Ticks = candlesOfMont,
-                    Timeframe = data.Timeframe
-                };
-                using (var fs = File.Open(newInfo.FilePath, FileMode.Create))
-                    Serializer.Serialize<SymbolHistoryRaw>(fs, sdata);
-            }
-
         }
 
         public void Delete(string market, string symbol, TimeSpan time)
@@ -310,61 +218,61 @@ namespace SharpTrader.Storage
             foreach (var fi in ListAvailableData())
                 FixSymbolHistory(fi, DateTime.MinValue, DateTime.MaxValue, downloadCandlesCallback);
         }
+
         public void FixSymbolHistory(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime, Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
         {
             int duplicates = 0;
             int matchErrors = 0;
             Console.WriteLine($"Checking {histInfo.Symbol} history data ");
-            var hist = GetHistoryRaw(histInfo, fromTime, toTime);
             var meta = GetMetaDataInternal(histInfo);
-            lock (meta.Locker)
+            meta.LoadHistory(fromTime, toTime);
+
+
+            var oldTicks = meta.View.Ticks;
+            var newTicks = new List<Candlestick>();
+            Candlestick lastAdded() => newTicks[newTicks.Count - 1];
+            if (oldTicks.Count > 0)
             {
-                var oldTicks = hist.Ticks;
-                var newTicks = new List<Candlestick>();
-                Candlestick lastAdded() => newTicks[newTicks.Count - 1];
-                if (oldTicks.Count > 0)
+                newTicks.Add(oldTicks[0]);
+                for (int i = 1; i < oldTicks.Count; i++)
                 {
-                    newTicks.Add(oldTicks[0]);
-                    for (int i = 1; i < oldTicks.Count; i++)
+                    var candleToAdd = oldTicks[i];
+                    if (candleToAdd.OpenTime == lastAdded().OpenTime)
                     {
-                        var candleToAdd = oldTicks[i];
-                        if (candleToAdd.OpenTime == lastAdded().OpenTime)
-                        {
-                            //we skip this
-                            if (candleToAdd.Equals(lastAdded()))
-                                matchErrors++;
-                            duplicates++;
-                        }
-                        else if (candleToAdd.OpenTime < lastAdded().OpenTime)
-                        {
-                            Console.WriteLine($"   Bad candle at {candleToAdd.OpenTime}");
-                        }
-                        else
-                        {
-                            //check holes
-                            if (candleToAdd.OpenTime - lastAdded().OpenTime > histInfo.Timeframe)
-                            {
-                                //hole
-                                Console.WriteLine($"   Hole found {lastAdded().OpenTime} -> {candleToAdd.OpenTime}");
-                                //redownload data
-                                if (downloadCandlesCallback != null)
-                                {
-                                    var candlesToAdd = downloadCandlesCallback(histInfo.Symbol, lastAdded().OpenTime, candleToAdd.OpenTime)
-                                                        .Where(c => c.OpenTime > lastAdded().OpenTime)
-                                                        .OrderBy(c => c.OpenTime).ToArray();
-                                    newTicks.AddRange(candlesToAdd);
-                                    Console.WriteLine($"       Hole fixed!{candlesToAdd.FirstOrDefault()?.OpenTime} -> {candlesToAdd.LastOrDefault()?.OpenTime} ");
-                                }
-                            }
-                            //finally add the candle
-                            if (candleToAdd.OpenTime > lastAdded().OpenTime)
-                                newTicks.Add(candleToAdd);
-                        }
+                        //we skip this
+                        if (candleToAdd.Equals(lastAdded()))
+                            matchErrors++;
+                        duplicates++;
                     }
-                    hist.Ticks.Clear();
-                    hist.Ticks.AddRange(newTicks);
-                    SaveAndClose(histInfo);
+                    else if (candleToAdd.OpenTime < lastAdded().OpenTime)
+                    {
+                        Console.WriteLine($"   Bad candle at {candleToAdd.OpenTime}");
+                    }
+                    else
+                    {
+                        //check holes
+                        if (candleToAdd.OpenTime - lastAdded().OpenTime > histInfo.Resolution)
+                        {
+                            //hole
+                            Console.WriteLine($"   Hole found {lastAdded().OpenTime} -> {candleToAdd.OpenTime}");
+                            //redownload data
+                            if (downloadCandlesCallback != null)
+                            {
+                                var candlesToAdd = downloadCandlesCallback(histInfo.Symbol, lastAdded().OpenTime, candleToAdd.OpenTime)
+                                                    .Where(c => c.OpenTime > lastAdded().OpenTime)
+                                                    .OrderBy(c => c.OpenTime).ToArray();
+                                newTicks.AddRange(candlesToAdd);
+                                Console.WriteLine($"       Hole fixed!{candlesToAdd.FirstOrDefault()?.OpenTime} -> {candlesToAdd.LastOrDefault()?.OpenTime} ");
+                            }
+                        }
+                        //finally add the candle
+                        if (candleToAdd.OpenTime > lastAdded().OpenTime)
+                            newTicks.Add(candleToAdd);
+                    }
                 }
+                meta.View.Ticks.Clear();
+                meta.View.Ticks.AddRange(newTicks);
+                SaveAndClose(histInfo);
             }
 
             Console.WriteLine($"   Fixing {histInfo.Symbol} completed: duplicates {duplicates} - matchErrors {matchErrors}");
@@ -375,14 +283,14 @@ namespace SharpTrader.Storage
             lock (SymbolsMetaData)
             {
                 var myData = GetMetaDataInternal(finfo);
-                if (myData.Ticks != null)
+                if (myData.View != null)
                 {
-                    var ticks = myData.Ticks.Ticks;
+                    var ticks = myData.View.Ticks;
                     for (int i = 1; i < ticks.Count; i++)
                     {
                         if (ticks[i].OpenTime < ticks[i - 1].OpenTime)
                         {
-                            Console.WriteLine($"{finfo.Market} - {finfo.Symbol} - {finfo.Timeframe} -> bad data at {i}");
+                            Console.WriteLine($"{finfo.Market} - {finfo.Symbol} - {finfo.Resolution} -> bad data at {i}");
                         }
                     }
                 }
