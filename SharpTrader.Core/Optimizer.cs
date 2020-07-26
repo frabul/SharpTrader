@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SharpTrader.Storage;
 using System;
 using System.IO;
 using System.Linq;
@@ -14,6 +15,7 @@ namespace SharpTrader
 
     public class Optimizer
     {
+        TradeBarsRepository HistoryDB ;
         public class Configuration
         {
             public string SessionName;
@@ -46,7 +48,7 @@ namespace SharpTrader
         {
             Logger = NLog.LogManager.GetLogger($"Optimizer_{SessionName}");
             Logger.Info($"Starting optimization session: {SessionName}");
-
+            HistoryDB = new TradeBarsRepository(Config.BacktesterConfig.HistoryDb);
             for (int i = Session.Lastexecuted + 1; i < BaseSpace.Configurations.Count; i++)
             {
                 RunOne(BaseSpace.Configurations[i]);
@@ -61,7 +63,7 @@ namespace SharpTrader
         {
             var backtesterConfig = JsonConvert.DeserializeObject<BackTester.Configuration>(JsonConvert.SerializeObject(Config.BacktesterConfig));
             backtesterConfig.AlgoConfig = JObject.FromObject(algoConfig);
-            var backTester = new BackTester(backtesterConfig)
+            var backTester = new BackTester(backtesterConfig, HistoryDB)
             {
                 ShowPlotCallback = ShowPlotCallback,
                 Logger = this.Logger, 

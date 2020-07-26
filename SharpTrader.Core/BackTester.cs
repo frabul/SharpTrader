@@ -92,6 +92,46 @@ namespace SharpTrader
             if (this.Algo == null)
                 throw new Exception("Wrong algo class");
         }
+        public BackTester(Configuration config, TradeBarsRepository db)
+        {
+            Config = config;
+
+            if (Logger == null)
+                Logger = NLog.LogManager.GetLogger("BackTester_" + Config.SessionName);
+
+            var HistoryDB = db;
+            this.MarketSimulator = new MultiMarketSimulator(Config.DataDir, HistoryDB, Config.StartTime, Config.EndTime);
+            MarketSimulator.Deposit(Config.Market, Config.StartingBalance.Asset, Config.StartingBalance.Amount);
+
+            var algoClass = Type.GetType(Config.AlgoClass);
+            if (algoClass == null)
+                throw new Exception($"Algorith class {Config.AlgoClass} not found.");
+
+            var ctors = algoClass.GetConstructors();
+            var myctor = ctors.FirstOrDefault(ct =>
+            {
+                var pars = ct.GetParameters();
+                return pars.Length == 2 && pars[0].ParameterType == typeof(IMarketApi);
+            });
+            if (myctor == null)
+                throw new Exception("Unable to find a constructor with 2 parameters (ImarketApi, config)");
+            var configClass = myctor.GetParameters()[1].ParameterType;
+            algoConfig = null;
+            try
+            {
+                algoConfig = JsonConvert.DeserializeObject(config.AlgoConfig.ToString(), configClass);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Unable to translate from provided algo config to ${configClass.FullName }: ${ex.Message}");
+            }
+
+            this.Algo = myctor.Invoke(new[] { MarketSimulator.GetMarketApi(config.Market), algoConfig }) as TradingAlgo;
+            this.Algo.IsPlottingEnabled = Config.PlottingEnabled;
+            this.Algo.ShowPlotCallback = (pl) => this?.ShowPlotCallback(pl);
+            if (this.Algo == null)
+                throw new Exception("Wrong algo class");
+        }
 
         public void Start()
         {
