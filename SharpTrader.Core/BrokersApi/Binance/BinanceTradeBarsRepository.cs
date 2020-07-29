@@ -20,13 +20,23 @@ namespace SharpTrader.Core.BrokersApi.Binance
         private BinanceClient Client;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private Dictionary<string, DateTime> LastHistoryRequest = new Dictionary<string, DateTime>();
-        private readonly string MarketName = "Binance";
-        private SemaphoreSlim DownloadCandlesSemaphore = new SemaphoreSlim(10, 10);
+        private readonly string MarketName = "Binance"; 
+        private SemaphoreSlim DownloadCandlesSemaphore ;
+        public int ConcurrencyCount { get; set; } = 10;
 
         public BinanceTradeBarsRepository(string dataDir, BinanceClient cli) : base(dataDir)
         {
             Client = cli;
             _ = CheckClosing();
+            DownloadCandlesSemaphore = new SemaphoreSlim(ConcurrencyCount, ConcurrencyCount);
+        }
+         
+
+        //--------------------------------------------
+        public BinanceTradeBarsRepository(string dataDir, double rateLimitFactor = 0.4f) : base(dataDir)
+        {
+            Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
+            DownloadCandlesSemaphore = new SemaphoreSlim(ConcurrencyCount, ConcurrencyCount);
         }
 
         private async Task CheckClosing()
@@ -48,12 +58,6 @@ namespace SharpTrader.Core.BrokersApi.Binance
                 }
                 await Task.Delay(10000);
             }
-        }
-
-        //--------------------------------------------
-        public BinanceTradeBarsRepository(string dataDir, double rateLimitFactor = 0.4f) : base(dataDir)
-        {
-            Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
         }
 
         public void SynchSymbolsTable(string DataDir)
@@ -129,8 +133,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             {
                 DownloadCandlesSemaphore.Release();
                 sem.Release();
-            }
-            this.SaveAndClose(histInfo, true);
+            } 
             //this.SaveAll();
         }
 
@@ -223,7 +226,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             return base.GetSymbolHistory(info, startOfData, endOfData);
         }
 
-        public int ConcurrencyCount { get; set; } = 10;
+       
 
         public void DownloadSymbols(Func<ExchangeInfoSymbol, bool> filter, TimeSpan redownloadSpan)
         {
@@ -265,13 +268,16 @@ namespace SharpTrader.Core.BrokersApi.Binance
             var symbols = exchangeInfo.Symbols;
 
             var toDownload = symbols
+              
                 .Where(s => filter(s.symbol))
                 .Select(sp => sp.symbol).ToList();
+            toDownload.Sort();
             List<Task> tasks = new List<Task>();
             foreach (var sym in toDownload)
-            {
-                tasks.Add(
-                    this.AssureData(new SymbolHistoryId("Binance", sym, TimeSpan.FromMinutes(1)), fromTime, toTime));
+            { 
+                var histInfo = new SymbolHistoryId("Binance", sym, TimeSpan.FromMinutes(1));
+                var task = this.AssureData(histInfo, fromTime, toTime).ContinueWith(t => this.SaveAndClose(histInfo, true));
+                tasks.Add(task); 
             }
             await Task.WhenAll(tasks);
         }
