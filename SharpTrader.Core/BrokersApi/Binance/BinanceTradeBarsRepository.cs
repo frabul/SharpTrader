@@ -43,7 +43,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                         {
                             this.SaveAndClose(SymbolHistoryId.Parse(key), true);
                             LastHistoryRequest.Remove(key);
-                        }    
+                        }
                     }
                 }
                 await Task.Delay(10000);
@@ -51,7 +51,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         }
 
         //--------------------------------------------
-        public BinanceTradeBarsRepository(string dataDir, double rateLimitFactor = 0.6f) : base(dataDir)
+        public BinanceTradeBarsRepository(string dataDir, double rateLimitFactor = 0.4f) : base(dataDir)
         {
             Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
         }
@@ -75,7 +75,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict);
             var deserialized = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, SymbolInfo>>(json);
-            System.IO.File.WriteAllText(DataDir + "BinanceSymbolsTable.json", json);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(DataDir, "BinanceSymbolsTable.json"), json);
         }
 
         public async Task AssureData(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime)
@@ -130,10 +130,13 @@ namespace SharpTrader.Core.BrokersApi.Binance
                 DownloadCandlesSemaphore.Release();
                 sem.Release();
             }
+            this.SaveAndClose(histInfo, true);
+            //this.SaveAll();
         }
 
         private async Task<List<Candlestick>> DownloadCandles(string symbol, DateTime startTime, DateTime endTime)
         {
+            Console.WriteLine($"Downloading candes for {symbol} from {startTime} to {endTime}");
             List<Candlestick> allCandles = new List<SharpTrader.Candlestick>();
             try
             {
@@ -256,7 +259,22 @@ namespace SharpTrader.Core.BrokersApi.Binance
             while (tasks.Any(t => !t.IsCompleted))
                 System.Threading.Thread.Sleep(1);
         }
+        public async Task AssureFilter(Func<string, bool> filter, DateTime fromTime, DateTime toTime)
+        {
+            var exchangeInfo = Client.GetExchangeInfo().Result;
+            var symbols = exchangeInfo.Symbols;
 
+            var toDownload = symbols
+                .Where(s => filter(s.symbol))
+                .Select(sp => sp.symbol).ToList();
+            List<Task> tasks = new List<Task>();
+            foreach (var sym in toDownload)
+            {
+                tasks.Add(
+                    this.AssureData(new SymbolHistoryId("Binance", sym, TimeSpan.FromMinutes(1)), fromTime, toTime));
+            }
+            await Task.WhenAll(tasks);
+        }
         public async Task DownloadHistoryAsync(string symbol, DateTime fromTime, TimeSpan redownloadStart)
         {
             //we must assure that there is only one downloading action ongoing for each symbol!

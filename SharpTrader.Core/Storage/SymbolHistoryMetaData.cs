@@ -87,17 +87,21 @@ namespace SharpTrader.Storage
             lock (this.Locker)
             {
                 //save the view
-                this.View.Save_Protobuf(dataDir);
+                if(this.View != null)
+                {
+                    this.View.Save_Protobuf(dataDir);
 
-                //check that saved chucks are present in chunks cache
-                foreach (var chunk in View.LoadedFiles)
-                    this.Chunks.Add(chunk);
+                    //check that saved chucks are present in chunks cache
+                    foreach (var chunk in View.LoadedFiles)
+                        this.Chunks.Add(chunk);
+                }
+                
             }
         }
 
         public void LoadHistory(DateTime startOfData, DateTime endOfData)
         {
-            startOfData = new DateTime(startOfData.Year, startOfData.Month, 1);
+            startOfData = new DateTime(startOfData.Year, startOfData.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             List<DateRange> missingData = new List<DateRange>();
             lock (this.Locker)
             {
@@ -128,7 +132,7 @@ namespace SharpTrader.Storage
                     Debug.Assert(HistoryId.Key == finfo.HistoryId.Key);
                     var dateInRange = missingData.Any(dr => finfo.StartDate >= dr.start && finfo.StartDate < dr.end);
                     if (dateInRange && this.View.LoadedFiles.Add(finfo)) //if is in any range and not already loaded
-                    { 
+                    {
                         try
                         {
                             HistoryChunk fdata = HistoryChunk.Load(finfo.FilePath);

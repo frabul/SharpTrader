@@ -75,7 +75,7 @@ namespace SharpTrader.AlgoFramework
         public DateTime CloseDeadTime { get; private set; } = DateTime.MaxValue;
         public DateTime LastInvestmentTime { get; private set; }
         public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
-    
+
         /// <summary>
         /// All trades associated with this operation
         /// </summary> 
@@ -244,7 +244,7 @@ namespace SharpTrader.AlgoFramework
                 throw new Exception("Unknown trade direction");
         }
 
-     
+
         public override string ToString()
         {
             return ToString("");
@@ -255,16 +255,16 @@ namespace SharpTrader.AlgoFramework
             {
                 var ar = " AR%: -";
                 var gainprc = "";
-                if (AmountInvested > 0 && AmountRemaining / AmountInvested < 0.05m)
-                    gainprc = $", G%: {(this.AverageExitPrice - this.AverageEntryPrice) * 100 / this.AverageEntryPrice: 0.###}";
+                if (AmountInvested > 0 && AmountRemaining / AmountInvested < 0.05m && this.AverageEntryPrice > 0)
+                    gainprc = $", G%: {(this.AverageExitPrice - this.AverageEntryPrice) * 100 / this.AverageEntryPrice: 0.000}";
 
                 if (AmountInvested > 0)
-                    ar = $" AR%: {this.AmountRemaining * 100 / this.AmountInvested:0.###}";
-                return $"{{ Id: {Id} {Symbol.Key} {CreationTime:dd-MM-yyyy HH:mm:ss}," +
-                    $" EP: {this.AverageEntryPrice:0.########}," +
-                    $" TP: {Signal.PriceTarget:0.########}," +
-                    $" EP: {this.AverageExitPrice:0.########}," +
-                    $" QA: {this.QuoteAmountInvested:0.######}," +
+                    ar = $" AR%: {this.AmountRemaining * 100 / this.AmountInvested:0.000}";
+                return $"{{ {Id} - {Symbol.Key,-8} {CreationTime:dd-MM-yyyy HH:mm:ss}," +
+                    $" OP: {this.AverageEntryPrice:0.00000000}," +
+                    $" TP: {Signal.PriceTarget:0.00000000}," +
+                    $" CP: {this.AverageExitPrice:0.00000000}," +
+                    $" QA: {this.QuoteAmountInvested:0.00000000}," +
                     ar + gainprc + " }";
             }
             else
@@ -300,7 +300,7 @@ namespace SharpTrader.AlgoFramework
                 CloseDeadTime = DateTime.MaxValue;
                 this.SetChanged();
                 OnResumed?.Invoke(this);
-            } 
+            }
         }
 
         public void AcceptChanges()

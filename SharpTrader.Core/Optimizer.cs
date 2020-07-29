@@ -9,13 +9,13 @@ namespace SharpTrader
 {
     class OptimizerSession
     {
-        public int Lastexecuted { get; set; }
+        public int Lastexecuted { get; set; } = -1;
     }
 
 
     public class Optimizer
     {
-        TradeBarsRepository HistoryDB ;
+        TradeBarsRepository HistoryDB;
         public class Configuration
         {
             public string SessionName;
@@ -37,8 +37,13 @@ namespace SharpTrader
             ShowPlotCallback = showPlotCallback;
             Config = config;
             //load session
-            var sessionJson = File.ReadAllText(SessionFile);
-            Session = JsonConvert.DeserializeObject<OptimizerSession>(sessionJson);
+            if (File.Exists(SessionFile))
+            {
+                var sessionJson = File.ReadAllText(SessionFile);
+                Session = JsonConvert.DeserializeObject<OptimizerSession>(sessionJson);
+            }
+            else
+                Session = new OptimizerSession();
             //load space
             var spaceJson = File.ReadAllText(SpaceFile);
             BaseSpace = OptimizationSpace.FromJson(spaceJson);
@@ -66,10 +71,10 @@ namespace SharpTrader
             var backTester = new BackTester(backtesterConfig, HistoryDB)
             {
                 ShowPlotCallback = ShowPlotCallback,
-                Logger = this.Logger, 
-                
+                Logger = this.Logger,
+
             };
-            backTester.Start(); 
+            backTester.Start();
         }
     }
 }

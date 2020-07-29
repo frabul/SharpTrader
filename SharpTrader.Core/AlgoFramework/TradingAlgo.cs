@@ -15,7 +15,7 @@ namespace SharpTrader.AlgoFramework
         public class Configuration
         {
             public string DataDir { get; set; } = Path.Combine(".", "Data");
-            public string Name { get; set; } = "Unnamed";
+            public string Name { get; set; } = "Unnamed v1";
             public bool SaveData { get; set; } = false;
         }
         class NonVolatileVars

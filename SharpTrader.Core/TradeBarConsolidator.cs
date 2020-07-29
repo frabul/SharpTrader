@@ -8,7 +8,7 @@ namespace SharpTrader
       
         private Candlestick FormingCandle;
 
-        DateTime BaseTime = new DateTime(1970, 1, 1);
+        DateTime BaseTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         public event Action<ITradeBar> OnConsolidated;
         
