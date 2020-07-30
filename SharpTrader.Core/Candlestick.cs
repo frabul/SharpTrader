@@ -114,5 +114,9 @@ namespace SharpTrader
         {
             return base.GetHashCode();
         }
+        public override string ToString()
+        {
+            return $"{{ {Time} Open:{Open:f7} Hi:{High:f7} Low:{Low:f7} Close:{Close:f7}  }}";
+        }
     }
 }
