@@ -36,7 +36,7 @@ namespace SharpTrader.AlgoFramework
         private Configuration Config;
         private object WorkingSliceLock = new object();
         private bool EntriesStopppedByStrategy = false;
-
+        public abstract string Version { get; }
         public string Name => Config.Name;
         public string MyDataDir => Path.Combine(Config.DataDir, Config.Name);
         public Action<PlotHelper> ShowPlotCallback { get; set; }
@@ -171,7 +171,7 @@ namespace SharpTrader.AlgoFramework
                 if (activeOp != null)
                 {
                     activeOp.AddTrade(trade);
-                    Logger.Info($"New trade for operation {activeOp.ToString()}: {trade.ToString()}");
+                    Logger.Info($"{Time} - New trade for operation {activeOp.ToString()}: {trade.ToString()}");
                 }
                 else
                 {
@@ -184,7 +184,7 @@ namespace SharpTrader.AlgoFramework
 
                     if (oldOp != null)
                     {
-                        Logger.Info($"New trade for 'old' operation {activeOp}: {trade.ToString()}");
+                        Logger.Info($"{Time} - New trade for 'old' operation {activeOp}: {trade.ToString()}");
                         oldOp.AddTrade(trade);
                         //check if it got resumed by this new trade
                         if (!oldOp.IsClosed)
@@ -194,7 +194,7 @@ namespace SharpTrader.AlgoFramework
                         }
                     }
                     else
-                        Logger.Trace($"New trade {trade.ToString()} without any associated operation");
+                        Logger.Trace($"{Time} - New trade {trade.ToString()} without any associated operation");
 
                 }
             }
@@ -214,7 +214,10 @@ namespace SharpTrader.AlgoFramework
                 List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
                 foreach (var op in operationsToClose)
                 {
-                    Logger.Info($"Closing operation {op.ToString("c")}.");
+                    if(op.AmountInvested > 0)
+                        Logger.Info("{0} - Closing operation {1}.", Time, op.ToString("c"));
+                    else
+                        Logger.Debug("{0} - Closing operation {1}.", Time, op.ToString("c"));
                     op.Close();
                     _ActiveOperations.Remove(op);
                     if (this.Config.SaveData || op.AmountInvested > 0)

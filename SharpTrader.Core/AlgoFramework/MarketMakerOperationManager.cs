@@ -304,7 +304,7 @@ namespace SharpTrader.AlgoFramework
                     myOpData.ExitManager = null;
 
                     //put in close queue
-                    Logger.Info($"Queue for close {self.Op.ToString("c")}\n    because amount remaining is 0 and entry expired.");
+                    Logger.Debug($"Queue for close {self.Op.ToString("c")}\n    because amount remaining is 0 and entry expired.");
                     await CloseQueueAsync(self.Op, TimeSpan.FromMinutes(2.5));
                 }
                 else
@@ -348,12 +348,13 @@ namespace SharpTrader.AlgoFramework
             //---------- manage exit orders -------------- 
             if (myOpData.CurrentExitOrder == null)
             {
+                var price = Math.Max(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Ask);
                 if (op.AmountRemaining > 0 && !op.IsExitExpired(Algo.Time))
                 {
                     //if we have no order 
                     if (myOpData.CurrentExitOrder == null)
                     {
-                        var adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget);
+                        var adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, price);
                         //create a limit order 
                         if (adj.amount > 0)
                         {
@@ -361,7 +362,7 @@ namespace SharpTrader.AlgoFramework
                             if (adj.amount > 0)
                             {
                                 //Debug.Assert(adj.amount == op.AmountRemaining);
-                                Logger.Info($"Setting EXIT order for oper {op} - amount:{adj.amount} - price: {adj.price}");
+                                Logger.Debug($"{Algo.Time} - Setting EXIT order for oper {op} - amount:{adj.amount} - price: {adj.price}");
                                 var request =
                                     await Algo.Market.LimitOrderAsync(
                                         op.Symbol.Key, op.ExitTradeDirection, adj.amount, adj.price, op.GetNewOrderId());
@@ -412,7 +413,7 @@ namespace SharpTrader.AlgoFramework
                 var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m;
                 if (wrongPrice || wrongAmout || Algo.Time > op.Signal.ExpireDate)
                 {
-                    Logger.Info($"Cancelling exit order for operation {op} - wrongAmout: {wrongAmout} - wrongPrice: {wrongPrice} ");
+                    Logger.Debug($"Cancelling exit order for operation {op} - wrongAmout: {wrongAmout} - wrongPrice: {wrongPrice} ");
                     var requestResult = await this.CloseExitOrder(op, myOpData);
                     if (requestResult)
                     {
@@ -474,7 +475,7 @@ namespace SharpTrader.AlgoFramework
                         adjusted = Algo.ClampOrderAmount(symData, op.EntryTradeDirection, adjusted);
                         if (adjusted.amount / originalAmount > 0.1m)
                         {
-                            Logger.Info($"{Algo.Time} - Setting Entry for {op} - amount: {adjusted.amount:0.########} - price: {adjusted.price:0.########}");
+                            Logger.Debug($"{Algo.Time} - Setting Entry for {op} - amount: {adjusted.amount:0.########} - price: {adjusted.price:0.########}");
                             //Debug.Assert(op.AmountInvested == 0);
                             var req =
                                 await Algo.Market.LimitOrderAsync(

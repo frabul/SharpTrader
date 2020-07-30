@@ -50,7 +50,7 @@ namespace SharpTrader.MarketSimulator
 
         public override string ToString()
         {
-            return $"Trade{{ Id: {Id}, Symbol:{Symbol}, Direction:{Direction}, Time:{Time} }}";
+            return $"{{ Id: {Id} - Symbol:{Symbol} {Direction} at {Time} }}";
         }
     }
 }

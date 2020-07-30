@@ -20,8 +20,8 @@ namespace BackTestOptimizer
 
         static async Task Main(string[] args)
         {
-            var StartTime = new DateTime(2020, 02, 01);
-            var EndTime = new DateTime(2020, 05, 30);
+            var StartTime = new DateTime(2020, 04, 01);
+            var EndTime = new DateTime(2020, 07, 30);
             //var db = new BinanceTradeBarsRepository(@"D:\ProgettiBck\SharpTraderBots\Bin\Data2", rateLimitFactor: 0.4);
             //db.SynchSymbolsTable(@"D:\ProgettiBck\SharpTraderBots\Bin\Data2");
 

@@ -10,6 +10,7 @@ using NLog;
 using Newtonsoft.Json.Linq;
 using System.IO;
 using LiteDB;
+using SharpTrader.Storage;
 
 namespace SharpTrader.MarketSimulator
 {
@@ -41,8 +42,10 @@ namespace SharpTrader.MarketSimulator
         public IEnumerable<ISymbolFeed> Feeds => SymbolsFeeds.Values;
         public IEnumerable<ITrade> Trades => this._Trades;
 
-        public Market(string name, decimal makerFee, decimal takerFee, string dataDir)
+
+        public Market(string name, decimal makerFee, decimal takerFee, string dataDir, Action<Market, SymbolFeed> initializeDataSourceCallBack)
         {
+            this.initializeDataSourceCallBack = initializeDataSourceCallBack;
             Logger = LogManager.GetCurrentClassLogger();
 
             MarketName = name;
@@ -77,6 +80,7 @@ namespace SharpTrader.MarketSimulator
             {
                 var sInfo = SymbolsTable[symbol];
                 feed = new SymbolFeed(this.MarketName, sInfo);
+                initializeDataSourceCallBack(this, feed);
                 lock (LockObject)
                     SymbolsFeeds.Add(symbol, feed);
             }
@@ -215,10 +219,21 @@ namespace SharpTrader.MarketSimulator
                     var feed = SymbolsFeeds[order.Symbol];
                     if (order.Type == OrderType.Limit)
                     {
-                        var willBuy = (order.TradeType == TradeDirection.Buy && feed.LastTick.Low + feed.Spread <= (double)order.Price);
-                        var willSell = (order.TradeType == TradeDirection.Sell && feed.LastTick.High - feed.Spread >= (double)order.Price);
+                        var orderCompletes = false;
+                        decimal orderPrice = 0;
 
-                        if (willBuy || willSell)
+                        if (order.TradeType == TradeDirection.Buy)
+                        {
+                            orderCompletes = feed.LastTick.Low + feed.Spread <= (double)order.Price;
+                            orderPrice = order.Price;
+                        }
+                        else if (order.TradeType == TradeDirection.Sell)
+                        {
+                            orderCompletes = feed.LastTick.High - feed.Spread >= (double)order.Price;
+                            orderPrice = order.Price;
+                        }
+
+                        if (orderCompletes)
                         {
                             var trade = new Trade(
                                 market: this.MarketName,
@@ -417,6 +432,7 @@ namespace SharpTrader.MarketSimulator
 
         private List<Order> DeserializedOrders = new List<Order>();
         private List<Trade> DeserializedTrades = new List<Trade>();
+        private Action<Market, SymbolFeed> initializeDataSourceCallBack;
 
         public void RegisterSerializationHandlers(BsonMapper mapper)
         {

@@ -136,9 +136,8 @@ namespace SharpTrader
         public void Start()
         {
             if (Started)
-                return;
-            Logger.Info($"Starting backtest {StartTime} - {EndTime}");
-            Logger.Info($"Backtesting {Algo.ToString()}, configuration:\n" + JObject.FromObject(algoConfig).ToString());
+                return; 
+            Logger.Info($"Backtesting {Algo.Version} from  {StartTime} - {EndTime} with configuration:\n" + JObject.FromObject(algoConfig).ToString());
 
             Stopwatch sw = new Stopwatch();
             sw.Start();

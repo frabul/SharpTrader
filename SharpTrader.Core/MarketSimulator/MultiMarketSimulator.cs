@@ -33,7 +33,7 @@ namespace SharpTrader.MarketSimulator
             int i = 0;
             foreach (var mc in Config.Markets)
             {
-                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory);
+                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
                 _Markets[i++] = market;
             }
         }
@@ -55,7 +55,7 @@ namespace SharpTrader.MarketSimulator
             int i = 0;
             foreach (var mc in Config.Markets)
             {
-                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory);
+                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
                 _Markets[i++] = market;
             }
         }
@@ -93,7 +93,6 @@ namespace SharpTrader.MarketSimulator
                 foreach (var feed in market.SymbolsFeeds.Values)
                 {
                     feed.Time = market.Time;
-                    InitializeDataSource(market, feed);
                     var dataSource = feed.DataSource;
                     if (dataSource.Ticks.Count > 0)
                     {
@@ -123,7 +122,7 @@ namespace SharpTrader.MarketSimulator
             return nextTick <= this.EndTime && NoMoreDataCount < 10;
         }
 
-        private void InitializeDataSource(Market market, SymbolFeed feed)
+        private void InitializeDataSourceCallBack(Market market, SymbolFeed feed)
         {
             if (feed.DataSource == null)
             {
