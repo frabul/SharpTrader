@@ -22,7 +22,7 @@ namespace SharpTrader.MarketSimulator
         public string Market { get; private set; }
         public double Spread { get; set; }
         public ISymbolHistory DataSource { get; set; }
-        public IBaseData LastTick { get; private set; }
+        public IBaseData LastTick { get; private set;  }  
 
         public SymbolFeed(string market, SymbolInfo symbol)
         {
@@ -49,17 +49,16 @@ namespace SharpTrader.MarketSimulator
 
         internal void AddNewData(IBaseData newMarketData)
         {
-            Bid = newMarketData.Value;
-            Ask = Bid + Spread;
-            NewData.Add(newMarketData);
-
+            Bid = newMarketData.Value - Spread / 2;
+            Ask = newMarketData.Value + Spread / 2;
+            LastTick = newMarketData;
+            NewData.Add(newMarketData); 
         }
 
         public void RaisePendingEvents(ISymbolFeed sender)
         {
             if (NewData.Count > 0)
-            {
-                LastTick = NewData[NewData.Count - 1];
+            { 
                 foreach (var data in NewData)
                 {
                     OnData?.Invoke(this, data);
