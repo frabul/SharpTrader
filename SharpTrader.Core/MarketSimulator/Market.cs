@@ -289,6 +289,7 @@ namespace SharpTrader.MarketSimulator
 
         public void AddNewCandle(SymbolFeed feed, Candlestick tick)
         {
+            Logger.Trace("New candle  {0} - {1}", feed.Symbol, tick);
             feed.Spread = tick.Close * Spread;
             feed.AddNewData(tick);
         }
