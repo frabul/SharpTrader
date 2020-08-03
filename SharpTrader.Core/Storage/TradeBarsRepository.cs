@@ -89,7 +89,8 @@ namespace SharpTrader.Storage
 
         private void Init()
         {
-            Db = new LiteDB.LiteDatabase(Path.Combine(this.DataDir, "Database.db"));
+            var connectionString = $"Filename={Path.Combine(this.DataDir, "Database.db")};connection=shared";
+            Db = new LiteDB.LiteDatabase(connectionString);
             Db.Pragma("UTC_DATE", true);
 
             DbSymbolsMetaData = Db.GetCollection<SymbolHistoryMetaDataInternal>("SymbolsMetaData");
