@@ -260,7 +260,7 @@ namespace SharpTrader.AlgoFramework
 
                 if (AmountInvested > 0)
                     ar = $" AR%: {this.AmountRemaining * 100 / this.AmountInvested:0.000}";
-                return $"{{ {Id} - {Symbol.Key,-8} {CreationTime:dd-MM-yyyy HH:mm:ss}," +
+                return $"{{ {Id,-10} - {Symbol.Key,-8} {CreationTime:dd-MM-yyyy HH:mm:ss}," +
                     $" OP: {this.AverageEntryPrice:0.00000000}," +
                     $" TP: {Signal.PriceTarget:0.00000000}," +
                     $" CP: {this.AverageExitPrice:0.00000000}," +
