@@ -181,7 +181,10 @@ namespace SharpTrader.AlgoFramework
                         oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray();
                     }
                     var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
-
+                    //dispose the operations that we dont't need anymore
+                    foreach (var oper in oldOperations.Where(oo => oo != oldOp))
+                        oper.Dispose();
+                      
                     if (oldOp != null)
                     {
                         Logger.Info($"{Time} - New trade for 'old' operation {activeOp}: {trade.ToString()}");
@@ -341,6 +344,7 @@ namespace SharpTrader.AlgoFramework
             {
                 if (!BackTesting)
                 {
+                    //ClearClosedOperations(TimeSpan.FromHours(1));
                     if (Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
                         Logger.Warn($"{Name} - OnTick duration longer than expected. Expected {Resolution} - real {Time - NextUpdateTime + Resolution }");
                 }
@@ -377,6 +381,15 @@ namespace SharpTrader.AlgoFramework
             EntriesStopppedByStrategy = true;
             //close all entry orders
             return this.Executor.CancelEntryOrders();
+        }
+
+        public void ClearClosedOperations(TimeSpan keepRange)
+        {
+            var timeLimit = Time - keepRange;
+            foreach (var op in ClosedOperations.Where(op => op.LastInvestmentTime < timeLimit).ToArray())
+            {
+                _ClosedOperations.Remove(op);
+            }
         }
     }
 

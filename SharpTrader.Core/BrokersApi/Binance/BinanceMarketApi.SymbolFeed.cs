@@ -162,7 +162,7 @@ namespace SharpTrader.BrokersApi.Binance
                     QuoteAssetVolume = (double)FormingCandle.QuoteVolume
                 };
 
-                HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
+                //HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
                 this.OnData?.Invoke(this, candle);
                 FormingCandle = null;
             }
@@ -181,7 +181,7 @@ namespace SharpTrader.BrokersApi.Binance
                     QuoteAssetVolume = (double)msg.Kline.QuoteVolume
                 };
 
-                HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
+                //HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
                 this.OnData?.Invoke(this, candle);
                 FormingCandle = null;
             }

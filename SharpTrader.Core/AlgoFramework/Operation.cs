@@ -49,13 +49,23 @@ namespace SharpTrader.AlgoFramework
             get => _Signal;
             private set
             {
+                if(_Signal != null)
+                    _Signal.OnModify -= OnSignalModified;
                 //System.Diagnostics.Debug.Assert(value.Operation == null);
                 _Signal = value;
                 _Signal.Operation = this;
-                _Signal.OnModify += (s) => Resume();
+                _Signal.OnModify -= OnSignalModified;
+                _Signal.OnModify += OnSignalModified;
                 CreationTime = _Signal.CreationTime;
             }
         }
+
+        private void OnSignalModified(Signal s)
+        {
+            if (s == this.Signal)
+                this.Resume();
+        }
+
         public AssetAmount AmountTarget { get; private set; }
         public decimal AverageEntryPrice { get; private set; }
         public decimal AverageExitPrice { get; private set; }
@@ -312,7 +322,12 @@ namespace SharpTrader.AlgoFramework
         {
             _IsChanged = true;
         }
-
+        public void Dispose()
+        {
+            var sign = _Signal;
+            if (_Signal != null)
+                _Signal.OnModify -= OnSignalModified;
+        }
         public override int GetHashCode()
         {
             return this.Id.GetHashCode();
