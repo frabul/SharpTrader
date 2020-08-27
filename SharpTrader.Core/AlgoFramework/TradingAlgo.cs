@@ -75,7 +75,7 @@ namespace SharpTrader.AlgoFramework
             if (!BackTesting)
             {
                 //on restart there is the possibility that we missed some trades, let's reload the last trades
-                var req = await Market.GetLastTradesAsync(Market.Time - TimeSpan.FromHours(6));
+                var req = await Market.GetLastTradesAsync(Market.Time - TimeSpan.FromHours(12));
                 if (req.IsSuccessful)
                 {
                     foreach (var trade in req.Result)

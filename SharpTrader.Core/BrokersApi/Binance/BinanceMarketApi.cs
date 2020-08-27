@@ -86,10 +86,10 @@ namespace SharpTrader.BrokersApi.Binance
         public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1)
         {
             Logger = LogManager.GetLogger("BinanceMarketApi");
-            Logger.Info("starting initialization..."); 
+            Logger.Info("starting initialization...");
             OperationsDbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
             OperationsArchivePath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd_archive.db");
-            InitializeOperationsDb(); 
+            InitializeOperationsDb();
             Client = new BinanceClient(new ClientConfiguration()
             {
                 ApiKey = apiKey ?? "null",
@@ -448,7 +448,7 @@ namespace SharpTrader.BrokersApi.Binance
                         foreach (var tr in trades)
                         {
                             //ignore trades older than the StartOfOperation
-                            if(tr.Time >= StartOperationDate)
+                            if (tr.Time >= StartOperationDate)
                             {
                                 Order order;
                                 lock (LockOrdersTrades)
@@ -464,7 +464,7 @@ namespace SharpTrader.BrokersApi.Binance
 
                                 lock (LockOrdersTrades)
                                     TradesUpdateOrInsert(tr);
-                            } 
+                            }
                         }
                         //if has active orders we want it to continue updating when the active order becomes inactive
                         if (!hasActiveOrders)
@@ -513,7 +513,9 @@ namespace SharpTrader.BrokersApi.Binance
                     {
                         AccountUpdateMessageHandler = HandleAccountUpdatedMessage,
                         OrderUpdateMessageHandler = HandleOrderUpdateMsg,
-                        TradeUpdateMessageHandler = HandleTradeUpdateMsg
+                        TradeUpdateMessageHandler = HandleTradeUpdateMsg,
+                        OutboundAccountPositionHandler = HandleOutboundAccountPosition
+
                     });
                 }
             }
@@ -523,6 +525,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
 
         }
+
 
         private void CloseUserDataSocket()
         {
@@ -541,6 +544,18 @@ namespace SharpTrader.BrokersApi.Binance
         }
 
         private void HandleAccountUpdatedMessage(BinanceAccountUpdateData msg)
+        {
+            lock (LockBalances)
+            {
+                foreach (var bal in msg.Balances)
+                {
+                    this._Balances[bal.Asset].Free = bal.Free;
+                    this._Balances[bal.Asset].Locked = bal.Locked;
+                }
+            }
+        }
+
+        private void HandleOutboundAccountPosition(OutboundAccountPosition msg)
         {
             lock (LockBalances)
             {
@@ -1123,7 +1138,7 @@ namespace SharpTrader.BrokersApi.Binance
             Order BsonToOrder(BsonValue value)
             {
                 lock (LockOrdersTrades)
-                { 
+                {
                     var order = OpenOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
                     if (order == null)
                         order = Orders.FindById(value["_id"].AsString);
@@ -1141,7 +1156,7 @@ namespace SharpTrader.BrokersApi.Binance
                 Trade result = null;
                 lock (LockOrdersTrades)
                     result = Trades.FindById(value["_id"].AsString);
-                if(result == null )
+                if (result == null)
                     result = defaultMapper.Deserialize<Trade>(value);
                 return result;
             }
