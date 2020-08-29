@@ -205,7 +205,7 @@ namespace SharpTrader.AlgoFramework
             QuoteAmountRemaining = AmountInvested - AmountLiquidated;
         }
 
-        public void AddEntry(ITrade entry)
+        public bool AddEntry(ITrade entry)
         {
             if (this._Entries.Add(entry))
             {
@@ -219,11 +219,12 @@ namespace SharpTrader.AlgoFramework
                 this.SetChanged();
                 Resume();
                 OnNewTrade?.Invoke(this, entry);
+                return true;
             }
-
+            return false;
         }
 
-        public void AddExit(ITrade exit)
+        public bool AddExit(ITrade exit)
         {
             if (this._Exits.Add(exit))
             {
@@ -236,7 +237,9 @@ namespace SharpTrader.AlgoFramework
                 this.SetChanged();
                 Resume();
                 OnNewTrade?.Invoke(this, exit);
+                return true;
             }
+            return false;
         }
 
         public bool IsStarted()
@@ -244,12 +247,12 @@ namespace SharpTrader.AlgoFramework
             return this.IsClosed || this.IsClosing || this.AmountInvested > 0;
         }
 
-        public void AddTrade(ITrade trade)
+        public bool AddTrade(ITrade trade)
         {
             if (trade.Direction == this.EntryTradeDirection)
-                this.AddEntry(trade);
+                return this.AddEntry(trade);
             else if (trade.Direction == this.ExitTradeDirection)
-                this.AddExit(trade);
+                return this.AddExit(trade);
             else
                 throw new Exception("Unknown trade direction");
         }

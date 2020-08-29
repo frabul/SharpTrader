@@ -163,6 +163,7 @@ namespace SharpTrader.AlgoFramework
 
             // register trades with their linked operations
             Operation[] oldOperations = null;
+            List<Operation> operationsResumed = new List<Operation>();
             foreach (ITrade trade in slice.Trades)
             {
                 //first search in active operations
@@ -170,25 +171,25 @@ namespace SharpTrader.AlgoFramework
                 var activeOp = symData.ActiveOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
                 if (activeOp != null)
                 {
-                    activeOp.AddTrade(trade);
-                    Logger.Info($"{Time} - New trade for operation {activeOp.ToString()}: {trade.ToString()}");
+                    if(activeOp.AddTrade(trade))
+                        Logger.Info($"{Time} - New trade for operation {activeOp.ToString()}: {trade.ToString()}");
                 }
                 else
                 {
-                    lock (DbLock)
+                    //let's search in closed operations
+                    if (oldOperations == null)
                     {
-                        //let's search in closed operations
-                        oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray();
+                        lock (DbLock)
+                            oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray();
                     }
+                     
                     var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
-                    //dispose the operations that we dont't need anymore
-                    foreach (var oper in oldOperations.Where(oo => oo != oldOp))
-                        oper.Dispose();
-                      
+
                     if (oldOp != null)
                     {
-                        Logger.Info($"{Time} - New trade for 'old' operation {activeOp}: {trade.ToString()}");
-                        oldOp.AddTrade(trade);
+                        operationsResumed.Add(oldOp); 
+                        if (oldOp.AddTrade(trade))
+                            Logger.Info($"{Time} - New trade for 'old' operation {activeOp}: {trade.ToString()}");
                         //check if it got resumed by this new trade
                         if (!oldOp.IsClosed)
                         {
@@ -197,10 +198,13 @@ namespace SharpTrader.AlgoFramework
                         }
                     }
                     else
-                        Logger.Trace($"{Time} - New trade {trade.ToString()} without any associated operation");
-
+                        Logger.Trace($"{Time} - New trade {trade.ToString()} without any associated operation"); 
                 }
             }
+            //dispose the operations that we didn't use  
+            if (oldOperations != null)
+                foreach (var oper in oldOperations.Where(oo => !operationsResumed.Contains(oo)))
+                    oper.Dispose();
             await OnUpdate(slice);
 
             // get signals 
@@ -217,7 +221,7 @@ namespace SharpTrader.AlgoFramework
                 List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
                 foreach (var op in operationsToClose)
                 {
-                    if(op.AmountInvested > 0)
+                    if (op.AmountInvested > 0)
                         Logger.Info("{0} - Closing operation {1}.", Time, op.ToString("c"));
                     else
                         Logger.Debug("{0} - Closing operation {1}.", Time, op.ToString("c"));
