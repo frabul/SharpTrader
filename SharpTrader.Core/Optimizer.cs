@@ -23,7 +23,7 @@ namespace SharpTrader
         }
 
         private string SessionFile => $"OptimizerSession_{SessionName}.json";
-        private string SpaceFile => $"OptimizerSession_{SessionName}_space.json";
+        private string SpaceFile => $"OptimizationSapce_{SessionName}.json";
 
         private OptimizerSession Session;
         private NLog.Logger Logger;

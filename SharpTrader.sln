@@ -9,8 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChartDataMiner", "ChartData
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{5B143371-C50B-4282-B999-43579B6B760A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestConsole", "Tests\TestConsole\TestConsole.csproj", "{5CBB7EB1-67C8-4706-9D9E-B961DD43E746}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Tests", "Tests\SharpTrader.Tests\SharpTrader.Tests.csproj", "{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Plotting", "SharpTrader.Plotting\SharpTrader.Plotting.csproj", "{6F67B4AB-53FB-4665-9116-C14F9256C0FA}"
@@ -22,6 +20,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backtester", "Backtester\Backtester.csproj", "{86382442-47C1-464D-9D73-FA8E1A01223D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BackTestOptimizer", "BackTestOptimizer\BackTestOptimizer.csproj", "{8AE7F5A9-2FFF-4E39-8508-B996B2D913C1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestConsole", "Tests\TestConsole\TestConsole.csproj", "{12FB46BA-BAB9-4005-9558-6A8AAE007605}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -37,10 +37,6 @@ Global
 		{6F2E907A-AF04-4D15-AE3C-9F34675CD039}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6F2E907A-AF04-4D15-AE3C-9F34675CD039}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6F2E907A-AF04-4D15-AE3C-9F34675CD039}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5CBB7EB1-67C8-4706-9D9E-B961DD43E746}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5CBB7EB1-67C8-4706-9D9E-B961DD43E746}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5CBB7EB1-67C8-4706-9D9E-B961DD43E746}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5CBB7EB1-67C8-4706-9D9E-B961DD43E746}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -65,13 +61,17 @@ Global
 		{8AE7F5A9-2FFF-4E39-8508-B996B2D913C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8AE7F5A9-2FFF-4E39-8508-B996B2D913C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8AE7F5A9-2FFF-4E39-8508-B996B2D913C1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{12FB46BA-BAB9-4005-9558-6A8AAE007605}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{12FB46BA-BAB9-4005-9558-6A8AAE007605}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{12FB46BA-BAB9-4005-9558-6A8AAE007605}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{12FB46BA-BAB9-4005-9558-6A8AAE007605}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{5CBB7EB1-67C8-4706-9D9E-B961DD43E746} = {5B143371-C50B-4282-B999-43579B6B760A}
 		{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323} = {5B143371-C50B-4282-B999-43579B6B760A}
+		{12FB46BA-BAB9-4005-9558-6A8AAE007605} = {5B143371-C50B-4282-B999-43579B6B760A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {1DD8B8D0-E23B-4A4D-9EA0-3E8D0B4591BB}

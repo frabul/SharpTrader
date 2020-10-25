@@ -76,10 +76,8 @@ namespace SharpTrader.Storage
                 //Debug.Assert(sdata.Ticks.Count > 0);
                 //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
                 meta.AddBars(candles);
-            } 
+            }
         }
-
-     
 
         internal void UpdateFirstKnownData(SymbolHistoryId info, ITradeBar firstAvailable)
         {
@@ -100,7 +98,61 @@ namespace SharpTrader.Storage
                 Update1();
                 Update2();
             }
+
             SymbolsMetaData = DbSymbolsMetaData.FindAll().ToDictionary(md => md.Id);
+            ValidateSymbolsMetadata();
+        }
+
+        private void ValidateSymbolsMetadata()
+        {
+            foreach (var symData in SymbolsMetaData.Values.ToArray())
+            {
+                bool ok = true;
+                foreach (var chunk in symData.Chunks.ToArray())
+                {
+                    var newPath = Path.GetFileName(chunk.Key); 
+                    //check that file exists
+                    if (File.Exists(newPath))
+                    {
+                        var fileInfo = new FileInfo(newPath);
+                        //check that file size is plausible
+                        if (fileInfo.Length > 3e6)
+                        {
+                            Logger.Error("Error: history file {0} has anomalous size. It will be deleted", newPath);
+                            ok = false;
+                            File.Delete(newPath);
+                            symData.Chunks.Remove(chunk);
+                        }
+                    }
+                    else
+                    {
+                        symData.Chunks.Remove(chunk);
+                        ok = false;
+                        Logger.Error("Error: history file {0} does not exist.", newPath);
+                    }
+                }
+                //rebuild history if needed
+                if (ok == false)
+                {
+                    Logger.Info("Rebuilding corrupted {0} history", symData.Id);
+                    symData.ClearView();
+                    var newSymData = new SymbolHistoryMetaDataInternal(symData.HistoryId);
+                    foreach (var chunk in symData.Chunks)
+                    {
+                        var chunkData = HistoryChunk.Load(chunk.Key);
+                        newSymData.AddBars(chunkData.Ticks);
+                    }
+                    //save data
+                    newSymData.Save(this.DataDir);
+                    //update dictionary
+                    SymbolsMetaData[newSymData.Id] = newSymData;
+                    //update db
+                    DbSymbolsMetaData.Upsert(newSymData);
+                    newSymData.Validated = true;
+
+                }
+                symData.Validated = true; 
+            }
         }
 
         private void Update1()
@@ -136,6 +188,7 @@ namespace SharpTrader.Storage
 
 
         }
+
         private void Update2()
         {
             var data = new Dictionary<string, SymbolHistoryMetaDataInternal>();
@@ -155,27 +208,19 @@ namespace SharpTrader.Storage
                 HistoryChunk fileData = HistoryChunk.Load(filePath);
                 if (fileData.Ticks.Count > 0)
                 {
-                    symData.UpdateBars(fileData.Ticks.First());
-                    symData.UpdateBars(fileData.Ticks.Last());
+                    symData.UpdateLastBar(fileData.Ticks.First());
+                    symData.UpdateLastBar(fileData.Ticks.Last());
                 }
             }
-          
+
             var allData = data.Values.ToArray();
             DbSymbolsMetaData.InsertBulk(allData);
             Db.Checkpoint();
         }
-
-
+      
         public SymbolHistoryId[] ListAvailableData()
         {
             return SymbolsMetaData.Values.Select(md => md.HistoryId).ToArray();
-        }
-
-        public void SaveAll()
-        {
-            lock (SymbolsMetaData)
-                foreach (var sdata in this.SymbolsMetaData.Values)
-                    Save(sdata);
         }
 
         public void SaveAndClose(SymbolHistoryId info, bool save = true)
@@ -186,7 +231,7 @@ namespace SharpTrader.Storage
 
             if (save)
                 Save(meta);
-            meta.View = null;
+            meta.ClearView();
         }
 
         private void Save(SymbolHistoryMetaDataInternal sdata)
@@ -194,7 +239,7 @@ namespace SharpTrader.Storage
             lock (DbSymbolsMetaData)
             {
                 sdata.Save(DataDir);
-                DbSymbolsMetaData.Upsert(sdata); 
+                DbSymbolsMetaData.Upsert(sdata);
             }
         }
 
@@ -217,13 +262,13 @@ namespace SharpTrader.Storage
             }
         }
 
-        public void FixDatabase(Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
+        public void DownloadMissingData(Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
         {
             foreach (var fi in ListAvailableData())
-                FixSymbolHistory(fi, DateTime.MinValue, DateTime.MaxValue, downloadCandlesCallback);
+                DownloadMissingData(fi, DateTime.MinValue, DateTime.MaxValue, downloadCandlesCallback);
         }
 
-        public void FixSymbolHistory(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime, Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
+        public void DownloadMissingData(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime, Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
         {
             int duplicates = 0;
             int matchErrors = 0;
@@ -300,9 +345,5 @@ namespace SharpTrader.Storage
                 }
             }
         }
-
-
-
-
     }
 }

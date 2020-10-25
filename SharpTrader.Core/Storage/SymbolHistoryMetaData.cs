@@ -37,9 +37,10 @@ namespace SharpTrader.Storage
         private Logger Logger = LogManager.GetCurrentClassLogger();
 
         [BsonIgnore]
-        internal HistoryView View { get; set; }
+        internal HistoryView View { get; private set; }
 
         public HashSet<HistoryChunkId> Chunks { get; set; }
+        public bool Validated { get; internal set; } = false;
 
         public SymbolHistoryMetaDataInternal(SymbolHistoryId historyId)
         {
@@ -59,7 +60,7 @@ namespace SharpTrader.Storage
 
         }
 
-        public void UpdateBars(ITradeBar bar)
+        public void UpdateLastBar(ITradeBar bar)
         {
             if (LastBar == null || this.LastBar.Time < bar.Time)
                 this.LastBar = bar;
@@ -71,12 +72,10 @@ namespace SharpTrader.Storage
         public void AddBars(IEnumerable<Candlestick> candles)
         {
             lock (this.Locker)
-            {
-                var data = this.View;
+            { 
                 foreach (var c in candles)
                 {
-                    this.UpdateBars(c);
-                    data.UpdateBars(c);
+                    this.UpdateLastBar(c); 
                     View.AddBar(c);
                 }
             }
@@ -87,7 +86,7 @@ namespace SharpTrader.Storage
             lock (this.Locker)
             {
                 //save the view
-                if(this.View != null)
+                if (this.View != null)
                 {
                     this.View.Save_Protobuf(dataDir);
 
@@ -95,7 +94,7 @@ namespace SharpTrader.Storage
                     foreach (var chunk in View.LoadedFiles)
                         this.Chunks.Add(chunk);
                 }
-                
+
             }
         }
 
@@ -148,5 +147,9 @@ namespace SharpTrader.Storage
 
         }
 
+        public void ClearView()
+        {
+            View = null;
+        }
     }
 }

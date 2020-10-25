@@ -12,11 +12,20 @@ namespace SharpTrader.Tests
         private const string MarketName = "Binance";
         private TradeBarsRepository HistoryDB;
 
-        private const string DataDir = ".\\Data\\";
+        private const string DataDir = @"D:\ProgettiBck\SharpTraderBots\Bin\Data";
 
+        public static void Run()
+        {
+            var test = new TestHistoryDB();
+            test.Test();
+        }
         public void Test()
         {
             HistoryDB = new TradeBarsRepository(DataDir);
+
+
+            Console.WriteLine("Db loaded, press a key to continue");
+            Console.ReadLine();
 
             foreach (var histInfo in HistoryDB.ListAvailableData())
             {
