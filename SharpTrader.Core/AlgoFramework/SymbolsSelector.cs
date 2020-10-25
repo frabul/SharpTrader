@@ -34,7 +34,7 @@ namespace SharpTrader.AlgoFramework
                 var removedSymbols =
                     (from sym in _SymbolsSelected.Values where !filtered.Any(s => s.Key == sym.Key) select sym)
                     .ToArray();
-                var added = from sym in filtered where !_SymbolsSelected.ContainsKey(sym.Key) select sym;
+                var added = (from sym in filtered where !_SymbolsSelected.ContainsKey(sym.Key) select sym).ToArray();
 
                 //remove unused symbols
                 foreach (var sym in removedSymbols)
@@ -45,9 +45,11 @@ namespace SharpTrader.AlgoFramework
                 //add new symbols
                 foreach (var sym in added)
                 {
-                    ISymbolFeed feed = await Algo.GetSymbolFeed(sym.Key);
+                    ISymbolFeed feed = await Algo.GetSymbolFeed(sym.Key); 
+                    _SymbolsSelected.Add(feed.Symbol.Key, feed.Symbol as SymbolInfo);
                 }
-                return new SelectedSymbolsChanges(added.ToArray(), removedSymbols.ToArray());
+                var retVal = new SelectedSymbolsChanges(added.ToArray(), removedSymbols.ToArray());
+                return retVal;
             }
 
             return SelectedSymbolsChanges.None;

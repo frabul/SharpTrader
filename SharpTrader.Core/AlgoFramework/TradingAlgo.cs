@@ -119,24 +119,30 @@ namespace SharpTrader.AlgoFramework
             if (changes != SelectedSymbolsChanges.None)
             {
                 var selectedForOperationsActive = this.ActiveOperations.Select(ao => ao.Symbol).GroupBy(ao => ao.Key).Select(g => g.First()).ToList();
-                //release feeds of unused symbols
-                var removedSymbolsWithoutActiveOperations = changes.RemovedSymbols.Where(rs => !selectedForOperationsActive.Any(aos => aos.Key == rs.Key));
-                foreach (var sym in removedSymbolsWithoutActiveOperations)
+                //release feeds of unused symbols 
+                foreach (var sym in changes.RemovedSymbols)
                 {
                     SymbolData symbolData = GetSymbolData(sym);
                     symbolData.IsSelectedForTrading = false;
-                    symbolData.Feed.OnData -= Feed_OnData;
-                    this.ReleaseFeed(symbolData.Feed);
-                    symbolData.Feed = null;
-                }
+                    //if it doesn't have acrive operations
+                    if(!selectedForOperationsActive.Any(aos => aos.Key == sym.Key))
+                    { 
+                        if (symbolData.Feed != null)
+                        {
+                            symbolData.Feed.OnData -= Feed_OnData;
+                            this.ReleaseFeed(symbolData.Feed);
+                            symbolData.Feed = null;
+                        }
+                    }
+                } 
 
                 //add feeds for added symbols and those that have open operations
                 foreach (var sym in changes.AddedSymbols)
                 {
                     SymbolData symbolData = GetSymbolData(sym);
-                    symbolData.IsSelectedForTrading = true;
-
+                    symbolData.IsSelectedForTrading = true; 
                 }
+
                 foreach (var sym in changes.AddedSymbols.Concat(selectedForOperationsActive))
                 {
                     SymbolData symbolData = GetSymbolData(sym);
@@ -171,7 +177,7 @@ namespace SharpTrader.AlgoFramework
                 var activeOp = symData.ActiveOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
                 if (activeOp != null)
                 {
-                    if(activeOp.AddTrade(trade))
+                    if (activeOp.AddTrade(trade))
                         Logger.Info($"{Time} - New trade for operation {activeOp.ToString()}: {trade.ToString()}");
                 }
                 else
@@ -182,12 +188,12 @@ namespace SharpTrader.AlgoFramework
                         lock (DbLock)
                             oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray();
                     }
-                     
+
                     var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
 
                     if (oldOp != null)
                     {
-                        operationsResumed.Add(oldOp); 
+                        operationsResumed.Add(oldOp);
                         if (oldOp.AddTrade(trade))
                             Logger.Info($"{Time} - New trade for 'old' operation {activeOp}: {trade.ToString()}");
                         //check if it got resumed by this new trade
@@ -198,7 +204,7 @@ namespace SharpTrader.AlgoFramework
                         }
                     }
                     else
-                        Logger.Trace($"{Time} - New trade {trade.ToString()} without any associated operation"); 
+                        Logger.Trace($"{Time} - New trade {trade.ToString()} without any associated operation");
                 }
             }
             //dispose the operations that we didn't use  
