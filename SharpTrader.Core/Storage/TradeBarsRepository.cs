@@ -110,7 +110,8 @@ namespace SharpTrader.Storage
                 bool ok = true;
                 foreach (var chunk in symData.Chunks.ToArray())
                 {
-                    var newPath = Path.GetFileName(chunk.Key); 
+                    var newPath = Path.GetFileName( chunk.FilePath);
+                    newPath = Path.Combine(DataDir, newPath);
                     //check that file exists
                     if (File.Exists(newPath))
                     {
@@ -170,9 +171,7 @@ namespace SharpTrader.Storage
                                                }
                                 );
                 foreach (var group in filesGrouped)
-                {
-                    if (group.Count() > 1)
-                    { }
+                { 
                     var info = HistoryChunkId.Parse(group.First());
                     var histMetadata = new SymbolHistoryMetaDataInternal(info.HistoryId);
                     foreach (var fpath in group)
