@@ -125,9 +125,10 @@ namespace SharpTrader.AlgoFramework
                     //get gain percent
                     if (op.Type == OperationType.BuyThenSell)
                     {
-                        var sl1 = Algo.SymbolsData[op.Symbol.Key].Feed.Bid < stopLossPrice;
-                        var sl2 = mySymData.BaseLevel == null || Algo.SymbolsData[op.Symbol.Key].Feed.Bid < mySymData.BaseLevel.Value;
-                        if (sl1 || sl2)
+                        var stopLossReached = Algo.SymbolsData[op.Symbol.Key].Feed.Bid < stopLossPrice;
+                        if (mySymData.BaseLevel != null) //BaseLevel is null if it is disabled by setting length to 0
+                            stopLossReached |= Algo.SymbolsData[op.Symbol.Key].Feed.Bid < mySymData.BaseLevel.Value;
+                        if (stopLossReached)
                             op.RiskManaged = true;
                     }
                     else if (op.Type == OperationType.SellThenBuy)
