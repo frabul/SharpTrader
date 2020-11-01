@@ -16,8 +16,9 @@ namespace SharpTrader.AlgoFramework
         //todo avoid problems due to unsynched info about trades
         //todo ogni volta che viene cancellato un ordine si deve aspettare del tempo prima di crearne uno nuovo
         NLog.Logger Logger;
-
         public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(5);
+        public TimeSpan DelayAfterCloseFailed = TimeSpan.FromSeconds(60);
+        public TimeSpan CloseQueueTime = TimeSpan.FromMinutes(1);
         public class MyOperationData : IChangeTracking
         {
             private volatile bool _IsChanged = true;
@@ -147,7 +148,6 @@ namespace SharpTrader.AlgoFramework
             return myOpData;
         }
 
-
         private void InitOpTasks(Operation op, MyOperationData myOpData)
         {
             if (myOpData.Initialized)
@@ -242,7 +242,7 @@ namespace SharpTrader.AlgoFramework
             else
             {
                 //retry in 30 seconds
-                self.Time = Algo.Time.AddSeconds(30);
+                self.Time = Algo.Time + DelayAfterCloseFailed;
             }
             return false;
         }
@@ -254,23 +254,23 @@ namespace SharpTrader.AlgoFramework
             if (op.AmountRemaining > 0)
             {
                 //immediatly liquidate everything with a market order 
-                var lr = await Algo.TryLiquidateOperation(op, self.LiquidateReason); 
-                if (lr.order != null)
-                { 
-                    self.myOpData.CurrentExitOrder = lr.order;
-                    await CloseQueueAsync(op, TimeSpan.FromMinutes(2));
-                    terminate = true; 
+                var liquidationResult = await Algo.TryLiquidateOperation(op, self.LiquidateReason);
+                if (liquidationResult.order != null)
+                {
+                    self.myOpData.CurrentExitOrder = liquidationResult.order;
+                    await CloseQueueAsync(op, CloseQueueTime);
+                    terminate = true;
                 }
-                else if(lr.amountRemainingLow)
+                else if (liquidationResult.amountRemainingLow)
                 {
                     Logger.Info($"Queue for close {op.ToString("c")} because amount remaining is too low");
-                    await this.CloseQueueAsync(op, TimeSpan.FromMinutes(2));
+                    await this.CloseQueueAsync(op, CloseQueueTime);
                     terminate = true;
                 }
             }
             else
             {
-                await CloseQueueAsync(op, TimeSpan.FromMinutes(2.5));
+                await CloseQueueAsync(op, CloseQueueTime);
                 terminate = true;
             }
             return terminate;
@@ -305,7 +305,7 @@ namespace SharpTrader.AlgoFramework
 
                     //put in close queue
                     Logger.Debug($"Queue for close {self.Op.ToString("c")}\n    because amount remaining is 0 and entry expired.");
-                    await CloseQueueAsync(self.Op, TimeSpan.FromMinutes(2.5));
+                    await CloseQueueAsync(self.Op, CloseQueueTime);
                 }
                 else
                 {
@@ -326,7 +326,9 @@ namespace SharpTrader.AlgoFramework
                 //set next step to close orders and liquidate operation
                 self.Next = new DeferredTaskDelegate(CloseOrdersAndLiquidate);
                 self.LiquidateReason = " exit deadtime elapsed.";
-                return await self.Next.Invoke(self); //also call next step immediatly
+                //also call next step immediatly only during backtesting
+                if (Algo.BackTesting)
+                    return await self.Next.Invoke(self);
             }
             return false;
         }
@@ -362,7 +364,7 @@ namespace SharpTrader.AlgoFramework
                             if (adj.amount > 0)
                             {
                                 //Debug.Assert(adj.amount == op.AmountRemaining);
-                                Logger.Debug($"{Algo.Time} - Setting EXIT order for oper {op} - amount:{adj.amount} - price: {adj.price}");
+                                Logger.Info($"{Algo.Time} - Setting EXIT order for oper {op} - amount:{adj.amount} - price: {adj.price}");
                                 var request =
                                     await Algo.Market.LimitOrderAsync(
                                         op.Symbol.Key, op.ExitTradeDirection, adj.amount, adj.price, op.GetNewOrderId());
@@ -419,15 +421,16 @@ namespace SharpTrader.AlgoFramework
                     {
                         myOpData.CurrentExitOrder = null;
                         self.Next = OpenExitOrder;
-                        self.Time = Algo.Time + DelayAfterOrderClosed;
-                        //if (Algo.BackTesting)
-                        //we want to reopen exit order immediatly
-                        await self.Next(self);
+                        // if backtesting we want to reopen exit order immediatly
+                        if (Algo.BackTesting)
+                            await self.Next(self);
+                        else
+                            self.Time = Algo.Time + DelayAfterOrderClosed;
                     }
                     else
                     {
                         //retry in 20 seconds
-                        self.Time = Algo.Time + TimeSpan.FromSeconds(20);
+                        self.Time = Algo.Time + TimeSpan.FromSeconds(19);
                     }
 
                 }
@@ -462,13 +465,13 @@ namespace SharpTrader.AlgoFramework
             {
                 //--- open a new entry if needed ---
                 var entryNear = op.Signal.Kind == SignalKind.Buy ?
-                    ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / (decimal)symData.Feed.Bid < EntryNearThreshold :
-                    (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry < EntryNearThreshold;
+                    ((decimal)symData.Feed.Ask - op.Signal.PriceEntry) / op.Signal.PriceEntry < EntryNearThreshold :
+                    (op.Signal.PriceEntry - (decimal)symData.Feed.Bid) / op.Signal.PriceEntry < EntryNearThreshold;
 
                 if (entryNear && !Algo.EntriesSuspended)
                 {
                     var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
-                    var stillToBuy = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed) - op.AmountInvested;
+                    var stillToBuy = originalAmount - op.AmountInvested;
                     if (stillToBuy / originalAmount > 0.2m)
                     {
                         var adjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(stillToBuy, op.Signal.PriceEntry);
@@ -513,8 +516,8 @@ namespace SharpTrader.AlgoFramework
             //  open entry if we got near the target price
             //  cancel entry if we are too far  
             var entryDistant = op.Signal.Kind == SignalKind.Buy ?
-              ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / (decimal)symData.Feed.Bid > EntryDistantThreshold :
-              (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / (decimal)symData.Feed.Ask > EntryDistantThreshold;
+              ((decimal)symData.Feed.Ask - op.Signal.PriceEntry) / op.Signal.PriceEntry > EntryDistantThreshold :
+              (op.Signal.PriceEntry - (decimal)symData.Feed.Bid) / op.Signal.PriceEntry > EntryDistantThreshold;
 
             if (myOpData.CurrentEntryOrder != null)
             {
@@ -524,9 +527,9 @@ namespace SharpTrader.AlgoFramework
                 var badPrice = Math.Abs(myOpData.CurrentEntryOrder.Price - priceAdjusted.price) / priceAdjusted.price > 0.006m;
                 var entryExpired = op.IsEntryExpired(Algo.Time);
 
-                if (entryDistant || badPrice || entryExpired) //N.B. also when signal entry is not valid we keep monitoring as it could be updated
+                //N.B. also when signal entry is not valid we keep monitoring as it could be updated
+                if (entryDistant || badPrice || entryExpired)
                 {
-                    //if the price or amount is wrong we try closing the order 
                     var orderClosed = await CloseEntryOrder(op, myOpData);
                     if (orderClosed)
                     {
