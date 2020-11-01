@@ -140,8 +140,7 @@ namespace SharpTrader.AlgoFramework
         }
 
         public override void RegisterSerializationHandlers(BsonMapper mapper)
-        {
-            mapper.RegisterType<MyOperationData>(o => new BsonValue(), bson => null);
+        { 
         }
 
         class MyOperationData

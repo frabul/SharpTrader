@@ -1133,8 +1133,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         public void RegisterSerializationHandlers(BsonMapper mapper)
         {
-            BsonMapper defaultMapper = new BsonMapper();
-            //this implementation is only for testing as the simulator doesn't save it's state
+            BsonMapper defaultMapper = new BsonMapper(); 
             Order BsonToOrder(BsonValue value)
             {
                 lock (LockOrdersTrades)

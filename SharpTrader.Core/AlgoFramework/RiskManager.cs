@@ -15,12 +15,9 @@ namespace SharpTrader.AlgoFramework
         {
             Algo = algo;
             return OnInitialize();
-        }
+        } 
 
-        internal virtual JToken GetSerializationData(object riskManagerData) { throw new NotImplementedException(); }
-        internal virtual object DeserializeOperationData(JToken jToken) { throw new NotImplementedException(); }
-
-        public abstract void RegisterSerializationHandlers(BsonMapper mapper);
+        public virtual void RegisterSerializationHandlers(BsonMapper mapper) { }
          
         /// <summary>
         /// Gets a state object that should be saved and restored on restarts

@@ -17,11 +17,7 @@ namespace SharpTrader.AlgoFramework
             Logger = NLog.LogManager.GetCurrentClassLogger();
             StopLoss = stopLoss;
         }
-
-        public override void RegisterSerializationHandlers(BsonMapper mapper)
-        {
-            mapper.RegisterType<RMData>(o => mapper.Serialize(o), bson => mapper.Deserialize<RMData>(bson));
-        }
+ 
         protected override Task OnInitialize()
         {
             return Task.CompletedTask;

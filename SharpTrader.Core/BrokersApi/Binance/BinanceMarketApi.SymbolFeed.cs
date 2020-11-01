@@ -251,7 +251,7 @@ namespace SharpTrader.BrokersApi.Binance
                 if (!Semaphores.ContainsKey(this.Symbol.Key))
                     Semaphores.Add(this.Symbol, new SemaphoreSlim(1, 1));
                 return Semaphores[this.Symbol];
-            } 
+            }
         }
 
         decimal NearestRoundHigher(decimal x, decimal precision)
@@ -274,8 +274,9 @@ namespace SharpTrader.BrokersApi.Binance
         }
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal amount, decimal price)
         {
-
+            //round price to it's maximum precision
             price = NearestRoundHigher(price, this.Symbol.PricePrecision);
+
             if (amount * price < Symbol.MinNotional)
                 amount = Symbol.MinNotional / price;
 
@@ -284,21 +285,27 @@ namespace SharpTrader.BrokersApi.Binance
 
             amount = NearestRoundHigher(amount, Symbol.LotSizeStep);
 
+            //check min notional ( abort if not met )
+            if (amount * price < Symbol.MinNotional)
+                amount = 0;
 
             return (price / 1.00000000000m, amount / 1.000000000000m);
         }
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal amount, decimal price)
         {
 
+            //round price to it's maximum precision
             price = NearestRoundLower(price, this.Symbol.PricePrecision);
-            if (amount * price < Symbol.MinNotional)
-                amount = 0;
-
+            //if amount is lower than min lot size then abort
+            //else round amount
             if (amount < Symbol.MinLotSize)
                 amount = 0;
+            else
+                amount = NearestRoundLower(amount, Symbol.LotSizeStep);
 
-            amount = NearestRoundLower(amount, Symbol.LotSizeStep);
-
+            //check min notional ( abort if not met )
+            if (amount * price < Symbol.MinNotional)
+                amount = 0;
             return (price / 1.00000000000m, amount / 1.000000000000m);
         }
     }

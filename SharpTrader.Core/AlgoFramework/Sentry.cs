@@ -21,7 +21,7 @@ namespace SharpTrader.AlgoFramework
             return OnInitialize();
         }
          
-        public abstract void RegisterSerializationHandlers(BsonMapper mapper);
+        public virtual void RegisterSerializationHandlers(BsonMapper mapper) { }
 
         /// <summary>
         /// Gets a state object that should be saved and restored on restarts
