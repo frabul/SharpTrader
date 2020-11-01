@@ -7,6 +7,6 @@ namespace SharpTrader
     /// </summary>
     public interface IObjectSerializationProvider
     {
-        void RegisterSerializationHandlers(BsonMapper mapper);
+        void RegisterCustomSerializers(BsonMapper mapper);
     }
 }

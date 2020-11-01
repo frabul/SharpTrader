@@ -435,7 +435,7 @@ namespace SharpTrader.MarketSimulator
         private List<Trade> DeserializedTrades = new List<Trade>();
         private Action<Market, SymbolFeed> initializeDataSourceCallBack;
 
-        public void RegisterSerializationHandlers(BsonMapper mapper)
+        public void RegisterCustomSerializers(BsonMapper mapper)
         {
             //this implementation is only for testing as the simulator doesn't save it's state 
             BsonMapper defaultMapper = new BsonMapper();

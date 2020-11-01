@@ -21,7 +21,7 @@ namespace SharpTrader.AlgoFramework
         
         public abstract decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset);
            
-        public abstract void RegisterSerializationHandlers(BsonMapper mapper);
+        public virtual void RegisterCustomSerializers(BsonMapper mapper) { }
 
         /// <summary>
         /// Gets a state object that should be saved and restored on restarts

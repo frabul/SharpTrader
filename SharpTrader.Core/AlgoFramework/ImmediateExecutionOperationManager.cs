@@ -139,10 +139,7 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-        public override void RegisterSerializationHandlers(BsonMapper mapper)
-        { 
-        }
-
+       
         class MyOperationData
         {
             public IOrder LastEntryOrder;

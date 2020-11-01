@@ -27,7 +27,7 @@ namespace SharpTrader.AlgoFramework
         /// </summary> 
         public virtual void RestoreState(object state) { }
 
-        public virtual void RegisterSerializationHandlers(BsonMapper mapper) { }
+        public virtual void RegisterCustomSerializers(BsonMapper mapper) { }
     }
 
 }

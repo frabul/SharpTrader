@@ -85,11 +85,6 @@ namespace SharpTrader.AlgoFramework
             EntryNearThreshold = entryNearThreshold;
         }
 
-        public override void RegisterSerializationHandlers(BsonMapper mapper)
-        {
-
-        }
-
         public override Task CancelAllOrders(Operation op)
         {
             var myOpData = GetMyOperationData(op);

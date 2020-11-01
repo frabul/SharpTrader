@@ -1131,7 +1131,7 @@ namespace SharpTrader.BrokersApi.Binance
             throw new NotImplementedException();
         }
 
-        public void RegisterSerializationHandlers(BsonMapper mapper)
+        public void RegisterCustomSerializers(BsonMapper mapper)
         {
             BsonMapper defaultMapper = new BsonMapper(); 
             Order BsonToOrder(BsonValue value)

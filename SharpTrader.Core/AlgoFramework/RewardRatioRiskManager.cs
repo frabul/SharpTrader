@@ -59,12 +59,6 @@ namespace SharpTrader.AlgoFramework
         public TimeSpan BaseLevelTimespan { get; set; } = TimeSpan.Zero;
         public bool TrailingStopLoss { get; set; } = false;
 
-
-        public override void RegisterSerializationHandlers(BsonMapper mapper)
-        {
-        }
-
-
         private MySymbolData GetData(SymbolData symData)
         {
             MySymbolData mydata = symData.RiskManagerData as MySymbolData;
@@ -139,10 +133,10 @@ namespace SharpTrader.AlgoFramework
                 }
 
                 if (op.RiskManaged && !(op.IsClosed || op.IsClosing))
-                {  
+                {
                     //--- liquidate operation funds ---
                     var liquidationResult = await Algo.TryLiquidateOperation(op, "stop loss reached");
-                 
+
                     if (liquidationResult.order != null)
                     {
                         //expect trade that will close the operation

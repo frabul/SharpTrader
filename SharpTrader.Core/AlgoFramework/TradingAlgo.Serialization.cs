@@ -84,10 +84,10 @@ namespace SharpTrader.AlgoFramework
         {
             DbMapper = new BsonMapperCustom();
 
-            Market.RegisterSerializationHandlers(DbMapper);
-            this.Executor?.RegisterSerializationHandlers(DbMapper);
-            this.RiskManager?.RegisterSerializationHandlers(DbMapper);
-            this.Sentry?.RegisterSerializationHandlers(DbMapper);
+            Market.RegisterCustomSerializers(DbMapper);
+            this.Executor?.RegisterCustomSerializers(DbMapper);
+            this.RiskManager?.RegisterCustomSerializers(DbMapper);
+            this.Sentry?.RegisterCustomSerializers(DbMapper);
 
             //---- add mapper for SymbolInfo
             DbMapper.Entity<SymbolInfo>().Ctor(

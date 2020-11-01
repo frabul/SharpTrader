@@ -99,7 +99,7 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
             throw new NotImplementedException();
         }
 
-        public void RegisterSerializationHandlers(BsonMapper mapper)
+        public void RegisterCustomSerializers(BsonMapper mapper)
         {
             throw new NotImplementedException();
         }
