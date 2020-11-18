@@ -20,8 +20,8 @@ namespace SharpTrader
             public string SessionName = "Backetester";
             public string DataDir { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
             public string HistoryDb { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
-            public bool PlottingEnabled = false;
-            public bool PlotResults = false;
+            public bool PlottingEnabled { get; set; } = false;
+            public bool PlotResults { get; set; } = false;
             public string AlgoClass;
             public DateTime StartTime { get; set; }
             public DateTime EndTime { get; set; }

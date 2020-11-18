@@ -97,11 +97,23 @@ namespace SharpTrader.AlgoFramework
 
         public override async Task Update(TimeSlice slice)
         {
-            foreach (var symSlice in Algo.SymbolsData.Values)
+            Random rand = new Random(); 
+            var symbols = Algo.SymbolsData.Values.OrderBy(el => rand.NextDouble()).ToArray();
+            //randomize the order of completion
+            foreach (var symSlice in symbols)
             {
-                //if we got a new signal let
-                await ManageSymbol(slice, symSlice);
+                //if we got a new signal let 
+                try
+                {
+                    await ManageSymbol(slice, symSlice); 
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Exception during MarketMakerOperationManager.Update: {0}, symbol {1}", ex.Message, symSlice.Symbol.Key);
+                } 
             }
+
+
         }
 
         public override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
