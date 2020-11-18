@@ -108,10 +108,13 @@ namespace SharpTrader.Storage
             foreach (var symData in SymbolsMetaData.Values.ToArray())
             {
                 bool ok = true;
-                foreach (var chunk in symData.Chunks.ToArray())
+                var chunks = symData.Chunks.ToList();
+                symData.Chunks.Clear();
+                foreach (var chunk in chunks)
                 {
-                    var newPath = Path.GetFileName( chunk.FilePath);
-                    newPath = Path.Combine(DataDir, newPath);
+                    bool canAddChunk = true;
+                    var newPath = Path.GetFileName(chunk.FilePath);
+                    newPath = Path.Combine(DataDir, newPath); 
                     //check that file exists
                     if (File.Exists(newPath))
                     {
@@ -121,16 +124,18 @@ namespace SharpTrader.Storage
                         {
                             Logger.Error("Error: history file {0} has anomalous size. It will be deleted", newPath);
                             ok = false;
-                            File.Delete(newPath);
-                            symData.Chunks.Remove(chunk);
+                            File.Delete(newPath); 
+                            canAddChunk = false;
                         }
                     }
                     else
                     {
-                        symData.Chunks.Remove(chunk);
+                        canAddChunk = false;
                         ok = false;
                         Logger.Error("Error: history file {0} does not exist.", newPath);
                     }
+                    if(canAddChunk)
+                        symData.Chunks.Add(new HistoryChunkId(DataDir, chunk.HistoryId, chunk.StartDate));
                 }
                 //rebuild history if needed
                 if (ok == false)
@@ -140,7 +145,7 @@ namespace SharpTrader.Storage
                     var newSymData = new SymbolHistoryMetaDataInternal(symData.HistoryId);
                     foreach (var chunk in symData.Chunks)
                     {
-                        var chunkData = HistoryChunk.Load(chunk.Key);
+                        var chunkData = HistoryChunk.Load(chunk.FilePath);
                         newSymData.AddBars(chunkData.Ticks);
                     }
                     //save data
@@ -152,7 +157,7 @@ namespace SharpTrader.Storage
                     newSymData.Validated = true;
 
                 }
-                symData.Validated = true; 
+                symData.Validated = true;
             }
         }
 
@@ -171,7 +176,7 @@ namespace SharpTrader.Storage
                                                }
                                 );
                 foreach (var group in filesGrouped)
-                { 
+                {
                     var info = HistoryChunkId.Parse(group.First());
                     var histMetadata = new SymbolHistoryMetaDataInternal(info.HistoryId);
                     foreach (var fpath in group)
@@ -216,7 +221,7 @@ namespace SharpTrader.Storage
             DbSymbolsMetaData.InsertBulk(allData);
             Db.Checkpoint();
         }
-      
+
         public SymbolHistoryId[] ListAvailableData()
         {
             return SymbolsMetaData.Values.Select(md => md.HistoryId).ToArray();
