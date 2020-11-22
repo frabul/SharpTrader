@@ -9,14 +9,15 @@ namespace SharpTrader.Storage
     [ProtoContract]
     public class HistoryChunkId
     {
+        private DateTime startDate;
+
         [ProtoMember(1)]
         public SymbolHistoryId HistoryId { get; private set; }
 
         [ProtoMember(2)]
-        public DateTime StartDate { get; private set; }
+        public DateTime StartDate { get => startDate; private set => startDate = value.ToUniversalTime(); }
 
-        [ProtoMember(3)]
-        public string FilePath { get; private set; }
+        public string GetFilePath(string dataDir) => Path.Combine(dataDir, Key + ".bin2");
 
         public string Key => HistoryId.Key + $"_{StartDate:yyyyMM}";
 
@@ -28,11 +29,10 @@ namespace SharpTrader.Storage
 
         }
 
-        public HistoryChunkId(string dataDir, SymbolHistoryId id, DateTime date)
-        { 
+        public HistoryChunkId(SymbolHistoryId id, DateTime date)
+        {
             HistoryId = id;
             this.StartDate = date;
-            FilePath = Path.Combine(dataDir, this.Key + ".bin2");
         }
 
         public override int GetHashCode()
@@ -50,10 +50,9 @@ namespace SharpTrader.Storage
                 string key = fileName.Substring(0, lastDivisor);
                 string datestr = fileName.Substring(lastDivisor + 1);
                 var symId = SymbolHistoryId.Parse(key);
-                var date = DateTime.ParseExact(datestr, "yyyyMM", CultureInfo.InvariantCulture);
+                var date = DateTime.ParseExact(datestr, "yyyyMM", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
                 ret = new HistoryChunkId()
                 {
-                    FilePath = filePath,
                     HistoryId = symId,
                     StartDate = date
                 };

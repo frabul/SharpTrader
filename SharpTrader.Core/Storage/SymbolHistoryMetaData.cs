@@ -72,10 +72,10 @@ namespace SharpTrader.Storage
         public void AddBars(IEnumerable<Candlestick> candles)
         {
             lock (this.Locker)
-            { 
+            {
                 foreach (var c in candles)
                 {
-                    this.UpdateLastBar(c); 
+                    this.UpdateLastBar(c);
                     View.AddBar(c);
                 }
             }
@@ -98,7 +98,7 @@ namespace SharpTrader.Storage
             }
         }
 
-        public void LoadHistory(DateTime startOfData, DateTime endOfData)
+        public void LoadHistory(string dataDir, DateTime startOfData, DateTime endOfData)
         {
             startOfData = new DateTime(startOfData.Year, startOfData.Month, 1, 0, 0, 0, DateTimeKind.Utc);
             List<DateRange> missingData = new List<DateRange>();
@@ -128,18 +128,19 @@ namespace SharpTrader.Storage
                 //load missing data  
                 foreach (var finfo in this.Chunks)
                 {
-                    Debug.Assert(HistoryId.Key == finfo.HistoryId.Key);
+                    Debug.Assert(HistoryId.Key == finfo.HistoryId.Key, $"Hist id {HistoryId.Key} - finfo {finfo.HistoryId.Key}");
                     var dateInRange = missingData.Any(dr => finfo.StartDate >= dr.start && finfo.StartDate < dr.end);
                     if (dateInRange && this.View.LoadedFiles.Add(finfo)) //if is in any range and not already loaded
                     {
                         try
                         {
-                            HistoryChunk fdata = HistoryChunk.Load(finfo.FilePath);
+
+                            HistoryChunk fdata = HistoryChunk.Load(finfo.GetFilePath(dataDir));
                             this.AddBars(fdata.Ticks.Where(tick => tick.Time <= endOfData));
                         }
                         catch (Exception ex)
                         {
-                            Logger.Error($"ERROR loading file {finfo.FilePath}: {ex.Message}");
+                            Logger.Error($"ERROR loading file {finfo.GetFilePath(dataDir)}: {ex.Message}");
                         }
                     }
                 }

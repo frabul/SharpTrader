@@ -75,10 +75,9 @@ namespace SharpTrader.Storage
         {
             this.Ticks = old.Ticks;
             ChunkId = new HistoryChunkId(
-                    old.FileName,
                     new SymbolHistoryId(old.Market, old.Symbol, old.Timeframe),
                     old.Ticks.First().Time
-                ); 
+                );
         }
 
         public static HistoryChunk Load(string filePath)

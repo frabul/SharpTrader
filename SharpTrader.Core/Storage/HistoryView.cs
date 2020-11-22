@@ -11,8 +11,8 @@ namespace SharpTrader.Storage
     {
         Logger Logger = LogManager.GetCurrentClassLogger();
         private List<Candlestick> _Ticks;
-        public SymbolHistoryId Id { get; set; } 
-        public HashSet<HistoryChunkId> LoadedFiles { get; set; } = new HashSet<HistoryChunkId>(); 
+        public SymbolHistoryId Id { get; set; }
+        public HashSet<HistoryChunkId> LoadedFiles { get; set; } = new HashSet<HistoryChunkId>();
         public DateTime StartOfData { get; set; } = DateTime.MaxValue;
         public DateTime EndOfData { get; set; } = DateTime.MinValue;
 
@@ -75,7 +75,7 @@ namespace SharpTrader.Storage
                     if (index > 0)
                         Debug.Assert(this.Ticks[index].OpenTime >= this.Ticks[index - 1].OpenTime);
                     if (index + 1 < this.Ticks.Count)
-                        Debug.Assert(this.Ticks[index].OpenTime <= this.Ticks[index + 1].OpenTime); 
+                        Debug.Assert(this.Ticks[index].OpenTime <= this.Ticks[index + 1].OpenTime);
                 }
                 else
                     this.Ticks.Add(toAdd);
@@ -92,7 +92,7 @@ namespace SharpTrader.Storage
             {
                 int i = 0;
                 while (i < this.Ticks.Count)
-                { 
+                {
                     DateTime startDate = new DateTime(this.Ticks[i].OpenTime.Year, this.Ticks[i].OpenTime.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                     DateTime endDate = startDate.AddMonths(1);
                     List<Candlestick> candlesOfMont = new List<Candlestick>();
@@ -102,13 +102,13 @@ namespace SharpTrader.Storage
                         i++;
                     }
 
-                    HistoryChunkId newChunkId = new HistoryChunkId(dataDir, this.Id, startDate);
+                    HistoryChunkId newChunkId = new HistoryChunkId(this.Id, startDate);
                     HistoryChunk sdata = new HistoryChunk()
                     {
                         ChunkId = newChunkId,
                         Ticks = candlesOfMont,
                     };
-                    using (var fs = File.Open(newChunkId.FilePath, FileMode.Create))
+                    using (var fs = File.Open(newChunkId.GetFilePath(dataDir), FileMode.Create))
                         Serializer.Serialize<HistoryChunk>(fs, sdata);
 
                     this.LoadedFiles.Add(newChunkId);

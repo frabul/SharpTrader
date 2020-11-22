@@ -51,7 +51,7 @@ namespace SharpTrader.Storage
         public virtual ISymbolHistory GetSymbolHistory(SymbolHistoryId info, DateTime startOfData, DateTime endOfData)
         {
             var meta = GetMetaDataInternal(info);
-            meta.LoadHistory(startOfData, endOfData);
+            meta.LoadHistory(DataDir, startOfData, endOfData);
             return new SymbolHistory(meta.View, startOfData, endOfData);
         }
 
@@ -71,7 +71,7 @@ namespace SharpTrader.Storage
             if (candles.Any())
             {
                 var meta = GetMetaDataInternal(symId);
-                meta.LoadHistory(candles.First().OpenTime, DateTime.MaxValue);
+                meta.LoadHistory(DataDir, candles.First().OpenTime, DateTime.MaxValue);
                 //add data 
                 //Debug.Assert(sdata.Ticks.Count > 0);
                 //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
@@ -87,9 +87,10 @@ namespace SharpTrader.Storage
 
         private void Init()
         {
-            var connectionString = $"Filename={Path.Combine(this.DataDir, "Database.db")};connection=shared";
+            var connectionString = $"Filename={Path.Combine(this.DataDir, "DatabaseV3.db")};connection=shared";
             Db = new LiteDB.LiteDatabase(connectionString);
             Db.Pragma("UTC_DATE", true);
+
 
             DbSymbolsMetaData = Db.GetCollection<SymbolHistoryMetaDataInternal>("SymbolsMetaData");
 
@@ -113,18 +114,25 @@ namespace SharpTrader.Storage
                 foreach (var chunk in chunks)
                 {
                     bool canAddChunk = true;
-                    var newPath = Path.GetFileName(chunk.FilePath);
-                    newPath = Path.Combine(DataDir, newPath); 
+                    var newPath = chunk.GetFilePath(DataDir);
                     //check that file exists
                     if (File.Exists(newPath))
                     {
+
                         var fileInfo = new FileInfo(newPath);
                         //check that file size is plausible
                         if (fileInfo.Length > 3e6)
                         {
                             Logger.Error("Error: history file {0} has anomalous size. It will be deleted", newPath);
                             ok = false;
-                            File.Delete(newPath); 
+                            File.Delete(newPath);
+                            canAddChunk = false;
+                        }
+                        //check that id is right
+                        if (chunk.HistoryId.Key != symData.HistoryId.Key)
+                        {
+                            Logger.Error("Error: history file {0} has wrong history id {1}", newPath, chunk.HistoryId.Key);
+                            File.Delete(newPath);
                             canAddChunk = false;
                         }
                     }
@@ -134,8 +142,8 @@ namespace SharpTrader.Storage
                         ok = false;
                         Logger.Error("Error: history file {0} does not exist.", newPath);
                     }
-                    if(canAddChunk)
-                        symData.Chunks.Add(new HistoryChunkId(DataDir, chunk.HistoryId, chunk.StartDate));
+                    if (canAddChunk)
+                        symData.Chunks.Add(new HistoryChunkId(chunk.HistoryId, chunk.StartDate));
                 }
                 //rebuild history if needed
                 if (ok == false)
@@ -145,7 +153,7 @@ namespace SharpTrader.Storage
                     var newSymData = new SymbolHistoryMetaDataInternal(symData.HistoryId);
                     foreach (var chunk in symData.Chunks)
                     {
-                        var chunkData = HistoryChunk.Load(chunk.FilePath);
+                        var chunkData = HistoryChunk.Load(chunk.GetFilePath(DataDir));
                         newSymData.AddBars(chunkData.Ticks);
                     }
                     //save data
@@ -161,20 +169,24 @@ namespace SharpTrader.Storage
             }
         }
 
+        /// <summary>
+        /// Loads all files then saves them again ( so format is updates )
+        /// </summary>
         private void Update1()
         {
             //get a
             var files = Directory.GetFiles(DataDir, "*.bin");
             IEnumerable<IGrouping<string, string>> filesGrouped;
-            if (files.Length > 0)
+            //if (files.Length > 0)
             {
                 files = files.Concat(Directory.GetFiles(DataDir, "*.bin2")).ToArray();
-                filesGrouped = files.GroupBy(f =>
-                                               {
-                                                   var info = HistoryChunkId.Parse(f);
-                                                   return info.HistoryId.Key;
-                                               }
-                                );
+                filesGrouped = files.GroupBy(
+                    f =>
+                        {
+                            var info = HistoryChunkId.Parse(f);
+                            return info.HistoryId.Key;
+                        }
+                );
                 foreach (var group in filesGrouped)
                 {
                     var info = HistoryChunkId.Parse(group.First());
@@ -216,9 +228,12 @@ namespace SharpTrader.Storage
                     symData.UpdateLastBar(fileData.Ticks.Last());
                 }
             }
-
+            //reinsert everything
+            DbSymbolsMetaData.DeleteAll();
+            Db.Checkpoint();
             var allData = data.Values.ToArray();
-            DbSymbolsMetaData.InsertBulk(allData);
+            foreach (var dat in allData)
+                DbSymbolsMetaData.Upsert(dat);
             Db.Checkpoint();
         }
 
@@ -259,8 +274,8 @@ namespace SharpTrader.Storage
 
                 foreach (var fileInfo in meta.Chunks.ToArray())
                 {
-                    if (File.Exists(fileInfo.FilePath))
-                        File.Delete(fileInfo.FilePath);
+                    if (File.Exists(fileInfo.GetFilePath(DataDir)))
+                        File.Delete(fileInfo.GetFilePath(DataDir));
                     meta.Chunks.Remove(fileInfo);
                 }
             }
@@ -278,7 +293,7 @@ namespace SharpTrader.Storage
             int matchErrors = 0;
             Console.WriteLine($"Checking {histInfo.Symbol} history data ");
             var meta = GetMetaDataInternal(histInfo);
-            meta.LoadHistory(fromTime, toTime);
+            meta.LoadHistory(DataDir, fromTime, toTime);
 
 
             var oldTicks = meta.View.Ticks;

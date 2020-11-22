@@ -7,7 +7,7 @@ namespace SharpTrader.Storage
         string Market { get; }
         string Symbol { get; }
         TimeSpan Resolution { get; }
-        TimeSerieNavigator<ITradeBar> Ticks { get; } 
+        TimeSerieNavigator<ITradeBar> Ticks { get; }
     }
 
 }
