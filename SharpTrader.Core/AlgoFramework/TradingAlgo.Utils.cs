@@ -63,7 +63,8 @@ namespace SharpTrader.AlgoFramework
                     var freeAmount = Market.GetFreeBalance(symData.Symbol.Asset);
                     if (adj.amount > freeAmount)
                     {
-                        adj.amount = freeAmount;
+                        if (!symData.Symbol.IsBorrowAllowed)
+                            adj.amount = freeAmount;
                         if (adj.amount > 0)
                             adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(adj.amount, adj.price);
                     }
