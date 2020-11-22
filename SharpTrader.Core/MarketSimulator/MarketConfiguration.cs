@@ -5,6 +5,7 @@
         public string MarketName { get; set; }
         public decimal MakerFee { get; set; }
         public decimal TakerFee { get; set; }
+        public bool AllowBorrrow { get; set; }
     }
 
 }

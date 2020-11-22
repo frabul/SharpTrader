@@ -60,6 +60,7 @@ namespace SharpTrader.MarketSimulator
                 {
                     Key = token.Key,
                     Asset = token.Value["Asset"].ToObject<string>(),
+                    IsBorrowAllowed = token.Value["IsMarginTadingAllowed"].ToObject<bool>(),
                     IsMarginTadingAllowed = token.Value["IsMarginTadingAllowed"].ToObject<bool>(),
                     IsSpotTadingAllowed = token.Value["IsSpotTadingAllowed"].ToObject<bool>(),
                     QuoteAsset = token.Value["QuoteAsset"].ToObject<string>(),
@@ -132,11 +133,11 @@ namespace SharpTrader.MarketSimulator
                 bal = _Balances[ass.QuoteAsset];
                 amount = order.Amount * (decimal)order.Price;
             }
-
-            if (!AllowBorrow && bal.Free < amount)
-            {
-                return (false, "Insufficient balance");
-            }
+            if (bal.Free < amount)
+                if (!AllowBorrow || !ass.IsMarginTadingAllowed)
+                {
+                    return (false, "Insufficient balance");
+                }
 
             bal.Free -= amount;
             bal.Locked += amount;

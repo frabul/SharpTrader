@@ -34,6 +34,7 @@ namespace SharpTrader.MarketSimulator
             foreach (var mc in Config.Markets)
             {
                 var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
+                market.AllowBorrow = mc.AllowBorrrow;
                 _Markets[i++] = market;
             }
         }
@@ -56,6 +57,7 @@ namespace SharpTrader.MarketSimulator
             foreach (var mc in Config.Markets)
             {
                 var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
+                market.AllowBorrow = mc.AllowBorrrow;
                 _Markets[i++] = market;
             }
         }

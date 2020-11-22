@@ -71,9 +71,9 @@ namespace SharpTrader.MarketSimulator
         {
             Debug.Assert(amount > 0);
             Debug.Assert(price > 0);
-            amount = Math.Round(amount - 0.00049m, 3);
-            if (amount * price < 0.001m)
-                amount = 0.001m;
+            amount = Math.Round(amount - 0.00049m, 4);
+            if (amount * price < 0.00001m)
+                amount = 0.00001m / price;
             return (price, amount);
         }
 
@@ -81,10 +81,10 @@ namespace SharpTrader.MarketSimulator
         {
             Debug.Assert(amount > 0);
             Debug.Assert(price > 0);
-            amount = Math.Round(amount + 0.00049m, 3);
+            amount = Math.Round(amount + 0.00049m, 4);
 
-            if (amount * price < 0.001m)
-                amount = 0.001m / price;
+            if (amount * price < 0.00001m)
+                amount = 0.00001m / price;
             return (price, amount);
         }
     } 
