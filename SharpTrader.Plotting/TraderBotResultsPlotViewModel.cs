@@ -27,7 +27,8 @@ namespace SharpTrader.Plotting
     {
         static volatile bool ok = false;
         public static void Show(PlotHelper plot)
-        {  
+        {
+            ok = false;
             TraderBotResultsPlotViewModel vm = null;
             Thread newWindowThread = new Thread(new ThreadStart(() =>
             {
@@ -236,7 +237,7 @@ namespace SharpTrader.Plotting
                     MarkerStrokeThickness = 2,
                     LineStyle = LineStyle.Solid,
                     Color = OxyColor.FromArgb(line.Color.A, line.Color.R, line.Color.G, line.Color.B),
-                    StrokeThickness = 1.2f,
+                    StrokeThickness = 3f,
                     YAxisKey = line.AxisId ?? this.Candles_Yaxis.Key
                 };
 

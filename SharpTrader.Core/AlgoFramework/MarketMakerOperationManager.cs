@@ -270,7 +270,7 @@ namespace SharpTrader.AlgoFramework
                 }
                 else if (liquidationResult.amountRemainingLow)
                 {
-                    Logger.Info($"Queue for close {op.ToString("c")} because amount remaining is too low");
+                    Logger.Trace($"Queue for close {op.ToString("c")} because amount remaining is too low");
                     await this.CloseQueueAsync(op, CloseQueueTime);
                     terminate = true;
                 }
@@ -311,7 +311,7 @@ namespace SharpTrader.AlgoFramework
                     myOpData.ExitManager = null;
 
                     //put in close queue
-                    Logger.Debug($"Queue for close {self.Op.ToString("c")}\n    because amount remaining is 0 and entry expired.");
+                    Logger.Trace($"Queue for close {self.Op.ToString("c")}\n    because amount remaining is 0 and entry expired.");
                     await CloseQueueAsync(self.Op, CloseQueueTime);
                 }
                 else
@@ -357,7 +357,7 @@ namespace SharpTrader.AlgoFramework
             //---------- manage exit orders -------------- 
             if (myOpData.CurrentExitOrder == null)
             {
-                var price = Math.Max(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Ask);
+                var price = Math.Min(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Bid);
                 if (op.AmountRemaining > 0 && !op.IsExitExpired(Algo.Time))
                 {
                     //if we have no order 

@@ -65,7 +65,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             Dictionary<string, SymbolInfo> dict = new Dictionary<string, SymbolInfo>();
             var tradingRules = Client.GetExchangeInfo().Result;
             foreach (var symb in tradingRules.Symbols)
-            {
+            { 
                 dict.Add(symb.symbol,
                     new SymbolInfo
                     {
@@ -73,7 +73,8 @@ namespace SharpTrader.Core.BrokersApi.Binance
                         QuoteAsset = symb.quoteAsset,
                         Key = symb.symbol,
                         IsMarginTadingAllowed = symb.isMarginTradingAllowed,
-                        IsSpotTadingAllowed = symb.isSpotTradingAllowed
+                        IsSpotTadingAllowed = symb.isSpotTradingAllowed,
+                        IsBorrowAllowed = symb.isMarginTradingAllowed
                     });
 
             }
