@@ -60,10 +60,10 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
         }
 
-        public void SynchSymbolsTable(string DataDir)
+        public async Task SynchSymbolsTableAsync(string DataDir)
         {
             Dictionary<string, SymbolInfo> dict = new Dictionary<string, SymbolInfo>();
-            var tradingRules = Client.GetExchangeInfo().Result;
+            var tradingRules = await Client.GetExchangeInfo();
             foreach (var symb in tradingRules.Symbols)
             { 
                 dict.Add(symb.symbol,
@@ -78,6 +78,12 @@ namespace SharpTrader.Core.BrokersApi.Binance
                     });
 
             }
+            var crossPairs = await Client.GetAllCrossMarginPairs();
+            foreach(var pair in crossPairs)
+            {
+                if (dict.ContainsKey(pair.symbol))
+                    dict[pair.symbol].IsCrossMarginAllowed = true;
+            } 
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict);
             var deserialized = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, SymbolInfo>>(json);
             System.IO.File.WriteAllText(System.IO.Path.Combine(DataDir, "BinanceSymbolsTable.json"), json);

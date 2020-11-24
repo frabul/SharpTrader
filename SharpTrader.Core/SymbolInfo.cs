@@ -6,6 +6,8 @@
         public string Asset { get; set; }
         public string QuoteAsset { get; set; }
         public bool IsMarginTadingAllowed { get; set; }
+        public bool IsCrossMarginAllowed { get; set; }
+        public bool IsIsolatedMarginAllowed { get; set; }
         public bool IsSpotTadingAllowed { get; set; }
         public decimal MinLotSize { get; set; }
         public decimal LotSizeStep { get; set; }

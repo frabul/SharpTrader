@@ -77,4 +77,10 @@ namespace SharpTrader
         GTC,
         IOC,
     }
+
+    public enum MarginOrderEffect
+    {
+        OpenPosition,
+        ClosePosition
+    }
 }

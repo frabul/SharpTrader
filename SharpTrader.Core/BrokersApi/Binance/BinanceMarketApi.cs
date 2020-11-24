@@ -30,6 +30,9 @@ namespace SharpTrader.BrokersApi.Binance
             public string Symbol { get; set; }
             public long LastOrderAtTradesSynch { get; set; }
         }
+
+
+
         public event Action<IMarketApi, ITrade> OnNewTrade;
 
         private readonly object LockOrdersTrades = new object();
@@ -1015,6 +1018,67 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
+         
+        public async Task<IRequest<IOrder>> PostMarginLimitOrder(string symbol, TradeDirection type, MarginOrderEffect effect, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
+        { 
+            try
+            { 
+                PostMarginOrderResponse_Result newOrd = 
+                    (PostMarginOrderResponse_Result) await Client.PostMarginOrder(
+                        new PostMarginOrderRequest()
+                        {
+                            symbol = symbol,
+                            side = type == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell,
+                            quantity = amount / 1.00000000000000000000000000m,
+                            newClientOrderId = clientOrderId,
+                            newOrderRespType = NewOrderResponseType.Result,
+                            price = rate / 1.00000000000000000000000000000m,
+                            type = be.Enums.OrderType.Limit,
+                            sideEffectType = GetMarginOrderEffect(effect), 
+                            timeInForce = GetTimeInForce(timeInForce)
+                        }); 
+                var newApiOrder = new Order(newOrd);
+                newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
+                OrdersUpdateOrInsert(newApiOrder);
+                return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
+            }
+            catch (Exception ex)
+            {
+                return new Request<IOrder>(GetExceptionErrorInfo(ex));
+            }
+        }
+
+        public async Task<IRequest<IOrder>> PostMaginMarketOrder(string symbol, TradeDirection type, MarginOrderEffect effect, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
+        {
+            var side = type == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell;
+            try
+            {
+                var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == symbol);
+
+                var ord = (PostMarginOrderResponse_Result)await Client.PostMarginOrder(
+                        new PostMarginOrderRequest()
+                        {
+                            symbol = symbol,
+                            side = side,
+                            type = be.Enums.OrderType.Market,
+                            quantity =  amount / 1.00000000000000m,
+                            newClientOrderId = clientOrderId,
+                            sideEffectType = GetMarginOrderEffect(effect),
+                            newOrderRespType = NewOrderResponseType.Result 
+                        });
+
+                var newApiOrder = new Order(ord);
+                newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
+                OrdersUpdateOrInsert(newApiOrder); 
+                return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
+            }
+            catch (Exception ex)
+            {
+                return new Request<IOrder>(GetExceptionErrorInfo(ex));
+            }
+        }
+
+
         private be.Enums.TimeInForce GetTimeInForce(TimeInForce tif)
         {
             if (tif == TimeInForce.GTC)
@@ -1022,6 +1086,15 @@ namespace SharpTrader.BrokersApi.Binance
             else
                 return be.Enums.TimeInForce.IOC;
         }
+
+        private SideEffectType GetMarginOrderEffect(MarginOrderEffect effect)
+        {
+            if (effect == MarginOrderEffect.ClosePosition)
+                return SideEffectType.AUTO_REPAY;
+            else
+                return SideEffectType.MARGIN_BUY;
+        }
+
         public async Task<IRequest> OrderCancelAsync(string id)
         {
             try
@@ -1133,7 +1206,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         public void RegisterCustomSerializers(BsonMapper mapper)
         {
-            BsonMapper defaultMapper = new BsonMapper(); 
+            BsonMapper defaultMapper = new BsonMapper();
             Order BsonToOrder(BsonValue value)
             {
                 lock (LockOrdersTrades)
@@ -1161,6 +1234,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             mapper.Entity<Trade>().Ctor(DeserializeTrade);
         }
+
 
 
         class Request<T> : IRequest<T>

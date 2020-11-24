@@ -56,6 +56,23 @@ namespace SharpTrader.BrokersApi.Binance
             Time = binanceOrder.TransactionTime;
         }
 
+        public Order(PostMarginOrderResponse_Result binanceOrder)
+        {
+            OrderId = binanceOrder.OrderId;
+            ClientId = binanceOrder.ClientOrderdId;
+            Symbol = binanceOrder.Symbol;
+            Market = "Binance";
+
+            TradeType = binanceOrder.Side == OrderSide.Buy ? TradeDirection.Buy : TradeDirection.Sell;
+            Type = GetOrderType(binanceOrder.Type);
+            Amount = binanceOrder.OrigQty;
+            Price = binanceOrder.Price;
+            Status = GetStatus(binanceOrder.Status);
+            Filled = binanceOrder.ExecutedQty;
+            Id = Symbol + OrderId;
+            Time = binanceOrder.TransactionTime.ToDatetimeMilliseconds();
+        }
+
         public Order(OrderResponse or)
         {
             Symbol = or.Symbol;
