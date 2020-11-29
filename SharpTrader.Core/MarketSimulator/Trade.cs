@@ -1,5 +1,5 @@
 ﻿using System;
- 
+
 
 namespace SharpTrader.MarketSimulator
 {
@@ -10,13 +10,13 @@ namespace SharpTrader.MarketSimulator
         {
 
         }
-        public Trade(string market, string symbol, DateTime time, TradeDirection type, double price, decimal amount, Order order)
+        public Trade(string market, string symbol, DateTime time, TradeDirection type, decimal price, decimal amount, Order order)
         {
             Market = market;
             Symbol = symbol;
             Time = time;
             Direction = type;
-            Price = (decimal)price;
+            Price = price;
             Amount = amount;
             Order = order;
             Id = (IdCounter++).ToString();

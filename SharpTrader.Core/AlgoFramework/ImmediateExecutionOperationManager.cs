@@ -98,7 +98,16 @@ namespace SharpTrader.AlgoFramework
                         if ((amount / operation.AmountTarget.Amount) > 0.01m)
                         {
                             //TODO check requirements for order: price precision, minimum amount, min notional, available money
-                            var ticket = await Algo.Market.MarketOrderAsync(symbol.Key, execData.EntryDirection, amount, operation.GetNewOrderId());
+                            var orderInfo = new OrderInfo()
+                            {
+                                Symbol = symbol.Key,
+                                Type = OrderType.Market,
+                                Effect = Algo.DoMarginTrading ? MarginOrderEffect.OpenPosition : MarginOrderEffect.None,
+                                Amount = amount, 
+                                ClientOrderId = operation.GetNewOrderId(),
+                                Direction = execData.EntryDirection
+                            };
+                            var ticket = await Algo.Market.PostNewOrder(orderInfo); 
                             if (ticket.Status == RequestStatus.Completed)
                             {
                                 //Market order was executed - we should expect the trade on next update 
@@ -124,7 +133,16 @@ namespace SharpTrader.AlgoFramework
                     {
                         var amount = operation.AmountRemaining;
                         //TODO check requirements for order: price precision, minimum amount, min notional, available money
-                        var ticket = await Algo.Market.MarketOrderAsync(symbol.Key, execData.ExitDirection, amount, operation.GetNewOrderId());
+                        var orderInfo = new OrderInfo()
+                        {
+                            Symbol = symbol.Key,
+                            Type = OrderType.Market,
+                            Effect = Algo.DoMarginTrading ? MarginOrderEffect.ClosePosition : MarginOrderEffect.None,
+                            Amount = amount,
+                            ClientOrderId = operation.GetNewOrderId(),
+                            Direction = execData.ExitDirection
+                        };
+                        var ticket = await Algo.Market.PostNewOrder(orderInfo); 
                         if (ticket.Status == RequestStatus.Completed)
                         {
                             //Market order was executed - we should expect the trade on next update 

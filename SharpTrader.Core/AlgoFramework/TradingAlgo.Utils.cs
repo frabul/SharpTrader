@@ -24,9 +24,16 @@ namespace SharpTrader.AlgoFramework
                 {
                     //immediatly liquidate everything with a market order 
                     Logger.Info($"Try market exit amount:{adj.amount} - price: {adj.price}.");
-                    var request =
-                        await Market.MarketOrderAsync(
-                            op.Symbol.Key, op.ExitTradeDirection, adj.amount, op.GetNewOrderId());
+                    var orderInfo = new OrderInfo()
+                    {
+                        Symbol = op.Symbol.Key,
+                        Type = OrderType.Market,
+                        Effect = this.DoMarginTrading ? MarginOrderEffect.ClosePosition : MarginOrderEffect.None,
+                        Amount = adj.amount,
+                        ClientOrderId = op.GetNewOrderId(),
+                        Direction = op.ExitTradeDirection
+                    };
+                    var request = await Market.PostNewOrder(orderInfo); 
                     if (request.IsSuccessful)
                         result.order = request.Result;
                     else

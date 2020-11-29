@@ -17,6 +17,7 @@ namespace SharpTrader.AlgoFramework
             public string DataDir { get; set; } = Path.Combine(".", "Data");
             public string Name { get; set; } = "Unnamed v1";
             public bool SaveData { get; set; } = false;
+            public bool MarginTrading { get; set; } = false;
         }
         class NonVolatileVars
         {
@@ -62,6 +63,7 @@ namespace SharpTrader.AlgoFramework
             Config = config;
             Market = marketApi;
             Market.OnNewTrade += Market_OnNewTrade;
+            this.DoMarginTrading = config.MarginTrading;
         }
 
         public async Task Initialize()

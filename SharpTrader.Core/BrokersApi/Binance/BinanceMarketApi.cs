@@ -959,7 +959,21 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
-        public async Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
+        public Task<IRequest<IOrder>> PostLimitOrderAsync(string symbol, TradeDirection type, MarginOrderEffect effect, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
+        {
+            if (effect == MarginOrderEffect.None)
+                return PostSpotLimitOrderAsync(symbol, type, amount, rate, clientOrderId, timeInForce);
+            else
+                return PostMarginLimitOrder(symbol, type, effect, amount, rate, clientOrderId, timeInForce);
+        }
+        public Task<IRequest<IOrder>> PostMarketOrderAsync(string symbol, TradeDirection type, MarginOrderEffect effect, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
+        {
+            if (effect == MarginOrderEffect.None)
+                return PostSpotMarketOrderAsync(symbol, type, amount, clientOrderId, timeInForce);
+            else
+                return PostMaginMarketOrder(symbol, type, effect, amount, clientOrderId, timeInForce);
+        }
+        public async Task<IRequest<IOrder>> PostSpotLimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
         {
             ResultCreateOrderResponse newOrd;
             try
@@ -989,7 +1003,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
-        public async Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
+        public async Task<IRequest<IOrder>> PostSpotMarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
         {
             var side = type == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell;
             try
@@ -1018,13 +1032,13 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
-         
+
         public async Task<IRequest<IOrder>> PostMarginLimitOrder(string symbol, TradeDirection type, MarginOrderEffect effect, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
-        { 
+        {
             try
-            { 
-                PostMarginOrderResponse_Result newOrd = 
-                    (PostMarginOrderResponse_Result) await Client.PostMarginOrder(
+            {
+                PostMarginOrderResponse_Result newOrd =
+                    (PostMarginOrderResponse_Result)await Client.PostMarginOrder(
                         new PostMarginOrderRequest()
                         {
                             symbol = symbol,
@@ -1034,9 +1048,9 @@ namespace SharpTrader.BrokersApi.Binance
                             newOrderRespType = NewOrderResponseType.Result,
                             price = rate / 1.00000000000000000000000000000m,
                             type = be.Enums.OrderType.Limit,
-                            sideEffectType = GetMarginOrderEffect(effect), 
+                            sideEffectType = GetMarginOrderEffect(effect),
                             timeInForce = GetTimeInForce(timeInForce)
-                        }); 
+                        });
                 var newApiOrder = new Order(newOrd);
                 newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
                 OrdersUpdateOrInsert(newApiOrder);
@@ -1061,15 +1075,15 @@ namespace SharpTrader.BrokersApi.Binance
                             symbol = symbol,
                             side = side,
                             type = be.Enums.OrderType.Market,
-                            quantity =  amount / 1.00000000000000m,
+                            quantity = amount / 1.00000000000000m,
                             newClientOrderId = clientOrderId,
                             sideEffectType = GetMarginOrderEffect(effect),
-                            newOrderRespType = NewOrderResponseType.Result 
+                            newOrderRespType = NewOrderResponseType.Result
                         });
 
                 var newApiOrder = new Order(ord);
                 newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
-                OrdersUpdateOrInsert(newApiOrder); 
+                OrdersUpdateOrInsert(newApiOrder);
                 return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
             }
             catch (Exception ex)
@@ -1077,7 +1091,6 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
-
 
         private be.Enums.TimeInForce GetTimeInForce(TimeInForce tif)
         {
@@ -1091,8 +1104,10 @@ namespace SharpTrader.BrokersApi.Binance
         {
             if (effect == MarginOrderEffect.ClosePosition)
                 return SideEffectType.AUTO_REPAY;
-            else
+            else if (effect == MarginOrderEffect.OpenPosition)
                 return SideEffectType.MARGIN_BUY;
+            else
+                return SideEffectType.NO_SIDE_EFFECT;
         }
 
         public async Task<IRequest> OrderCancelAsync(string id)
@@ -1160,7 +1175,7 @@ namespace SharpTrader.BrokersApi.Binance
         }
 
         public IEnumerable<SymbolInfo> GetSymbols()
-        {
+        { 
             return ExchangeInfo.Symbols.Where(sym => sym.status == "TRADING").Select(sym => new SymbolInfo
             {
                 Asset = sym.baseAsset,
@@ -1235,7 +1250,10 @@ namespace SharpTrader.BrokersApi.Binance
             mapper.Entity<Trade>().Ctor(DeserializeTrade);
         }
 
-
+        public Task<IRequest<IOrder>> PostNewOrder(OrderInfo orderInfo)
+        {
+            throw new NotImplementedException();
+        }
 
         class Request<T> : IRequest<T>
         {

@@ -75,7 +75,6 @@ namespace SharpTrader.AlgoFramework
             }
         }
         public decimal EntryDistantThreshold { get; private set; }
-
         public decimal EntryNearThreshold { get; private set; }
 
         public MarketMakerOperationManager(decimal entryDistantThreshold, decimal entryNearThreshold)
@@ -97,7 +96,7 @@ namespace SharpTrader.AlgoFramework
 
         public override async Task Update(TimeSlice slice)
         {
-            Random rand = new Random(); 
+            Random rand = new Random();
             var symbols = Algo.SymbolsData.Values.OrderBy(el => rand.NextDouble()).ToArray();
             //randomize the order of completion
             foreach (var symSlice in symbols)
@@ -105,12 +104,12 @@ namespace SharpTrader.AlgoFramework
                 //if we got a new signal let 
                 try
                 {
-                    await ManageSymbol(slice, symSlice); 
+                    await ManageSymbol(slice, symSlice);
                 }
                 catch (Exception ex)
                 {
                     Logger.Error("Exception during MarketMakerOperationManager.Update: {0}, symbol {1}", ex.Message, symSlice.Symbol.Key);
-                } 
+                }
             }
 
 
@@ -372,9 +371,18 @@ namespace SharpTrader.AlgoFramework
                             {
                                 //Debug.Assert(adj.amount == op.AmountRemaining);
                                 Logger.Info($"{Algo.Time} - Setting EXIT order for oper {op} - amount:{adj.amount} - price: {adj.price}");
-                                var request =
-                                    await Algo.Market.LimitOrderAsync(
-                                        op.Symbol.Key, op.ExitTradeDirection, adj.amount, adj.price, op.GetNewOrderId());
+                                var orderInfo = new OrderInfo()
+                                {
+                                    Symbol = op.Symbol.Key,
+                                    Type = OrderType.Limit,
+                                    Effect = Algo.DoMarginTrading ? MarginOrderEffect.ClosePosition : MarginOrderEffect.None,
+                                    Amount = adj.amount,
+                                    Price = adj.price,
+                                    ClientOrderId = op.GetNewOrderId(),
+                                    Direction = op.ExitTradeDirection
+                                };
+
+                                var request = await Algo.Market.PostNewOrder(orderInfo);
 
                                 if (request.IsSuccessful)
                                 {
@@ -487,9 +495,17 @@ namespace SharpTrader.AlgoFramework
                         {
                             Logger.Debug($"{Algo.Time} - Setting Entry for {op} - amount: {adjusted.amount:0.########} - price: {adjusted.price:0.########}");
                             //Debug.Assert(op.AmountInvested == 0);
-                            var req =
-                                await Algo.Market.LimitOrderAsync(
-                                    op.Symbol.Key, op.EntryTradeDirection, adjusted.amount, adjusted.price, op.GetNewOrderId());
+                            var orderInfo = new OrderInfo()
+                            {
+                                Symbol = op.Symbol.Key,
+                                Type = OrderType.Limit,
+                                Effect = Algo.DoMarginTrading ? MarginOrderEffect.OpenPosition : MarginOrderEffect.None,
+                                Amount = adjusted.amount,
+                                Price = adjusted.price,
+                                ClientOrderId = op.GetNewOrderId(),
+                                Direction = op.EntryTradeDirection
+                            };
+                            var req = await Algo.Market.PostNewOrder(orderInfo);
 
                             if (req.IsSuccessful)
                             {

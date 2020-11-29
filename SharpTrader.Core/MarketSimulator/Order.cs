@@ -29,7 +29,7 @@ namespace SharpTrader.MarketSimulator
         {
 
         }
-        public Order(string market, string symbol, DateTime time, TradeDirection tradeSide, OrderType orderType, decimal amount, double rate, string clientId)
+        public Order(string market, string symbol, DateTime time, TradeDirection tradeSide, OrderType orderType, decimal amount, decimal price, string clientId)
         {
             Id = (idCounter++).ToString();
             ClientId = clientId;
@@ -38,7 +38,7 @@ namespace SharpTrader.MarketSimulator
             TradeType = tradeSide;
             Type = orderType;
             Amount = amount;
-            Price = (decimal)rate;
+            Price = price;
             Time = time;
         }
         public override string ToString()

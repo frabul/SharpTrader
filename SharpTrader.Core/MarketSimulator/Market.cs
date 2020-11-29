@@ -63,6 +63,8 @@ namespace SharpTrader.MarketSimulator
                     IsBorrowAllowed = token.Value["IsMarginTadingAllowed"].ToObject<bool>(),
                     IsMarginTadingAllowed = token.Value["IsMarginTadingAllowed"].ToObject<bool>(),
                     IsSpotTadingAllowed = token.Value["IsSpotTadingAllowed"].ToObject<bool>(),
+                    IsCrossMarginAllowed = token.Value["IsCrossMarginAllowed"].ToObject<bool>(),
+                    IsIsolatedMarginAllowed = token.Value["IsIsolatedMarginAllowed"].ToObject<bool>(),
                     QuoteAsset = token.Value["QuoteAsset"].ToObject<string>(),
                 };
                 this.SymbolsTable.Add(simInfo.Key, simInfo);
@@ -93,36 +95,83 @@ namespace SharpTrader.MarketSimulator
             return Task.FromResult<ISymbolFeed>(feed);
         }
 
-        public async Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
+        public async Task<IRequest<IOrder>> PostNewOrder(OrderInfo orderInfo)
         {
-            if (amount <= 0)
+
+            if (orderInfo.Amount <= 0)
                 throw new InvalidOperationException("Amount should be > 0");
-            if (amount <= 0)
+            if (orderInfo.Amount <= 0)
                 return new MarketRequest<IOrder>(RequestStatus.Failed, null)
                 {
                     ErrorInfo = "Order amount is zero or negative"
                 };
 
-            var order = new Order(this.MarketName, symbol, Time, type, OrderType.Limit, amount, (double)rate, clientOrderId);
 
-            var res = RegisterOrder(order);
-            if (res.result)
+
+            if (orderInfo.Type == OrderType.Market)
             {
                 lock (LockObject)
-                    this.PendingOrders.Add(order);
-                return new MarketRequest<IOrder>(RequestStatus.Completed, order) { };
+                {
+                    var feed = SymbolsFeeds[orderInfo.Symbol];
+                    var price = orderInfo.Direction == TradeDirection.Buy ? feed.Ask : feed.Bid;
+                    var order = new Order(
+                        this.MarketName,
+                        orderInfo.Symbol,
+                        Time,
+                        orderInfo.Direction,
+                        orderInfo.Type,
+                        orderInfo.Amount,
+                        (decimal)price,
+                        orderInfo.ClientOrderId);
+
+                    var (result, error) = RegisterOrder(order);
+                    if (!result)
+                        return new MarketRequest<IOrder>(RequestStatus.Failed, null) { ErrorInfo = error };
+
+                    var trade = new Trade(
+                        this.MarketName, order.Symbol, this.Time,
+                        order.TradeType, (decimal)price, order.Amount, order);
+
+                    RegisterTrade(feed, trade, isTaker: true);
+                    this.ClosedOrders.Add(order);
+                    return new MarketRequest<IOrder>(RequestStatus.Completed, order) { };
+                }
+
             }
             else
             {
-                return new MarketRequest<IOrder>(RequestStatus.Failed, null) { ErrorInfo = res.error };
+                var order = new Order(
+                    this.MarketName,
+                    orderInfo.Symbol,
+                    Time,
+                    orderInfo.Direction,
+                    orderInfo.Type,
+                    orderInfo.Amount,
+                    orderInfo.Price,
+                    orderInfo.ClientOrderId);
+                var res = RegisterOrder(order);
+                if (res.result)
+                {
+                    lock (LockObject)
+                        this.PendingOrders.Add(order);
+                    return new MarketRequest<IOrder>(RequestStatus.Completed, order) { };
+                }
+                else
+                {
+                    return new MarketRequest<IOrder>(RequestStatus.Failed, null) { ErrorInfo = res.error };
+                }
             }
+
+
+
+
         }
 
         private (bool result, string error) RegisterOrder(Order order)
         {
             var ass = SymbolsTable[order.Symbol];
             AssetBalance bal;
-            decimal amount;
+            decimal amount; 
             if (order.TradeType == TradeDirection.Sell)
             {
                 bal = _Balances[ass.Asset];
@@ -143,31 +192,6 @@ namespace SharpTrader.MarketSimulator
             bal.Locked += amount;
             return (true, null);
 
-        }
-
-        public async Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
-        {
-            if (amount <= 0)
-                throw new InvalidOperationException("Amount should be > 0");
-            lock (LockObject)
-            {
-
-                var feed = SymbolsFeeds[symbol];
-                var price = type == TradeDirection.Buy ? feed.Ask : feed.Bid;
-                var order = new Order(this.MarketName, symbol, Time, type, OrderType.Market, amount, price, clientOrderId);
-
-                var (result, error) = RegisterOrder(order);
-                if (!result)
-                    return new MarketRequest<IOrder>(RequestStatus.Failed, null) { ErrorInfo = error };
-
-                var trade = new Trade(
-                    this.MarketName, symbol, this.Time,
-                    type, price, amount, order);
-
-                RegisterTrade(feed, trade, isTaker: true);
-                this.ClosedOrders.Add(order);
-                return new MarketRequest<IOrder>(RequestStatus.Completed, order) { };
-            }
         }
 
         public decimal GetFreeBalance(string asset)
@@ -240,7 +264,7 @@ namespace SharpTrader.MarketSimulator
                                 market: this.MarketName,
                                 symbol: feed.Symbol.Key,
                                 time: feed.LastTick.Time,
-                                price: (double)order.Price,
+                                price: order.Price,
                                 amount: order.Amount,
                                 type: order.TradeType,
                                 order: order
@@ -260,7 +284,6 @@ namespace SharpTrader.MarketSimulator
             {
                 var qBal = _Balances[feed.Symbol.QuoteAsset];
                 var aBal = _Balances[feed.Symbol.Asset];
-
 
                 if (trade.Direction == TradeDirection.Buy)
                 {
@@ -294,8 +317,6 @@ namespace SharpTrader.MarketSimulator
             feed.Spread = tick.Close * Spread;
             feed.AddNewData(tick);
         }
-
-
 
         public Task<IRequest<decimal>> GetEquity(string asset)
         {

@@ -136,7 +136,7 @@ namespace SharpTrader
         public void Start()
         {
             if (Started)
-                return; 
+                return;
             Logger.Info($"Backtesting {Algo.Version} from  {StartTime} - {EndTime} with configuration:\n" + JObject.FromObject(algoConfig).ToString());
 
             Stopwatch sw = new Stopwatch();
@@ -194,7 +194,13 @@ namespace SharpTrader
             if (Config.PlotResults)
             {
                 PlotHelper plot = new PlotHelper("Equity");
-                var points = EquityHistory.Select(e => new IndicatorDataPoint(e.time, (double)e.bal));
+                int skipCount = (EquityHistory.Count + 1000) / 1000;
+                List<IndicatorDataPoint> points = new List<IndicatorDataPoint>();
+                for (int i = 0; i < EquityHistory.Count; i += skipCount)
+                {
+                    var e = EquityHistory[i];
+                    points.Add(new IndicatorDataPoint(e.time, (double)e.bal));
+                }
                 plot.PlotLine(points, ARGBColors.Purple);
                 plot.InitialView = (Config.StartTime, Config.EndTime);
                 ShowPlotCallback?.Invoke(plot);

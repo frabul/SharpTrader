@@ -7,6 +7,19 @@ using System.Threading.Tasks;
 
 namespace SharpTrader
 {
+    public class OrderInfo
+    {
+        public string Symbol { get; set; }
+        public OrderType Type { get; set; }
+        public TradeDirection Direction { get; set; }
+        public MarginOrderEffect Effect { get; set; }
+        public decimal Amount { get; set; }
+        public decimal Price { get; set; }
+        public string ClientOrderId { get; set; }
+        public TimeInForce TimeInForce { get; set; } = TimeInForce.GTC;
+    }
+
+
     public interface IMarketApi : IObjectSerializationProvider
     {
         event Action<IMarketApi, ITrade> OnNewTrade;
@@ -18,14 +31,9 @@ namespace SharpTrader
         DateTime Time { get; }
 
         /// <summary>
-        /// Put a market order
+        /// Puts an order on the market
         /// </summary> 
-        Task<IRequest<IOrder>> MarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC);
-
-        /// <summary>
-        /// Puts a limit order on the market
-        /// </summary> 
-        Task<IRequest<IOrder>> LimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC);
+        Task<IRequest<IOrder>> PostNewOrder(OrderInfo orderInfo);
 
         /// <summary>
         /// Gets the feed for the given symbol
@@ -80,7 +88,19 @@ namespace SharpTrader
 
     public enum MarginOrderEffect
     {
+        /// <summary>
+        /// Spot order
+        /// </summary>
+        None,
+        /// <summary>
+        /// Buys or sells with borrow
+        /// </summary>
         OpenPosition,
-        ClosePosition
+        /// <summary>
+        /// Buys or selles and then repay borrowed assets
+        /// </summary>
+        ClosePosition,
     }
+
+
 }

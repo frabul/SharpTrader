@@ -123,5 +123,10 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
         {
             throw new NotImplementedException();
         }
+
+        public Task<IRequest<IOrder>> PostNewOrder(OrderInfo orderInfo)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
