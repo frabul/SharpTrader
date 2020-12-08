@@ -958,100 +958,47 @@ namespace SharpTrader.BrokersApi.Binance
                 }
             }
         }
-
-        public Task<IRequest<IOrder>> PostLimitOrderAsync(string symbol, TradeDirection type, MarginOrderEffect effect, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
+        public async Task<IRequest<IOrder>> PostNewOrder(OrderInfo orderInfo)
         {
-            if (effect == MarginOrderEffect.None)
-                return PostSpotLimitOrderAsync(symbol, type, amount, rate, clientOrderId, timeInForce);
-            else
-                return PostMarginLimitOrder(symbol, type, effect, amount, rate, clientOrderId, timeInForce);
-        }
-        public Task<IRequest<IOrder>> PostMarketOrderAsync(string symbol, TradeDirection type, MarginOrderEffect effect, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
-        {
-            if (effect == MarginOrderEffect.None)
-                return PostSpotMarketOrderAsync(symbol, type, amount, clientOrderId, timeInForce);
-            else
-                return PostMaginMarketOrder(symbol, type, effect, amount, clientOrderId, timeInForce);
-        }
-        public async Task<IRequest<IOrder>> PostSpotLimitOrderAsync(string symbol, TradeDirection type, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
-        {
-            ResultCreateOrderResponse newOrd;
+            Order newApiOrder = null;
             try
             {
+                if (orderInfo.Effect == MarginOrderEffect.None)
+                {
 
-                newOrd = (ResultCreateOrderResponse)await Client.CreateOrder(
-                    new CreateOrderRequest()
-                    {
-                        Symbol = symbol,
-                        Side = type == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell,
-                        Quantity = amount / 1.00000000000000000000000000m,
-                        NewClientOrderId = clientOrderId,
-                        NewOrderResponseType = NewOrderResponseType.Result,
-                        Price = rate / 1.00000000000000000000000000000m,
-                        Type = be.Enums.OrderType.Limit,
-                        TimeInForce = GetTimeInForce(timeInForce)
-                    });
-
-                var newApiOrder = new Order(newOrd);
-                newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
-                OrdersUpdateOrInsert(newApiOrder);
-                return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
-            }
-            catch (Exception ex)
-            {
-                return new Request<IOrder>(GetExceptionErrorInfo(ex));
-            }
-        }
-
-        public async Task<IRequest<IOrder>> PostSpotMarketOrderAsync(string symbol, TradeDirection type, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
-        {
-            var side = type == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell;
-            try
-            {
-                var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == symbol);
-
-                var ord = (ResultCreateOrderResponse)await Client.CreateOrder(
+                    ResultCreateOrderResponse newOrd = (ResultCreateOrderResponse)await Client.CreateOrder(
                         new CreateOrderRequest()
                         {
-                            Symbol = symbol,
-                            Side = side,
-                            Type = be.Enums.OrderType.Market,
-                            Quantity = (decimal)amount / 1.00000000000000m,
-                            NewClientOrderId = clientOrderId,
-                            NewOrderResponseType = NewOrderResponseType.Result
+                            Symbol = orderInfo.Symbol,
+                            Side = orderInfo.Direction == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell,
+                            Quantity = orderInfo.Amount / 1.00000000000000000000000000m,
+                            NewClientOrderId = orderInfo.ClientOrderId,
+                            NewOrderResponseType = NewOrderResponseType.Result,
+                            Price = orderInfo.Price / 1.00000000000000000000000000000m,
+                            Type = GetOrderType(orderInfo.Type),
+                            TimeInForce = GetTimeInForce(orderInfo.TimeInForce),
                         });
 
-                var newApiOrder = new Order(ord);
-                newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
-                OrdersUpdateOrInsert(newApiOrder);
+                    newApiOrder = new Order(newOrd);
 
-                return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
-            }
-            catch (Exception ex)
-            {
-                return new Request<IOrder>(GetExceptionErrorInfo(ex));
-            }
-        }
-
-        public async Task<IRequest<IOrder>> PostMarginLimitOrder(string symbol, TradeDirection type, MarginOrderEffect effect, decimal amount, decimal rate, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
-        {
-            try
-            {
-                PostMarginOrderResponse_Result newOrd =
-                    (PostMarginOrderResponse_Result)await Client.PostMarginOrder(
+                }
+                else
+                {
+                    PostMarginOrderResponse_Result newOrd = (PostMarginOrderResponse_Result)await Client.PostMarginOrder(
                         new PostMarginOrderRequest()
                         {
-                            symbol = symbol,
-                            side = type == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell,
-                            quantity = amount / 1.00000000000000000000000000m,
-                            newClientOrderId = clientOrderId,
+                            symbol = orderInfo.Symbol,
+                            side = orderInfo.Direction == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell,
+                            quantity = orderInfo.Amount / 1.00000000000000000000000000m,
+                            newClientOrderId = orderInfo.ClientOrderId,
                             newOrderRespType = NewOrderResponseType.Result,
-                            price = rate / 1.00000000000000000000000000000m,
-                            type = be.Enums.OrderType.Limit,
-                            sideEffectType = GetMarginOrderEffect(effect),
-                            timeInForce = GetTimeInForce(timeInForce)
+                            price = orderInfo.Price / 1.00000000000000000000000000000m,
+                            type = GetOrderType(orderInfo.Type),
+                            sideEffectType = GetMarginOrderEffect(orderInfo.Effect),
+                            timeInForce = GetTimeInForce(orderInfo.TimeInForce)
                         });
-                var newApiOrder = new Order(newOrd);
+                    newApiOrder = new Order(newOrd);
+                }
                 newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
                 OrdersUpdateOrInsert(newApiOrder);
                 return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
@@ -1060,37 +1007,11 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
+
+
         }
 
-        public async Task<IRequest<IOrder>> PostMaginMarketOrder(string symbol, TradeDirection type, MarginOrderEffect effect, decimal amount, string clientOrderId = null, TimeInForce timeInForce = TimeInForce.GTC)
-        {
-            var side = type == TradeDirection.Buy ? OrderSide.Buy : OrderSide.Sell;
-            try
-            {
-                var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == symbol);
 
-                var ord = (PostMarginOrderResponse_Result)await Client.PostMarginOrder(
-                        new PostMarginOrderRequest()
-                        {
-                            symbol = symbol,
-                            side = side,
-                            type = be.Enums.OrderType.Market,
-                            quantity = amount / 1.00000000000000m,
-                            newClientOrderId = clientOrderId,
-                            sideEffectType = GetMarginOrderEffect(effect),
-                            newOrderRespType = NewOrderResponseType.Result
-                        });
-
-                var newApiOrder = new Order(ord);
-                newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
-                OrdersUpdateOrInsert(newApiOrder);
-                return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
-            }
-            catch (Exception ex)
-            {
-                return new Request<IOrder>(GetExceptionErrorInfo(ex));
-            }
-        }
 
         private be.Enums.TimeInForce GetTimeInForce(TimeInForce tif)
         {
@@ -1108,6 +1029,22 @@ namespace SharpTrader.BrokersApi.Binance
                 return SideEffectType.MARGIN_BUY;
             else
                 return SideEffectType.NO_SIDE_EFFECT;
+        }
+
+        readonly Dictionary<OrderType, be.Enums.OrderType> OrderTypesLookupTable = new Dictionary<OrderType, be.Enums.OrderType>()
+        {
+            { OrderType.Limit, be.Enums.OrderType.Limit},
+            { OrderType. Market, be.Enums.OrderType.Market},
+            { OrderType.StopLoss, be.Enums.OrderType.StopLoss},
+            { OrderType.StopLossLimit, be.Enums.OrderType.StopLossLimit},
+            { OrderType.TakeProfit, be.Enums.OrderType.TakeProfit},
+            { OrderType.TakeProfitLimit, be.Enums.OrderType.TakeProfitLimit},
+            { OrderType.LimitMaker, be.Enums.OrderType.LimitMaker},
+        };
+
+        private be.Enums.OrderType GetOrderType(OrderType type)
+        {
+            return OrderTypesLookupTable[type];
         }
 
         public async Task<IRequest> OrderCancelAsync(string id)
@@ -1175,7 +1112,7 @@ namespace SharpTrader.BrokersApi.Binance
         }
 
         public IEnumerable<SymbolInfo> GetSymbols()
-        { 
+        {
             return ExchangeInfo.Symbols.Where(sym => sym.status == "TRADING").Select(sym => new SymbolInfo
             {
                 Asset = sym.baseAsset,
@@ -1250,11 +1187,7 @@ namespace SharpTrader.BrokersApi.Binance
             mapper.Entity<Trade>().Ctor(DeserializeTrade);
         }
 
-        public Task<IRequest<IOrder>> PostNewOrder(OrderInfo orderInfo)
-        {
-            throw new NotImplementedException();
-        }
-
+   
         class Request<T> : IRequest<T>
         {
             public T Result { get; }
