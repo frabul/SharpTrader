@@ -356,7 +356,10 @@ namespace SharpTrader.AlgoFramework
             //---------- manage exit orders -------------- 
             if (myOpData.CurrentExitOrder == null)
             {
-                var price = Math.Min(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Bid);
+                var price = op.ExitTradeDirection == TradeDirection.Buy ?
+                    Math.Min(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Ask) :
+                    Math.Max(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Bid);
+
                 if (op.AmountRemaining > 0 && !op.IsExitExpired(Algo.Time))
                 {
                     //if we have no order 
@@ -484,16 +487,22 @@ namespace SharpTrader.AlgoFramework
                     (op.Signal.PriceEntry - (decimal)symData.Feed.Bid) / op.Signal.PriceEntry < EntryNearThreshold;
 
                 if (entryNear && !Algo.EntriesSuspended)
-                {
+                { 
                     var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
                     var stillToBuy = originalAmount - op.AmountInvested;
                     if (stillToBuy / originalAmount > 0.2m)
                     {
-                        var adjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(stillToBuy, op.Signal.PriceEntry);
+                        //assure to enter a limit order ( doesn't execute immediatly
+                        var price = op.EntryTradeDirection == TradeDirection.Buy ?
+                            Math.Min(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Ask) :
+                            Math.Max(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Bid);
+
+                        //adjust price 
+                        var adjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(stillToBuy, price);
                         adjusted = Algo.ClampOrderAmount(symData, op.EntryTradeDirection, adjusted);
                         if (adjusted.amount / originalAmount > 0.1m)
                         {
-                            Logger.Debug($"{Algo.Time} - Setting Entry for {op} - amount: {adjusted.amount:0.########} - price: {adjusted.price:0.########}");
+                            Logger.Info($"{Algo.Time} - Setting Entry for {op} - amount: {adjusted.amount:0.########} - price: {adjusted.price:0.########}");
                             //Debug.Assert(op.AmountInvested == 0);
                             var orderInfo = new OrderInfo()
                             {
@@ -516,7 +525,7 @@ namespace SharpTrader.AlgoFramework
                             else
                             {
                                 //log error and repeat operation in 30 seconds
-                                Logger.Error($"Failed opening entry order for operation {op.Id} - symbol {op.Symbol} - error: " + req.ErrorInfo.Replace("\n", "\n\t"));
+                                Logger.Error($"{Algo.Time} - Failed opening entry order for operation {op.Id} - symbol {op.Symbol} - error: " + req.ErrorInfo.Replace("\n", "\n\t"));
                                 self.Time = Algo.Time.AddSeconds(30);
                             }
                         }
