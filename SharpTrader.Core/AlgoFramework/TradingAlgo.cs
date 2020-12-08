@@ -33,7 +33,7 @@ namespace SharpTrader.AlgoFramework
         private TimeSlice OldSlice = new TimeSlice();
         private HashSet<Operation> _ActiveOperations = new HashSet<Operation>();
         private HashSet<Operation> _ClosedOperations = new HashSet<Operation>();
-        private NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        private NLog.Logger Logger = NLog.LogManager.GetLogger("TradingAlgo");
         private Configuration Config;
         private object WorkingSliceLock = new object();
         private bool EntriesStopppedByStrategy = false;

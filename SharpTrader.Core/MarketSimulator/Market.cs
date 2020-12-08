@@ -46,7 +46,7 @@ namespace SharpTrader.MarketSimulator
         public Market(string name, decimal makerFee, decimal takerFee, string dataDir, Action<Market, SymbolFeed> initializeDataSourceCallBack)
         {
             this.initializeDataSourceCallBack = initializeDataSourceCallBack;
-            Logger = LogManager.GetCurrentClassLogger();
+            Logger = LogManager.GetLogger("Market");
 
             MarketName = name;
             MakerFee = makerFee;
@@ -171,7 +171,7 @@ namespace SharpTrader.MarketSimulator
         {
             var ass = SymbolsTable[order.Symbol];
             AssetBalance bal;
-            decimal amount; 
+            decimal amount;
             if (order.TradeType == TradeDirection.Sell)
             {
                 bal = _Balances[ass.Asset];

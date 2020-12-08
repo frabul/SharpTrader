@@ -16,12 +16,12 @@ namespace SharpTrader.Core.BrokersApi.Binance
 {
     public class BinanceTradeBarsRepository : TradeBarsRepository
     {
-        NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        NLog.Logger Logger = NLog.LogManager.GetLogger("BinanceTradeBarsRepository");
         private BinanceClient Client;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private Dictionary<string, DateTime> LastHistoryRequest = new Dictionary<string, DateTime>();
-        private readonly string MarketName = "Binance"; 
-        private SemaphoreSlim DownloadCandlesSemaphore ;
+        private readonly string MarketName = "Binance";
+        private SemaphoreSlim DownloadCandlesSemaphore;
         public int ConcurrencyCount { get; set; } = 10;
 
         public BinanceTradeBarsRepository(string dataDir, BinanceClient cli) : base(dataDir)
@@ -30,7 +30,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             _ = CheckClosing();
             DownloadCandlesSemaphore = new SemaphoreSlim(ConcurrencyCount, ConcurrencyCount);
         }
-         
+
 
         //--------------------------------------------
         public BinanceTradeBarsRepository(string dataDir, double rateLimitFactor = 0.4f) : base(dataDir)
@@ -65,7 +65,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             Dictionary<string, SymbolInfo> dict = new Dictionary<string, SymbolInfo>();
             var tradingRules = await Client.GetExchangeInfo();
             foreach (var symb in tradingRules.Symbols)
-            { 
+            {
                 dict.Add(symb.symbol,
                     new SymbolInfo
                     {
@@ -79,11 +79,11 @@ namespace SharpTrader.Core.BrokersApi.Binance
 
             }
             var crossPairs = await Client.GetAllCrossMarginPairs();
-            foreach(var pair in crossPairs)
+            foreach (var pair in crossPairs)
             {
                 if (dict.ContainsKey(pair.symbol))
                     dict[pair.symbol].IsCrossMarginAllowed = true;
-            } 
+            }
             var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict);
             var deserialized = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, SymbolInfo>>(json);
             System.IO.File.WriteAllText(System.IO.Path.Combine(DataDir, "BinanceSymbolsTable.json"), json);
@@ -140,7 +140,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             {
                 DownloadCandlesSemaphore.Release();
                 sem.Release();
-            } 
+            }
             //this.SaveAll();
         }
 
@@ -233,7 +233,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             return base.GetSymbolHistory(info, startOfData, endOfData);
         }
 
-       
+
 
         public void DownloadSymbols(Func<ExchangeInfoSymbol, bool> filter, TimeSpan redownloadSpan)
         {
@@ -275,16 +275,16 @@ namespace SharpTrader.Core.BrokersApi.Binance
             var symbols = exchangeInfo.Symbols;
 
             var toDownload = symbols
-              
+
                 .Where(s => filter(s.symbol))
                 .Select(sp => sp.symbol).ToList();
             toDownload.Sort();
             List<Task> tasks = new List<Task>();
             foreach (var sym in toDownload)
-            { 
+            {
                 var histInfo = new SymbolHistoryId("Binance", sym, TimeSpan.FromMinutes(1));
                 var task = this.AssureData(histInfo, fromTime, toTime).ContinueWith(t => this.SaveAndClose(histInfo, true));
-                tasks.Add(task); 
+                tasks.Add(task);
             }
             await Task.WhenAll(tasks);
         }

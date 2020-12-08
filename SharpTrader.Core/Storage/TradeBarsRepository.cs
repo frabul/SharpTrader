@@ -17,7 +17,7 @@ namespace SharpTrader.Storage
     //TODO make thread safe
     public class TradeBarsRepository
     {
-        private Logger Logger = LogManager.GetCurrentClassLogger();
+        private Logger Logger = LogManager.GetLogger("TradeBarsRepository");
         private static readonly CandlestickTimeComparer<Candlestick> CandlestickTimeComparer = new CandlestickTimeComparer<Candlestick>();
         private string DataDir;
 

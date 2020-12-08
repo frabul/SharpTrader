@@ -9,7 +9,7 @@ namespace SharpTrader.Storage
 {
     class HistoryView
     {
-        Logger Logger = LogManager.GetCurrentClassLogger();
+        Logger Logger = LogManager.GetLogger("HistoryView");
         private List<Candlestick> _Ticks;
         public SymbolHistoryId Id { get; set; }
         public HashSet<HistoryChunkId> LoadedFiles { get; set; } = new HashSet<HistoryChunkId>();

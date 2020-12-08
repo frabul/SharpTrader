@@ -487,7 +487,7 @@ namespace SharpTrader.AlgoFramework
                     (op.Signal.PriceEntry - (decimal)symData.Feed.Bid) / op.Signal.PriceEntry < EntryNearThreshold;
 
                 if (entryNear && !Algo.EntriesSuspended)
-                { 
+                {
                     var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
                     var stillToBuy = originalAmount - op.AmountInvested;
                     if (stillToBuy / originalAmount > 0.2m)

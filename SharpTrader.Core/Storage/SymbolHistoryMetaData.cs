@@ -34,7 +34,7 @@ namespace SharpTrader.Storage
         private object Locker = new object();
 
         [BsonIgnore]
-        private Logger Logger = LogManager.GetCurrentClassLogger();
+        private Logger Logger = LogManager.GetLogger("SymbolHistoryMetaDataInternal");
 
         [BsonIgnore]
         internal HistoryView View { get; private set; }

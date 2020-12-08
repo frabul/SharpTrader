@@ -14,10 +14,10 @@ namespace SharpTrader.AlgoFramework
         private NLog.Logger Logger;
         public SimpleStopLossRiskManager(decimal stopLoss)
         {
-            Logger = NLog.LogManager.GetCurrentClassLogger();
+            Logger = NLog.LogManager.GetLogger("SimpleStopLossRiskManager");
             StopLoss = stopLoss;
         }
- 
+
         protected override Task OnInitialize()
         {
             return Task.CompletedTask;
