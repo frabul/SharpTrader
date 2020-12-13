@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 
@@ -15,7 +16,7 @@ namespace SharpTrader.AlgoFramework
         BuyThenSell,
         SellThenBuy,
     }
-
+    [Obfuscation(Exclude = true)]
     public class Operation : IChangeTracking
     {
 
@@ -35,10 +36,13 @@ namespace SharpTrader.AlgoFramework
         /// <summary>
         /// Unique identifier for this operation
         /// </summary> 
+        [Obfuscation(Exclude = true)]
         public string Id { get; private set; }
         public bool RiskManaged { get; set; }
         public IChangeTracking ExecutorData { get; set; }
         public IChangeTracking RiskManagerData { get; set; }
+
+       
         public DateTime CreationTime { get; private set; }
 
         /// <summary>

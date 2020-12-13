@@ -147,7 +147,7 @@ namespace SharpTrader.MarketSimulator
                     orderInfo.Direction,
                     orderInfo.Type,
                     orderInfo.Amount,
-                    orderInfo.Price,
+                    orderInfo.Price.Value,
                     orderInfo.ClientOrderId);
                 var res = RegisterOrder(order);
                 if (res.result)

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -124,7 +125,7 @@ namespace SharpTrader
         }
 
     }
-
+    [Obfuscation(Exclude = true)]
     public interface ITrade
     {
         string Id { get; }

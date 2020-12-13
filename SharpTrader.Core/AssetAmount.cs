@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace SharpTrader
 {
+    [Obfuscation(Exclude = true)]
     public class AssetAmount
     {
         public string Asset { get; set; }

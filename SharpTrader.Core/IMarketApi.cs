@@ -14,9 +14,9 @@ namespace SharpTrader
         public TradeDirection Direction { get; set; }
         public MarginOrderEffect Effect { get; set; }
         public decimal Amount { get; set; }
-        public decimal Price { get; set; }
+        public decimal? Price { get; set; }
         public string ClientOrderId { get; set; }
-        public TimeInForce TimeInForce { get; set; } = TimeInForce.GTC;
+        public TimeInForce? TimeInForce { get; set; } = SharpTrader.TimeInForce.GTC;
     }
 
 

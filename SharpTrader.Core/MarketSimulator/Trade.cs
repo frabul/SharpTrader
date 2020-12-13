@@ -1,8 +1,9 @@
 ﻿using System;
-
+using System.Reflection;
 
 namespace SharpTrader.MarketSimulator
 {
+    [Obfuscation(Exclude = true)]
     class Trade : ITrade
     {
         private static long IdCounter = 0;

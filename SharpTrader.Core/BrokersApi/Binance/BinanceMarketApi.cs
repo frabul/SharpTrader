@@ -963,9 +963,13 @@ namespace SharpTrader.BrokersApi.Binance
             Order newApiOrder = null;
             try
             {
-                if (orderInfo.Effect == MarginOrderEffect.None)
+                if (orderInfo.Type == OrderType.Market)
                 {
-
+                    orderInfo.Price = null;
+                    orderInfo.TimeInForce = null;
+                }
+                if (orderInfo.Effect == MarginOrderEffect.None)
+                { 
                     ResultCreateOrderResponse newOrd = (ResultCreateOrderResponse)await Client.CreateOrder(
                         new CreateOrderRequest()
                         {
@@ -1011,10 +1015,10 @@ namespace SharpTrader.BrokersApi.Binance
 
         }
 
-
-
-        private be.Enums.TimeInForce GetTimeInForce(TimeInForce tif)
+        private be.Enums.TimeInForce? GetTimeInForce(TimeInForce? tif)
         {
+            if (tif == null)
+                return null;
             if (tif == TimeInForce.GTC)
                 return be.Enums.TimeInForce.GTC;
             else
@@ -1187,7 +1191,7 @@ namespace SharpTrader.BrokersApi.Binance
             mapper.Entity<Trade>().Ctor(DeserializeTrade);
         }
 
-   
+
         class Request<T> : IRequest<T>
         {
             public T Result { get; }

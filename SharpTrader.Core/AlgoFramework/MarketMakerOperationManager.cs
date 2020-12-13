@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Dynamic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace SharpTrader.AlgoFramework
@@ -19,6 +20,8 @@ namespace SharpTrader.AlgoFramework
         public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(5);
         public TimeSpan DelayAfterCloseFailed = TimeSpan.FromSeconds(60);
         public TimeSpan CloseQueueTime = TimeSpan.FromMinutes(1);
+
+        [Obfuscation(Exclude = true)]
         public class MyOperationData : IChangeTracking
         {
             private volatile bool _IsChanged = true;

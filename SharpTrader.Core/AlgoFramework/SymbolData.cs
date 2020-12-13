@@ -1,9 +1,11 @@
 ﻿using LiteDB;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace SharpTrader.AlgoFramework
 {
+    [Obfuscation(Exclude = true)]
     public class SymbolData
     {
         private List<Operation> _ActiveOperations { get; } = new List<Operation>();

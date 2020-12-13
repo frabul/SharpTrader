@@ -1,5 +1,8 @@
-﻿namespace SharpTrader
+﻿using System.Reflection;
+
+namespace SharpTrader
 {
+    [Obfuscation(Exclude = true)]
     public class SymbolInfo : ISymbolInfo
     {
         public string Key { get; set; }

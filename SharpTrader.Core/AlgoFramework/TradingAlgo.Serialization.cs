@@ -5,6 +5,7 @@ using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 
 namespace SharpTrader.AlgoFramework
@@ -132,17 +133,20 @@ namespace SharpTrader.AlgoFramework
             DbClosedOperations.EnsureIndex(oper => oper.CreationTime);
             DbActiveOperations = this.Db.GetCollection<Operation>("ActiveOperations");
             DbActiveOperations.EnsureIndex(oper => oper.Id);
+            Db.Checkpoint();
 
             //purge old operations that never got to active state
-            Logger.Info("Purgin old operations and rebuilding database.");
+            Logger.Info("Purging old operations and rebuilding database.");
             var purgeLimit = this.Time - TimeSpan.FromDays(7);
             List<string> operationsToRemove = new List<string>();
+         
             foreach (var oper in this.Db.GetCollection("ClosedOperations").FindAll())
             {
-                var isOld = oper["CreationTime"].AsDateTime < purgeLimit;
-                var entryZero = oper["AmountInvested"].AsDecimal <= 0 && oper["AmountLiquidated"].AsDecimal <= 0;
+                var op = this.OperationFromBson(oper); 
+                var isOld = op.CreationTime < purgeLimit;
+                var entryZero = op.AmountInvested <= 0 && op.AmountLiquidated <= 0;
                 if (isOld && entryZero)
-                    operationsToRemove.Add(oper["_id"].AsString);
+                    operationsToRemove.Add(op.Id);
             }
 
 
@@ -155,7 +159,7 @@ namespace SharpTrader.AlgoFramework
             Db.Commit();
             Db.Checkpoint();
             Db.Rebuild();
-            Logger.Info("Rebuld completed.");
+            Logger.Info("Rebuild completed.");
         }
         /// <summary>
         /// This function should provide and object that is going to be saved for reload after reset
@@ -199,7 +203,7 @@ namespace SharpTrader.AlgoFramework
                 Db.Checkpoint();
             }
         }
-
+        
         public void LoadNonVolatileVars()
         {
             lock (DbLock)

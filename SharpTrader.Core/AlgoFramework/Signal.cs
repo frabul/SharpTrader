@@ -3,9 +3,11 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.ComponentModel;
 using System.Dynamic;
+using System.Reflection;
 
 namespace SharpTrader.AlgoFramework
 {
+    [Obfuscation(Exclude = true)]
     public class Signal : IChangeTracking
     { 
         public event Action<Signal> OnModify;
