@@ -10,7 +10,7 @@ namespace SharpTrader.MarketSimulator
 {
     public class SymbolFeed : ISymbolFeed
     {
-        public event Action<ISymbolFeed, IBaseData> OnData; 
+        public event Action<ISymbolFeed, IBaseData> OnData;
         private TimeSpan Resolution = TimeSpan.FromSeconds(60);
         private List<IBaseData> NewData = new List<IBaseData>(10);
 
@@ -22,7 +22,7 @@ namespace SharpTrader.MarketSimulator
         public string Market { get; private set; }
         public double Spread { get; set; }
         public ISymbolHistory DataSource { get; set; }
-        public IBaseData LastTick { get; private set;  }  
+        public IBaseData LastTick { get; private set; }
 
         public SymbolFeed(string market, SymbolInfo symbol)
         {
@@ -52,13 +52,13 @@ namespace SharpTrader.MarketSimulator
             Bid = newMarketData.Value - Spread / 2;
             Ask = newMarketData.Value + Spread / 2;
             LastTick = newMarketData;
-            NewData.Add(newMarketData); 
+            NewData.Add(newMarketData);
         }
 
         public void RaisePendingEvents(ISymbolFeed sender)
         {
             if (NewData.Count > 0)
-            { 
+            {
                 foreach (var data in NewData)
                 {
                     OnData?.Invoke(this, data);
@@ -73,7 +73,7 @@ namespace SharpTrader.MarketSimulator
             Debug.Assert(price > 0);
             amount = Math.Round(amount - 0.00049m, 4);
             if (amount * price < 0.00001m)
-                amount = 0.00001m / price;
+                amount = 0;
             return (price, amount);
         }
 
@@ -87,5 +87,5 @@ namespace SharpTrader.MarketSimulator
                 amount = 0.00001m / price;
             return (price, amount);
         }
-    } 
+    }
 }
