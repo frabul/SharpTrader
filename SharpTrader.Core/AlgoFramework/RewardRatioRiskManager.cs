@@ -55,6 +55,7 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
+        private NLog.Logger Logger = NLog.LogManager.GetLogger(nameof(RewardRatioRiskManager));
         public double RiskRewardRatio { get; set; } = 1;
         public TimeSpan BaseLevelTimespan { get; set; } = TimeSpan.Zero;
         public bool TrailingStopLoss { get; set; } = false;
@@ -113,7 +114,7 @@ namespace SharpTrader.AlgoFramework
                 var opData = GetData(op);
 
                 //---
-                if (!op.RiskManaged)
+                if (op.AmountRemaining > 0 && !op.RiskManaged)
                 {
                     var stopLossPrice = TrailingStopLoss ? opData.HighestPrice + opData.StopLossDelta : (double)op.Signal.PriceEntry + opData.StopLossDelta;
                     //get gain percent
@@ -134,19 +135,23 @@ namespace SharpTrader.AlgoFramework
 
                 if (op.RiskManaged && !(op.IsClosed || op.IsClosing))
                 {
-                    //--- liquidate operation funds ---
-                    var liquidationResult = await Algo.TryLiquidateOperation(op, "stop loss reached");
-
-                    if (liquidationResult.order != null)
+                    if (op.AmountRemaining > 0)
                     {
-                        //expect trade that will close the operation
-                        opData.LastExit = liquidationResult.order;
-                        //warning - we just requested a trade, the new trade will cancel our close request!!
-                        op.ScheduleClose(Algo.Time.AddMinutes(5));
+                        //--- liquidate operation funds ---
+                        var lr = await Algo.TryLiquidateOperation(op, $"stopLoss reached");
+                        if (lr.amountRemainingLow)
+                        {
+                            if (op.AmountRemaining / op.AmountInvested < 0.07m) //todo gestire meglio
+                            {
+                                Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low.");
+                                op.ScheduleClose(Algo.Time.AddMinutes(3));
+                            }
+                        }
                     }
                     else
                     {
-                        //todo log error
+                        Logger.Info($"Queueing for close operation {op.ToString("c")}");
+                        op.ScheduleClose(Algo.Time.AddMinutes(3));
                     }
                 }
             }
