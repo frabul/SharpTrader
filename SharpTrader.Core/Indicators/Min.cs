@@ -54,7 +54,7 @@ namespace SharpTrader.Indicators
                 } 
             }
              
-            output = new IndicatorDataPoint(input.Time, output.Low);
+            output = new IndicatorDataPoint(output.Time, output.Low);
             LastOutput = output;
             return output;
         }

@@ -18,5 +18,10 @@
         {
             return new MarketRequest<T>(RequestStatus.Completed, val);
         }
-    } 
+
+        public static IRequest<T> FromError(string errorInfo)
+        {
+            return new MarketRequest<T>(RequestStatus.Failed, default(T)) { ErrorInfo = errorInfo };
+        }
+    }
 }
