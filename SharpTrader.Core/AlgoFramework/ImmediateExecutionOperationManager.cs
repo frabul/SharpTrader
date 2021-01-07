@@ -15,7 +15,7 @@ namespace SharpTrader.AlgoFramework
         {
             return Task.CompletedTask;
         }
-        
+
         public override Task CancelEntryOrders()
         {
             return Task.CompletedTask;
@@ -73,29 +73,28 @@ namespace SharpTrader.AlgoFramework
             //foreach operation check if the entry is enough
             foreach (Operation operation in symData.ActiveOperations)
             {
-                var execData = InitializeOperationData(operation);
+                MyOperationData execData = InitializeOperationData(operation);
 
-                //add trades correlated to this order
-                foreach (ITrade trade in slice.SymbolsData[symbol.Key].Trades)
+                //check if it needs to be closed
+                if (operation.IsEntryExpired(Algo.Time) && (operation.AmountInvested <= 0 || operation.AmountRemaining / operation.AmountInvested <= 0.03m))
                 {
-                    if (trade.Direction == execData.EntryDirection)
-                        operation.AddEntry(trade);
-                    else
-                        operation.AddExit(trade);
+                    operation.ScheduleClose(Algo.Time.AddSeconds(5));
+                    continue;
                 }
 
                 //check if entry needed
-                if (operation.AmountInvested <= 0 && Algo.Time < operation.Signal.ExpireDate)
+                if (operation.AmountInvested <= 0 && !operation.IsEntryExpired(Algo.Time) && !Algo.EntriesSuspended)
                 {
                     var gotEntry = operation.Type == OperationType.BuyThenSell ?
                                      (decimal)symData.Feed.Ask <= operation.Signal.PriceEntry :
                                      (decimal)symData.Feed.Bid >= operation.Signal.PriceEntry;
                     //todo  check if the last entry order was effectively executed
                     //check if we have already sent an order
-                    if (execData.LastEntryOrder != null)
+                    if (execData.LastEntryOrder == null)
                     {
-                        var amount = operation.AmountTarget.Amount - operation.AmountInvested;
-                        if ((amount / operation.AmountTarget.Amount) > 0.01m)
+                        var originalAmount = AssetAmount.Convert(operation.AmountTarget, operation.Symbol.Asset, symData.Feed);
+                        var stillToBuy = originalAmount - operation.AmountInvested;
+                        if (stillToBuy / originalAmount > 0.2m)
                         {
                             //TODO check requirements for order: price precision, minimum amount, min notional, available money
                             var orderInfo = new OrderInfo()
@@ -103,11 +102,11 @@ namespace SharpTrader.AlgoFramework
                                 Symbol = symbol.Key,
                                 Type = OrderType.Market,
                                 Effect = Algo.DoMarginTrading ? MarginOrderEffect.OpenPosition : MarginOrderEffect.None,
-                                Amount = amount, 
+                                Amount = stillToBuy,
                                 ClientOrderId = operation.GetNewOrderId(),
                                 Direction = execData.EntryDirection
                             };
-                            var ticket = await Algo.Market.PostNewOrder(orderInfo); 
+                            var ticket = await Algo.Market.PostNewOrder(orderInfo);
                             if (ticket.Status == RequestStatus.Completed)
                             {
                                 //Market order was executed - we should expect the trade on next update 
@@ -122,7 +121,7 @@ namespace SharpTrader.AlgoFramework
                 }
 
                 //check if exit needed
-                if (execData.LastExitOrder != null)
+                if (execData.LastExitOrder == null)
                 {
                     var shouldExit = operation.Signal.ExpireDate < Algo.Time;
                     var gotTarget = operation.Type == OperationType.BuyThenSell ?
@@ -142,7 +141,7 @@ namespace SharpTrader.AlgoFramework
                             ClientOrderId = operation.GetNewOrderId(),
                             Direction = execData.ExitDirection
                         };
-                        var ticket = await Algo.Market.PostNewOrder(orderInfo); 
+                        var ticket = await Algo.Market.PostNewOrder(orderInfo);
                         if (ticket.Status == RequestStatus.Completed)
                         {
                             //Market order was executed - we should expect the trade on next update 
@@ -157,7 +156,7 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-       
+
         class MyOperationData
         {
             public IOrder LastEntryOrder;
