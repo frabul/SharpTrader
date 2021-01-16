@@ -79,11 +79,14 @@ namespace SharpTrader.MarketSimulator
         }
 
         int NoMoreDataCount = 0;
-
+        public bool IncrementalHistoryLoading { get; set; } = false;
         public bool NextTick()
         {
             //calculate next tick time
             var nextTick = this.Time + Resolution;
+
+            //if a new month has started
+
 
             //update market time
             this.Time = nextTick;
@@ -91,6 +94,22 @@ namespace SharpTrader.MarketSimulator
             //add new data to all symbol feeds that have it    
             foreach (var market in _Markets)
             {
+                if (IncrementalHistoryLoading)
+                    if (Time.Month != market.Time.Month || Time.Year != market.Time.Year || !market.FistTickPassed)
+                    {
+                        market.FistTickPassed = true;
+                        // a new month has started, let's load the data for this month
+                        foreach (var feed in market.SymbolsFeeds.Values)
+                        {
+                            var histInfo = new SymbolHistoryId(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
+
+                            feed.DataSource = this.HistoryDb.GetSymbolHistory(
+                                histInfo,
+                                this.Time,
+                                new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1).AddMilliseconds(-1));
+                            this.HistoryDb.SaveAndClose(histInfo, false);
+                        }
+                    }
                 market.Time = this.Time;
                 foreach (var feed in market.SymbolsFeeds.Values)
                 {
@@ -126,12 +145,13 @@ namespace SharpTrader.MarketSimulator
 
         private void InitializeDataSourceCallBack(Market market, SymbolFeed feed)
         {
-            if (feed.DataSource == null)
-            {
-                var histInfo = new SymbolHistoryId(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
-                feed.DataSource = this.HistoryDb.GetSymbolHistory(histInfo, StartTime, EndTime);
-                //this.HistoryDb.CloseFile(histInfo);
-            }
+            if (!IncrementalHistoryLoading)
+                if (feed.DataSource == null)
+                {
+                    var histInfo = new SymbolHistoryId(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
+                    feed.DataSource = this.HistoryDb.GetSymbolHistory(histInfo, StartTime, EndTime);
+                    //this.HistoryDb.CloseFile(histInfo);
+                }
         }
 
         public void Deposit(string market, string asset, decimal amount)

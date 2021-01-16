@@ -216,6 +216,8 @@ namespace SharpTrader.MarketSimulator
             }
         }
 
+        public   bool FistTickPassed { get; set; } = false;
+
         internal void RaisePendingEvents()
         {
             List<ITrade> trades;
