@@ -25,7 +25,7 @@ namespace SharpTrader
             public string AlgoClass;
             public DateTime StartTime { get; set; }
             public DateTime EndTime { get; set; }
-
+            public bool IncrementalHistoryLoading { get; set; } = false;
             public AssetAmount StartingBalance { get; set; } = new AssetAmount("BTC", 100);
             public string Market = "Binance";
 
@@ -43,6 +43,11 @@ namespace SharpTrader
         public DateTime EndTime => Config.EndTime;
         public string BaseAsset => Config.StartingBalance.Asset;
         public List<(DateTime time, decimal bal)> EquityHistory { get; set; } = new List<(DateTime time, decimal bal)>();
+        public List<IndicatorDataPoint> Benchmark { get; set; } = new List<IndicatorDataPoint>();
+
+        Dictionary<string, double> LastPrices = new Dictionary<string, double>();
+
+
         public decimal FinalBalance { get; set; }
         public decimal MaxDrowDown { get; private set; }
         /// <summary>
@@ -61,6 +66,8 @@ namespace SharpTrader
 
             var HistoryDB = new TradeBarsRepository(Config.HistoryDb);
             this.MarketSimulator = new MultiMarketSimulator(Config.DataDir, HistoryDB, Config.StartTime, Config.EndTime);
+            if (config.IncrementalHistoryLoading)
+                this.MarketSimulator.IncrementalHistoryLoading = true;
             MarketSimulator.Deposit(Config.Market, Config.StartingBalance.Asset, Config.StartingBalance.Amount);
 
             var algoClass = Type.GetType(Config.AlgoClass);
@@ -151,6 +158,7 @@ namespace SharpTrader
 
 
             var startingBal = -1m;
+            var currentBenchmarkVal = 0.0;
             while (MarketSimulator.NextTick() && MarketSimulator.Time < EndTime)
             {
                 if (startingBal < 0)
@@ -160,12 +168,43 @@ namespace SharpTrader
                 steps++;
 
                 var balance = MarketSimulator.GetEquity(BaseAsset);
-                EquityHistory.Add((MarketSimulator.Time, balance));
+
                 BalancePeak = balance > BalancePeak ? balance : BalancePeak;
                 if (BalancePeak - balance > MaxDrowDown)
                 {
                     MaxDrowDown = BalancePeak - balance;
                 }
+                //---- update equity and benchmark ----------
+
+                if (steps % 30 == 0)
+                {
+                    EquityHistory.Add((MarketSimulator.Time, balance));
+                    double changeSum = 0;
+                    int changeCount = 0;
+                    foreach (var symData in Algo.SymbolsData.Values)
+                    {
+
+                        if (symData.Feed != null && symData.Feed.Ask > 0 && symData.Feed.Bid > 0)
+                        {
+                            var sk = symData.Feed.Symbol.Key;
+                            if (symData.Feed != null && LastPrices.ContainsKey(sk))
+                            {
+                                changeCount++;
+                                changeSum += (symData.Feed.Bid - LastPrices[sk]) / LastPrices[sk];
+                            }
+                            LastPrices[sk] = symData.Feed.Ask;
+                        }
+
+                    }
+
+                    if (changeCount > 0)
+                    {
+                        currentBenchmarkVal += changeSum * 100 / changeCount;
+                        Benchmark.Add(new IndicatorDataPoint(MarketSimulator.Time, currentBenchmarkVal));
+                    }
+
+                }
+
             }
 
             var totalBal = MarketSimulator.GetEquity(BaseAsset);
@@ -202,6 +241,7 @@ namespace SharpTrader
                     points.Add(new IndicatorDataPoint(e.time, (double)e.bal));
                 }
                 plot.PlotLine(points, ARGBColors.Purple);
+                plot.PlotLine(Benchmark, ARGBColors.MediumPurple, "asdasd");
                 plot.InitialView = (Config.StartTime, Config.EndTime);
                 ShowPlotCallback?.Invoke(plot);
             }
