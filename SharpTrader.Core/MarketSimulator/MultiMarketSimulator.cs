@@ -94,10 +94,10 @@ namespace SharpTrader.MarketSimulator
             //add new data to all symbol feeds that have it    
             foreach (var market in _Markets)
             {
-                if (IncrementalHistoryLoading)
+                if (IncrementalHistoryLoading)  
                     if (Time.Month != market.Time.Month || Time.Year != market.Time.Year || !market.FistTickPassed)
                     {
-                        market.FistTickPassed = true;
+                        
                         // a new month has started, let's load the data for this month
                         foreach (var feed in market.SymbolsFeeds.Values)
                         {
@@ -108,7 +108,9 @@ namespace SharpTrader.MarketSimulator
                                 this.Time,
                                 new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1).AddMilliseconds(-1));
                             this.HistoryDb.SaveAndClose(histInfo, false);
+                            market.FistTickPassed = true;
                         }
+                  
                     }
                 market.Time = this.Time;
                 foreach (var feed in market.SymbolsFeeds.Values)
