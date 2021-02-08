@@ -15,6 +15,37 @@ namespace SharpTrader
 {
     public class BackTester
     {
+        class TimeAndValue
+        {
+            public DateTime Time;
+            public decimal Value;
+        }
+        public class Statistics
+        {
+            public List<IndicatorDataPoint> EquityHistory { get; set; } = new List<IndicatorDataPoint>();
+            public double BalancePeak { get; private set; }
+            public double MaxDrowDown { get; private set; }
+            public double StartingEquity { get; private set; }
+            public double Profit { get; private set; }
+            public double ProfitOverMaxDrowDown { get; private set; }
+            private bool IsFirstRecord = true;
+            internal void Update(DateTime time, double equity)
+            {
+                if (IsFirstRecord)
+                    StartingEquity = equity;
+
+                IsFirstRecord = false;
+                EquityHistory.Add(new IndicatorDataPoint(time, equity));
+                BalancePeak = equity > BalancePeak ? equity : BalancePeak;
+                if (BalancePeak - equity > MaxDrowDown)
+                    MaxDrowDown = BalancePeak - equity;
+
+                Profit = equity - StartingEquity;
+                if (MaxDrowDown != 0)
+                    ProfitOverMaxDrowDown = Profit / MaxDrowDown;
+            }
+        }
+
         public class Configuration
         {
             public string SessionName = "Backetester";
@@ -42,14 +73,12 @@ namespace SharpTrader
         public DateTime StartTime => Config.StartTime;
         public DateTime EndTime => Config.EndTime;
         public string BaseAsset => Config.StartingBalance.Asset;
-        public List<(DateTime time, decimal bal)> EquityHistory { get; set; } = new List<(DateTime time, decimal bal)>();
-        public List<IndicatorDataPoint> Benchmark { get; set; } = new List<IndicatorDataPoint>();
+
 
         Dictionary<string, double> LastPrices = new Dictionary<string, double>();
+        public Statistics BotStats;
+        public Statistics BenchmarkStats;
 
-
-        public decimal FinalBalance { get; set; }
-        public decimal MaxDrowDown { get; private set; }
         /// <summary>
         /// How much history should be loaded back from the simulation start time
         /// </summary>
@@ -144,6 +173,8 @@ namespace SharpTrader
         {
             if (Started)
                 return;
+            this.BenchmarkStats = new Statistics();
+            this.BotStats = new Statistics();
             Logger.Info($"Backtesting {Algo.Version} from  {StartTime} - {EndTime} with configuration:\n" + JObject.FromObject(algoConfig).ToString());
 
             Stopwatch sw = new Stopwatch();
@@ -166,24 +197,16 @@ namespace SharpTrader
 
                 Algo.OnTickAsync().Wait();
                 steps++;
-
-                var balance = MarketSimulator.GetEquity(BaseAsset);
-
-                BalancePeak = balance > BalancePeak ? balance : BalancePeak;
-                if (BalancePeak - balance > MaxDrowDown)
-                {
-                    MaxDrowDown = BalancePeak - balance;
-                }
-                //---- update equity and benchmark ----------
-
+                //---- update equity and benchmark ---------- 
                 if (steps % 30 == 0)
                 {
-                    EquityHistory.Add((MarketSimulator.Time, balance));
+                    var balance = MarketSimulator.GetEquity(BaseAsset);
+                    BotStats.Update(MarketSimulator.Time, (double)balance);
+                    //--- calculate benchmark change
                     double changeSum = 0;
                     int changeCount = 0;
                     foreach (var symData in Algo.SymbolsData.Values)
                     {
-
                         if (symData.Feed != null && symData.Feed.Ask > 0 && symData.Feed.Bid > 0)
                         {
                             var sk = symData.Feed.Symbol.Key;
@@ -194,17 +217,14 @@ namespace SharpTrader
                             }
                             LastPrices[sk] = symData.Feed.Ask;
                         }
-
                     }
-
                     if (changeCount > 0)
                     {
                         currentBenchmarkVal += changeSum * 100 / changeCount;
-                        Benchmark.Add(new IndicatorDataPoint(MarketSimulator.Time, currentBenchmarkVal));
+                        BenchmarkStats.Update(MarketSimulator.Time, currentBenchmarkVal);
                     }
 
                 }
-
             }
 
             var totalBal = MarketSimulator.GetEquity(BaseAsset);
@@ -219,13 +239,17 @@ namespace SharpTrader
                                                 });
             var lostInFee = feeList.Sum();
             //get profit
-            var profit = totalBal - startingBal;
-            var totalBuys = MarketSimulator.Trades.Where(tr => tr.Direction == TradeDirection.Buy).Count();
+
             sw.Stop();
+
             Logger.Info($"Test terminated in {sw.ElapsedMilliseconds} ms.");
             Logger.Info($"Balance: {totalBal} - Trades:{MarketSimulator.Trades.Count()} - Lost in fee:{lostInFee}");
-            if (totalBuys > 0)
-                Logger.Info($"Profit/buy: {(totalBal - startingBal) / totalBuys:F8} - MaxDrawDown:{MaxDrowDown} - Profit/MDD:{profit / MaxDrowDown}");
+            var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
+            if (operations.Count > 0)
+            {
+                Logger.Info($"Algorithm => Profit/MDD: {BotStats.Profit / BotStats.MaxDrowDown} - MaxDrawDown: {BotStats.MaxDrowDown} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
+                Logger.Info($"BenchMark => Profit/MDD: {BenchmarkStats.Profit / BenchmarkStats.MaxDrowDown} - MaxDrawDown: {BenchmarkStats.MaxDrowDown} ");
+            }
 
             foreach (var p in Algo.Plots)
                 ShowPlotCallback?.Invoke(p);
@@ -233,15 +257,22 @@ namespace SharpTrader
             if (Config.PlotResults)
             {
                 PlotHelper plot = new PlotHelper("Equity");
-                int skipCount = (EquityHistory.Count + 1000) / 1000;
-                List<IndicatorDataPoint> points = new List<IndicatorDataPoint>();
-                for (int i = 0; i < EquityHistory.Count; i += skipCount)
+                int skipCount = (BotStats.EquityHistory.Count + 2000) / 2000;
+                List<IndicatorDataPoint> botPoints = new List<IndicatorDataPoint>();
+                List<IndicatorDataPoint> benchPoints = new List<IndicatorDataPoint>();
+               
+                for (int i = 0; i < BotStats.EquityHistory.Count; i += skipCount)
                 {
-                    var e = EquityHistory[i];
-                    points.Add(new IndicatorDataPoint(e.time, (double)e.bal));
+                    var e = BotStats.EquityHistory[i];
+                    botPoints.Add(new IndicatorDataPoint(e.Time, e.Value));
+                    if(BenchmarkStats.EquityHistory.Count > i)
+                    {
+                        e = BenchmarkStats.EquityHistory[i];
+                        benchPoints.Add(new IndicatorDataPoint(e.Time, e.Value));
+                    } 
                 }
-                plot.PlotLine(points, ARGBColors.Purple);
-                plot.PlotLine(Benchmark, ARGBColors.MediumPurple, "asdasd");
+                plot.PlotLine(botPoints, ARGBColors.Purple);
+                plot.PlotLine(benchPoints, ARGBColors.MediumPurple, "asdasd");
                 plot.InitialView = (Config.StartTime, Config.EndTime);
                 ShowPlotCallback?.Invoke(plot);
             }
