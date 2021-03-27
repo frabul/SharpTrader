@@ -139,10 +139,10 @@ namespace SharpTrader.AlgoFramework
             Logger.Info("Purging old operations and rebuilding database.");
             var purgeLimit = this.Time - TimeSpan.FromDays(7);
             List<string> operationsToRemove = new List<string>();
-         
+
             foreach (var oper in this.Db.GetCollection("ClosedOperations").FindAll())
             {
-                var op = this.OperationFromBson(oper); 
+                var op = this.OperationFromBson(oper);
                 var isOld = op.CreationTime < purgeLimit;
                 var entryZero = op.AmountInvested <= 0 && op.AmountLiquidated <= 0;
                 if (isOld && entryZero)
@@ -203,7 +203,7 @@ namespace SharpTrader.AlgoFramework
                 Db.Checkpoint();
             }
         }
-        
+
         public void LoadNonVolatileVars()
         {
             lock (DbLock)
@@ -266,6 +266,15 @@ namespace SharpTrader.AlgoFramework
                 return l1.Concat(l2).ToArray();
             }
         }
+        public Operation[] QueryClosedOperations(Expression<Func<BsonDocument, bool>> predicate)
+        {
+            lock (DbLock)
+            {
+                var l1 = this.Db.GetCollection("ClosedOperations").Find(predicate).ToList();
+                return l1.Select(bson => OperationFromBson(bson)).ToArray();
+            }
+        }
+
         public Operation[] QueryOperations(Expression<Func<Operation, bool>> predicate)
         {
             lock (DbLock)

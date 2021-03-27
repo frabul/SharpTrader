@@ -127,8 +127,8 @@ namespace SharpTrader.AlgoFramework
                     SymbolData symbolData = GetSymbolData(sym);
                     symbolData.IsSelectedForTrading = false;
                     //if it doesn't have acrive operations
-                    if(!selectedForOperationsActive.Any(aos => aos.Key == sym.Key))
-                    { 
+                    if (!selectedForOperationsActive.Any(aos => aos.Key == sym.Key))
+                    {
                         if (symbolData.Feed != null)
                         {
                             symbolData.Feed.OnData -= Feed_OnData;
@@ -136,13 +136,13 @@ namespace SharpTrader.AlgoFramework
                             symbolData.Feed = null;
                         }
                     }
-                } 
+                }
 
                 //add feeds for added symbols and those that have open operations
                 foreach (var sym in changes.AddedSymbols)
                 {
                     SymbolData symbolData = GetSymbolData(sym);
-                    symbolData.IsSelectedForTrading = true; 
+                    symbolData.IsSelectedForTrading = true;
                 }
 
                 foreach (var sym in changes.AddedSymbols.Concat(selectedForOperationsActive))
@@ -184,14 +184,23 @@ namespace SharpTrader.AlgoFramework
                 }
                 else
                 {
-                    //let's search in closed operations
+                    //let's search in closed operations by getting ligtweigth instances
                     if (oldOperations == null)
                     {
+                        //lock (DbLock)
+                        //    oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray(); 
                         lock (DbLock)
-                            oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray();
+                            oldOperations = QueryClosedOperations(doc => doc["CreationTime"].AsDateTime >= Market.Time.AddDays(-2));
                     }
 
                     var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
+                    //if we found an operation let's get a real instance 
+                    if (oldOp != null)
+                    {
+                        oldOp = DbClosedOperations.FindById(oldOp.Id);
+                        if (oldOp == null)
+                            Logger.Error($"Operation found then not found!  {oldOp}.");
+                    }
 
                     if (oldOp != null)
                     {
@@ -206,7 +215,7 @@ namespace SharpTrader.AlgoFramework
                         }
                     }
                     else
-                        Logger.Trace($"{Time} - New trade {trade.ToString()} without any associated operation");
+                        Logger.Warn($"{Time} - New trade {trade.ToString()} without any associated operation");
                 }
             }
             //dispose the operations that we didn't use  

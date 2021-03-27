@@ -19,7 +19,7 @@ namespace SharpTrader.AlgoFramework
         NLog.Logger Logger;
         public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(5);
         public TimeSpan DelayAfterCloseFailed = TimeSpan.FromSeconds(60);
-        public TimeSpan CloseQueueTime = TimeSpan.FromMinutes(1);
+        public TimeSpan CloseQueueTime = TimeSpan.FromMinutes(2);
 
         [Obfuscation(Exclude = true)]
         public class MyOperationData : IChangeTracking
