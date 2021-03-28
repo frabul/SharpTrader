@@ -1,15 +1,23 @@
 ﻿using LiteDB;
 using System;
+using System.ComponentModel;
 using System.Threading.Tasks;
 
 namespace SharpTrader.AlgoFramework
 {
     public class SimpleStopLossRiskManager : RiskManager
     {
-        class RMData
+        public class RMData : IChangeTracking
         {
-            public IOrder LastExit { get; set; }
+            public DateTime NextTry { get; set; } = DateTime.MinValue;
+            public int LiquidationTries { get; set; }
+            public bool IsChanged => false;
+            public void AcceptChanges()
+            {
+
+            }
         }
+
         public decimal StopLoss { get; private set; }
         private NLog.Logger Logger;
         public SimpleStopLossRiskManager(decimal stopLoss)
@@ -23,10 +31,20 @@ namespace SharpTrader.AlgoFramework
             return Task.CompletedTask;
         }
 
+        private RMData GetData(Operation op)
+        {
+            if (op.RiskManagerData is RMData myData)
+                return myData;
+            op.RiskManagerData = new RMData();
+            return op.RiskManagerData as RMData;
+        }
+
         public override async Task Update(TimeSlice slice)
         {
+
             foreach (var op in Algo.ActiveOperations)
             {
+
                 //---
                 if (op.AmountRemaining > 0 && !op.RiskManaged)
                 {
@@ -47,17 +65,26 @@ namespace SharpTrader.AlgoFramework
 
                 if (op.RiskManaged && !(op.IsClosing || op.IsClosed))
                 {
-                    if (op.AmountRemaining > 0)
+                    var myData = GetData(op);
+
+                    if (Algo.Time > myData.NextTry && op.AmountRemaining > 0)
                     {
                         //--- liquidate operation funds ---
                         var lr = await Algo.TryLiquidateOperation(op, $"stopLoss reached");
                         if (lr.amountRemainingLow)
                         {
-                            if (op.AmountRemaining / op.AmountInvested < 0.07m) //todo gestire meglio
+                            if (op.AmountRemaining / op.AmountInvested < 0.1m) //todo gestire meglio
                             {
                                 Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low.");
                                 op.ScheduleClose(Algo.Time.AddMinutes(3));
                             }
+                        }
+                        myData.LiquidationTries++;
+                        var delaySeconds = 120 + Math.Min(8, myData.LiquidationTries) * 60;
+                        myData.NextTry = Algo.Time.AddSeconds(delaySeconds);
+                        if(myData.LiquidationTries > 100)
+                        {
+                            Logger.Info($"Schedule operation for close {op.ToString("c")} as it reached maximum number of liquidation tries.");
                         }
                     }
                     else
