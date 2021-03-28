@@ -17,7 +17,7 @@ namespace SharpTrader.AlgoFramework
         //todo avoid problems due to unsynched info about trades
         //todo ogni volta che viene cancellato un ordine si deve aspettare del tempo prima di crearne uno nuovo
         NLog.Logger Logger;
-        public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(5);
+        public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(15);
         public TimeSpan DelayAfterCloseFailed = TimeSpan.FromSeconds(60);
         public TimeSpan CloseQueueTime = TimeSpan.FromMinutes(2);
 
@@ -447,6 +447,10 @@ namespace SharpTrader.AlgoFramework
                             await self.Next(self);
                         else
                             self.Time = Algo.Time + DelayAfterOrderClosed;
+
+                        //in case signal expired there is no pressure to open a new order, take some more time ( to avoid double exit )
+                        if (Algo.Time > op.Signal.ExpireDate)
+                            self.Time = Algo.Time.AddSeconds(30);
                     }
                     else
                     {
