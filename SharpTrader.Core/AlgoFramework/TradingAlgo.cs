@@ -213,15 +213,19 @@ namespace SharpTrader.AlgoFramework
                             this.ResumeOperation(oldOp);
                             Logger.Info($"Resuming 'old' operation {activeOp}.");
                         }
+                        else
+                            oldOp.Dispose(); //otherwise we must dispose it
                     }
                     else
-                        Logger.Warn($"{Time} - New trade {trade.ToString()} without any associated operation");
+                        Logger.Debug($"{Time} - New trade {trade.ToString()} without any associated operation");
                 }
             }
             //dispose the operations that we didn't use  
             if (oldOperations != null)
                 foreach (var oper in oldOperations.Where(oo => !operationsResumed.Contains(oo)))
                     oper.Dispose();
+
+            // call OnUpdate
             await OnUpdate(slice);
 
             // get signals 
