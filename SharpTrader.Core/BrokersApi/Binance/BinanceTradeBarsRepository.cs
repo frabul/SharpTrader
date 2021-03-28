@@ -233,8 +233,6 @@ namespace SharpTrader.Core.BrokersApi.Binance
             return base.GetSymbolHistory(info, startOfData, endOfData);
         }
 
-
-
         public void DownloadSymbols(Func<ExchangeInfoSymbol, bool> filter, TimeSpan redownloadSpan)
         {
             var exchangeInfo = Client.GetExchangeInfo().Result;
@@ -269,6 +267,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             while (tasks.Any(t => !t.IsCompleted))
                 System.Threading.Thread.Sleep(1);
         }
+
         public async Task AssureFilter(Func<string, bool> filter, DateTime fromTime, DateTime toTime)
         {
             var exchangeInfo = Client.GetExchangeInfo().Result;
@@ -288,6 +287,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
             await Task.WhenAll(tasks);
         }
+
         public async Task DownloadHistoryAsync(string symbol, DateTime fromTime, TimeSpan redownloadStart)
         {
             //we must assure that there is only one downloading action ongoing for each symbol!
