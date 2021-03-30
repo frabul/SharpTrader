@@ -346,7 +346,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error during server time synch: " + GetExceptionErrorInfo(ex));
+                Logger.Error("Error during server time synch: " + GetExceptionErrorInfo(ex));
             }
 
         }
@@ -354,21 +354,25 @@ namespace SharpTrader.BrokersApi.Binance
         private async Task SynchBalance()
         {
             try
-            {
+            { 
                 var accountInfo = await Client.GetAccountInformation();
-                foreach (var bal in accountInfo.Balances)
+                lock (LockBalances)
                 {
-                    this._Balances[bal.Asset] = new AssetBalance
+                    foreach (var bal in accountInfo.Balances)
                     {
-                        Asset = bal.Asset,
-                        Free = bal.Free,
-                        Locked = bal.Locked
-                    };
-                }
+                        if (!_Balances.ContainsKey(bal.Asset))
+                            this._Balances[bal.Asset] = new AssetBalance();
+
+                        this._Balances[bal.Asset].Asset = bal.Asset;
+                        this._Balances[bal.Asset].Free = bal.Free;
+                        this._Balances[bal.Asset].Locked = bal.Locked;
+
+                    }
+                } 
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error while trying to update account info: " + GetExceptionErrorInfo(ex));
+                Logger.Error("Error while trying to update account info: " + GetExceptionErrorInfo(ex));
             }
 
 
@@ -413,7 +417,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error during orders synchronization: " + GetExceptionErrorInfo(ex));
+                Logger.Error("Error during orders synchronization: " + GetExceptionErrorInfo(ex));
             }
         }
         private async Task SynchLastTrades()
@@ -524,7 +528,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Failed to listen for user data stream because: " + GetExceptionErrorInfo(ex));
+                Logger.Error("Failed to listen for user data stream because: " + GetExceptionErrorInfo(ex));
             }
 
         }
@@ -969,7 +973,7 @@ namespace SharpTrader.BrokersApi.Binance
                     orderInfo.TimeInForce = null;
                 }
                 if (orderInfo.Effect == MarginOrderEffect.None)
-                { 
+                {
                     ResultCreateOrderResponse newOrd = (ResultCreateOrderResponse)await Client.CreateOrder(
                         new CreateOrderRequest()
                         {
