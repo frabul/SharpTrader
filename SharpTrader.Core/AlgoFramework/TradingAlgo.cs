@@ -190,7 +190,7 @@ namespace SharpTrader.AlgoFramework
                         //lock (DbLock)
                         //    oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray(); 
                         lock (DbLock)
-                            oldOperations = QueryClosedOperations(doc => doc["CreationTime"].AsDateTime >= Market.Time.AddDays(-2));
+                            oldOperations = QueryClosedOperations(doc => doc["CreationTime"].AsDateTime >= Market.Time.AddDays(-4));
                     }
 
                     var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
@@ -235,10 +235,11 @@ namespace SharpTrader.AlgoFramework
             //create operations
             if (Allocator != null)
                 Allocator.Update(slice);
+
+            //close operations that have been in close queue for enough time
             lock (DbLock)
             {
-                this.Db?.BeginTrans();
-                //close operations that have been in close queue for enough time
+                this.Db?.BeginTrans(); 
                 List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
                 foreach (var op in operationsToClose)
                 {
