@@ -71,21 +71,25 @@ namespace SharpTrader.AlgoFramework
                     {
                         //--- liquidate operation funds ---
                         var lr = await Algo.TryLiquidateOperation(op, $"stopLoss reached");
-                        if (lr.amountRemainingLow)
-                        {
-                            if (op.AmountRemaining / op.AmountInvested < 0.1m) //todo gestire meglio
-                            {
-                                Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low.");
-                                op.ScheduleClose(Algo.Time.AddMinutes(3));
-                            }
-                        }
-                        myData.LiquidationTries++;
+                        //if (lr.amountRemainingLow)
+                        //{
+                        //if (op.AmountRemaining / op.AmountInvested < 0.1m) //todo gestire meglio
+                        //    {
+                        //        Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low.");
+                        //        op.ScheduleClose(Algo.Time.AddMinutes(3));
+                        //    }
+                        //}
+                        myData.LiquidationTries++; 
                         var delaySeconds = 120 + Math.Min(8, myData.LiquidationTries) * 60;
                         myData.NextTry = Algo.Time.AddSeconds(delaySeconds);
-                        if(myData.LiquidationTries > 100)
+                        if (lr.amountRemainingLow || lr.OrderError)
+                        {
+                            Logger.Info($"Liquidation failed for {op.ToString("c")}, tries count: {myData.LiquidationTries}, retrying in {delaySeconds}s ");
+                        }
+                        if (myData.LiquidationTries > 50)
                         {
                             Logger.Info($"Schedule operation for close {op.ToString("c")} as it reached maximum number of liquidation tries.");
-                        }
+                        } 
                     }
                     else
                     {

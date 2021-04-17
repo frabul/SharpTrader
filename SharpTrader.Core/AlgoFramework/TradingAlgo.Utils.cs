@@ -45,7 +45,7 @@ namespace SharpTrader.AlgoFramework
                 else
                 {
                     result.amountRemainingLow = true;
-                    Logger.Info($"Unable to liquidate operation {op} as because amount remaining is too low");
+                    Logger.Info($"Unable to liquidate operation {op} because amount remaining is too low");
                 }
             }
             return result;
