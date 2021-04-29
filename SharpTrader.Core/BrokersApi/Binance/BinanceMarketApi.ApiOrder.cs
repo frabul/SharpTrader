@@ -163,5 +163,9 @@ namespace SharpTrader.BrokersApi.Binance
         {
             return this.Id.GetHashCode();
         }
+        public override string ToString()
+        {
+            return $"Order{{ Id: {this.Id}, ClientId: {this.ClientId} }}";
+        }
     }
 }

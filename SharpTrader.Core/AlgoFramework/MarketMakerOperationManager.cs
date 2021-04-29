@@ -295,13 +295,18 @@ namespace SharpTrader.AlgoFramework
             if (op.IsClosing || op.IsClosed)
             {
                 if (op.AmountRemaining > 0)
-                    Logger.Warn("op is not closing but amountremaining is > 0");
+                    Logger.Warn($"Operation {op} is closing but amountremaining is > 0");
                 return true;
             }
 
             //if signal entry is expired and we yet didn't get to enter, then we can just   
             //      queue the operation for close 
-            if (op.IsEntryExpired(Algo.Time) && (op.AmountInvested == 0 || op.AmountRemaining / op.AmountInvested <= 0.03m) && self.myOpData.NoActiveExit())
+            bool isEntryExpired = op.IsEntryExpired(Algo.Time);
+            bool noActiveExit = self.myOpData.NoActiveExit();
+            var (_, amount) = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget); 
+            bool remainingAmountSmall = (op.AmountInvested == 0 || amount <= 0);
+        
+            if (isEntryExpired && noActiveExit && remainingAmountSmall)
             {
                 var entryClosed = await CloseEntryOrder(self.Op, self.myOpData);
                 var exitClosed = await CloseExitOrder(self.Op, self.myOpData);
@@ -313,7 +318,10 @@ namespace SharpTrader.AlgoFramework
                     myOpData.ExitManager = null;
 
                     //put in close queue
-                    Logger.Debug($"Queue for close {self.Op.ToString("c")}\n    because amount remaining is 0 and entry expired.");
+                    if(op.AmountRemaining > 0)
+                        Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low (pt {op.Signal.PriceTarget}).");
+                    else 
+                        Logger.Debug($"Queue for close {self.Op.ToString("c")}\n    because amount remaining is 0 and entry expired.");
                     await CloseQueueAsync(self.Op, CloseQueueTime);
                 }
                 else

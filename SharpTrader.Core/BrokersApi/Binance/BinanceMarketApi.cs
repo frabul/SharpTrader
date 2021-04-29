@@ -354,7 +354,7 @@ namespace SharpTrader.BrokersApi.Binance
         private async Task SynchBalance()
         {
             try
-            { 
+            {
                 var accountInfo = await Client.GetAccountInformation();
                 lock (LockBalances)
                 {
@@ -368,7 +368,7 @@ namespace SharpTrader.BrokersApi.Binance
                         this._Balances[bal.Asset].Locked = bal.Locked;
 
                     }
-                } 
+                }
             }
             catch (Exception ex)
             {
@@ -404,15 +404,22 @@ namespace SharpTrader.BrokersApi.Binance
 
                 foreach (var ord in ordersClosed)
                 {
-                    if (!ord.IsClosed)
+                    try
                     {
-                        //the order is out of synch as we think it's still open but was actually closed
-                        var orderUpdated =
-                            new Order(await Client.QueryOrder(new QueryOrderRequest() { OrderId = ord.OrderId, Symbol = ord.Symbol }));
-                        ord.Update(orderUpdated);
-                        OrdersUpdateOrInsert(orderUpdated);
+                        if (!ord.IsClosed)
+                        {
+                            //the order is out of synch as we think it's still open but was actually closed
+                            var orderUpdated =
+                                new Order(await Client.QueryOrder(new QueryOrderRequest() { OrderId = ord.OrderId, Symbol = ord.Symbol }));
+                            ord.Update(orderUpdated);
+                            OrdersUpdateOrInsert(orderUpdated);
+                        }
+                        RemoveOpenOrder(ord);
                     }
-                    RemoveOpenOrder(ord);
+                    catch (Exception ex)
+                    {
+                        Logger.Error($"Error during order {ord.ToString()} synchronization: " + GetExceptionErrorInfo(ex));
+                    }
                 }
             }
             catch (Exception ex)
@@ -532,8 +539,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
 
         }
-
-
+         
         private void CloseUserDataSocket()
         {
             try

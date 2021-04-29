@@ -1,4 +1,5 @@
 ﻿using LiteDB;
+using SharpTrader.BrokersApi.Binance;
 using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
@@ -44,58 +45,77 @@ namespace SharpTrader.AlgoFramework
 
             foreach (var op in Algo.ActiveOperations)
             {
-
-                //---
-                if (op.AmountRemaining > 0 && !op.RiskManaged)
+                try
                 {
-                    //get gain percent
-                    if (op.Type == OperationType.BuyThenSell)
+                    await ManageOperation(op);
+                }
+                catch(Exception ex)
+                {
+                    var msg = BinanceMarketApi.GetExceptionErrorInfo(ex);
+                    Logger.Error($"SimpleStopLossRiskManager: exception while managin  {op.ToString("c")}\n       Error: {msg}");
+                }
+            }
+        }
+
+        private async Task ManageOperation(Operation op)
+        {
+            var symData = Algo.SymbolsData[op.Symbol.Key];
+            //---
+            if (op.AmountRemaining > 0 && !op.RiskManaged)
+            {
+                //get gain percent
+                if (op.Type == OperationType.BuyThenSell)
+                {
+                    var loss = -((decimal)symData.Feed.Bid - op.AverageEntryPrice) / op.AverageEntryPrice;
+                    if (loss >= StopLoss)
+                        op.RiskManaged = true;
+                }
+                else if (op.Type == OperationType.SellThenBuy)
+                {
+                    var loss = -(op.AverageEntryPrice - (decimal)symData.Feed.Ask) / op.AverageEntryPrice;
+                    if (loss >= StopLoss)
+                        op.RiskManaged = true;
+                }
+            }
+
+            if (op.RiskManaged && !(op.IsClosing || op.IsClosed))
+            {
+                var myData = GetData(op);
+
+                if (op.AmountRemaining > 0)
+                {
+                    if (Algo.Time > myData.NextTry)
                     {
-                        var loss = -((decimal)Algo.SymbolsData[op.Symbol.Key].Feed.Bid - op.AverageEntryPrice) / op.AverageEntryPrice;
-                        if (loss >= StopLoss)
-                            op.RiskManaged = true;
-                    }
-                    else if (op.Type == OperationType.SellThenBuy)
-                    {
-                        var loss = -(op.AverageEntryPrice - (decimal)Algo.SymbolsData[op.Symbol.Key].Feed.Ask) / op.AverageEntryPrice;
-                        if (loss >= StopLoss)
-                            op.RiskManaged = true;
+                        var (_, amount) = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget);
+                        bool remainingAmountSmall = (op.AmountInvested == 0 || amount <= 0);
+                        if (remainingAmountSmall)
+                        {
+                            Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low (pt {op.Signal.PriceTarget}).");
+                            op.ScheduleClose(Algo.Time.AddMinutes(3));
+                        }
+                        else
+                        {
+                            //--- liquidate operation funds ---
+                            var lr = await Algo.TryLiquidateOperation(op, $"stopLoss reached");
+                            myData.LiquidationTries++;
+                            var delaySeconds = 120 + Math.Min(8, myData.LiquidationTries) * 60;
+                            myData.NextTry = Algo.Time.AddSeconds(delaySeconds);
+                            if (lr.amountRemainingLow || lr.OrderError)
+                            {
+                                Logger.Info($"Liquidation failed for {op.ToString("c")}, tries count: {myData.LiquidationTries}, retrying in {delaySeconds}s ");
+                            }
+                            if (myData.LiquidationTries > 50)
+                            {
+                                Logger.Info($"Schedule operation for close {op.ToString("c")} as it reached maximum number of liquidation tries.");
+                                op.ScheduleClose(Algo.Time.AddMinutes(3));
+                            }
+                        }
                     }
                 }
-
-                if (op.RiskManaged && !(op.IsClosing || op.IsClosed))
+                else
                 {
-                    var myData = GetData(op);
-
-                    if (Algo.Time > myData.NextTry && op.AmountRemaining > 0)
-                    {
-                        //--- liquidate operation funds ---
-                        var lr = await Algo.TryLiquidateOperation(op, $"stopLoss reached");
-                        //if (lr.amountRemainingLow)
-                        //{
-                        //if (op.AmountRemaining / op.AmountInvested < 0.1m) //todo gestire meglio
-                        //    {
-                        //        Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low.");
-                        //        op.ScheduleClose(Algo.Time.AddMinutes(3));
-                        //    }
-                        //}
-                        myData.LiquidationTries++; 
-                        var delaySeconds = 120 + Math.Min(8, myData.LiquidationTries) * 60;
-                        myData.NextTry = Algo.Time.AddSeconds(delaySeconds);
-                        if (lr.amountRemainingLow || lr.OrderError)
-                        {
-                            Logger.Info($"Liquidation failed for {op.ToString("c")}, tries count: {myData.LiquidationTries}, retrying in {delaySeconds}s ");
-                        }
-                        if (myData.LiquidationTries > 50)
-                        {
-                            Logger.Info($"Schedule operation for close {op.ToString("c")} as it reached maximum number of liquidation tries.");
-                        } 
-                    }
-                    else
-                    {
-                        Logger.Info($"Queueing for close operation {op.ToString("c")}");
-                        op.ScheduleClose(Algo.Time.AddMinutes(3));
-                    }
+                    Logger.Info($"Queueing for close operation {op.ToString("c")}");
+                    op.ScheduleClose(Algo.Time.AddMinutes(3));
                 }
             }
         }
