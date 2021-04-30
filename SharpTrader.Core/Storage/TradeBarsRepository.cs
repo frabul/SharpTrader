@@ -71,7 +71,7 @@ namespace SharpTrader.Storage
             if (candles.Any())
             {
                 var meta = GetMetaDataInternal(symId);
-                meta.LoadHistory(DataDir, candles.First().OpenTime, DateTime.MaxValue);
+                //meta.LoadHistory(DataDir, candles.First().OpenTime, DateTime.MaxValue);
                 //add data 
                 //Debug.Assert(sdata.Ticks.Count > 0);
                 //Debug.Assert(candles.First().OpenTime > sdata.Ticks.First().OpenTime, "Error in sdata times");
