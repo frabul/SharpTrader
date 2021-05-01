@@ -18,12 +18,14 @@ namespace SharpTrader.AlgoFramework
             public string Name { get; set; } = "Unnamed v1";
             public bool SaveData { get; set; } = false;
             public bool MarginTrading { get; set; } = false;
+            public int OperationsStartupLookBackDays { get; set; } = 4;
         }
         class NonVolatileVars
         {
             public long TotalOperations { get; set; }
             public long TotalSignals { get; set; }
             public bool EntriesSuspendedByUser { get; set; }
+            public DateTime LastUpdate { get; set; }
         }
 
         //todo the main components should be allowed to be set only during Initialize 
@@ -50,7 +52,6 @@ namespace SharpTrader.AlgoFramework
         public OperationManager Executor { get; set; }
         public RiskManager RiskManager { get; set; }
         public IMarketApi Market { get; }
-        public DateTime LastUpdate { get; set; }
         public DateTime Time => Market.Time;
         public DateTime NextUpdateTime { get; private set; } = DateTime.MinValue;
         public TimeSpan Resolution { get; set; } = TimeSpan.FromSeconds(10);
@@ -114,8 +115,7 @@ namespace SharpTrader.AlgoFramework
         }
 
         public async Task Update(TimeSlice slice)
-        {
-            LastUpdate = Market.Time;
+        { 
             //update selected symbols
             var changes = await SymbolsFilter.UpdateAsync(slice);
             if (changes != SelectedSymbolsChanges.None)
@@ -189,8 +189,9 @@ namespace SharpTrader.AlgoFramework
                     {
                         //lock (DbLock)
                         //    oldOperations = oldOperations ?? DbClosedOperations.Find(o => o.CreationTime >= Market.Time.AddDays(-5)).ToArray(); 
+                        var lookBackTime = Market.Time.AddDays(-Config.OperationsStartupLookBackDays);
                         lock (DbLock)
-                            oldOperations = QueryClosedOperations(doc => doc["CreationTime"].AsDateTime >= Market.Time.AddDays(-4));
+                            oldOperations = QueryClosedOperations(doc => doc["CreationTime"].AsDateTime >= lookBackTime);
                     }
 
                     var oldOp = oldOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
@@ -289,6 +290,7 @@ namespace SharpTrader.AlgoFramework
                 }
             }
 
+            State.LastUpdate = Market.Time;
             if (Config.SaveData)
             {
                 SaveNonVolatileVars();
