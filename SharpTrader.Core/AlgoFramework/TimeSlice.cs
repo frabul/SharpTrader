@@ -70,10 +70,10 @@ namespace SharpTrader.AlgoFramework
         public class SymbolData
         {
             //todo maybe use lazy initialization for these collections
-            private List<Signal> _NewSignals = new List<Signal>(2);
-            private List<Operation> _NewOperations = new List<Operation>(2);
-            private List<ITrade> _Trades = new List<ITrade>(2);
-            private List<IBaseData> _Records = new List<IBaseData>(2);
+            private List<Signal> _NewSignals = new List<Signal>(5);
+            private List<Operation> _NewOperations = new List<Operation>(5);
+            private List<ITrade> _Trades = new List<ITrade>(5);
+            private List<IBaseData> _Records = new List<IBaseData>(5);
             public ISymbolInfo Symbol { get; }
             public IReadOnlyList<IBaseData> Records => _Records;
             public IReadOnlyList<Signal> NewSignals => _NewSignals;
@@ -87,7 +87,24 @@ namespace SharpTrader.AlgoFramework
 
             internal void Add(IBaseData dataRecord)
             {
-                _Records.Add(dataRecord);
+                if (_Records.Count > 0 && _Records[_Records.Count - 1].Time >= dataRecord.Time)
+                {
+                    for (int i = 0; i < Records.Count; i++)
+                    {
+                        if (_Records[i].Time == dataRecord.Time)
+                        {
+                            _Records[i] = dataRecord;
+                            break;
+                        }
+                        else if (_Records[i].Time > dataRecord.Time)
+                        {
+                            _Records.Insert(i, dataRecord);
+                            break;
+                        }  
+                    }
+                }
+                else
+                    _Records.Add(dataRecord);
             }
 
             internal void Add(ITrade trade)

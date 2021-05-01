@@ -42,6 +42,8 @@ namespace SharpTrader
                     Records[index] = historyRecord;
                 else
                 {
+                    if (Records.Count > 0 && EndTime > historyRecord.Time)
+                        throw new Exception("you cannot add a tick that's preceding the last one ");
                     Records.Add(historyRecord);
                 }
             }
