@@ -109,7 +109,7 @@ namespace SharpTrader.Storage
             foreach (var symData in SymbolsMetaData.Values.ToArray())
             {
                 bool ok = true;
-                var chunks = symData.Chunks.ToList();
+                var chunks = symData.Chunks.ToList(); 
                 symData.Chunks.Clear();
                 foreach (var chunk in chunks)
                 {

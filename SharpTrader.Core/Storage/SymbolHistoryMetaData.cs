@@ -111,7 +111,7 @@ namespace SharpTrader.Storage
 
         public void LoadHistory(string dataDir, DateTime startOfData, DateTime endOfData)
         {
-            startOfData = new DateTime(startOfData.Year, startOfData.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            startOfData = new DateTime(startOfData.Year, startOfData.Month, startOfData.Day, 0, 0, 0, DateTimeKind.Utc);
             List<DateRange> missingData = new List<DateRange>();
             lock (this.Locker)
             {
@@ -140,14 +140,17 @@ namespace SharpTrader.Storage
                 foreach (var finfo in this.Chunks)
                 {
                     Debug.Assert(HistoryId.Key == finfo.HistoryId.Key, $"Hist id {HistoryId.Key} - finfo {finfo.HistoryId.Key}");
-                    var dateInRange = missingData.Any(dr => finfo.StartDate >= dr.start && finfo.StartDate < dr.end);
+                    var dateInRange = missingData.Any(dr =>
+                        (finfo.StartDate >= dr.start && finfo.StartDate < dr.end) ||
+                        (finfo.EndDate >= dr.start && finfo.EndDate < dr.end)
+                        );
                     if (dateInRange && this.View.LoadedFiles.Add(finfo)) //if is in any range and not already loaded
                     {
                         try
                         {
 
                             HistoryChunk fdata = HistoryChunk.Load(finfo.GetFilePath(dataDir));
-                            this.AddBars(fdata.Ticks.Where(tick => tick.Time <= endOfData));
+                            this.AddBars(fdata.Ticks.Where(tick => tick.Time >= startOfData && tick.Time <= endOfData));
                         }
                         catch (Exception ex)
                         {
