@@ -289,7 +289,7 @@ namespace SharpTrader.BrokersApi.Binance
             await Task.WhenAll(tasks);
         }
 
-        private async Task SynchSymbolOrders(string sym)
+        public async Task SynchSymbolOrders(string sym)
         {
             var lastOrder = Orders.Find(o => o.Symbol == sym)?.OrderBy(o => o.OrderId).LastOrDefault();
             long start = (lastOrder != null) ? lastOrder.OrderId + 1 : 0;
@@ -433,7 +433,7 @@ namespace SharpTrader.BrokersApi.Binance
             foreach (var sym in ExchangeInfo.Symbols.Select(s => s.symbol))
                 await SynchLastTrades(sym);
         }
-        public async Task SynchLastTrades(string sym, bool force = false)
+        public async Task SynchLastTrades(string sym, bool force = false, int tradesCountLimit = 100)
         {
             var symData = SymbolsData.FindById(sym);
             if (symData == null)
@@ -441,7 +441,6 @@ namespace SharpTrader.BrokersApi.Binance
                 symData = new SymbolData { Symbol = sym };
                 SymbolsData.Insert(symData);
             }
-
 
             if (sym == null)
                 throw new Exception("Parameter sym cannot be null");
@@ -454,12 +453,13 @@ namespace SharpTrader.BrokersApi.Binance
                 var pastOrders = Orders.Find(o => o.Symbol == sym).OrderBy(o => o.OrderId);
                 var lastOrderClosed = pastOrders.LastOrDefault(o => o.IsClosed);
                 var lastOrder = pastOrders.LastOrDefault();
+                var lastOrderOpen = OpenOrders.LastOrDefault(o => o.Symbol == sym);
 
-                if (lastOrder != null)
+                if (lastOrder != null || force)
                 {
-                    if (symData.LastOrderAtTradesSynch != lastOrder.OrderId || hasActiveOrders || force)
+                    if (force || symData.LastOrderAtTradesSynch != lastOrder.OrderId || hasActiveOrders)
                     {
-                        var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = 100 });
+                        var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = tradesCountLimit });
                         var trades = resp.Select(tr => new Trade(sym, tr));
                         foreach (var tr in trades)
                         {
@@ -483,8 +483,14 @@ namespace SharpTrader.BrokersApi.Binance
                             }
                         }
 
-                        //if has active orders we want it to continue updating when the active order becomes inactive
-                        if (lastOrderClosed != null)
+                        //if has active orders want to continue update from that id until it's closed
+                        if (lastOrderOpen != null)
+                        {
+
+                            symData.LastOrderAtTradesSynch = lastOrderOpen.OrderId - 1;
+                            SymbolsData.Update(symData);
+                        }
+                        else if (lastOrderClosed != null)
                         {
                             symData.LastOrderAtTradesSynch = lastOrderClosed.OrderId;
                             SymbolsData.Update(symData);
