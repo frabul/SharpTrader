@@ -91,20 +91,33 @@ namespace SharpTrader.AlgoFramework
             this.Sentry?.RegisterCustomSerializers(DbMapper);
 
             //---- add mapper for SymbolInfo
+            symInfoEntityMapper = DbMapper.BuildEntityMapper(typeof(SymbolInfo));
+
             DbMapper.Entity<SymbolInfo>().Ctor(
                 bson =>
                     {
-                        var sym = Market.GetSymbols().FirstOrDefault(s => s.Key == bson["Key"].AsString);
+                        var sym = Market.GetSymbolInfo(bson["Key"].AsString);
                         if (sym == null)
                         {
-                            sym = new SymbolInfo();
-                            symInfoEntityMapper = DbMapper.BuildEntityMapper(typeof(SymbolInfo));
+                            sym = new SymbolInfo(); 
                             DbMapper.PopulateObjectProperties(symInfoEntityMapper, sym, bson);
                         }
                         return sym;
                     }
+            );
+            DbMapper.RegisterType<SymbolInfo>(
+                serialize: (obj) => DbMapper.SerializeObject<SymbolInfo>(symInfoEntityMapper, obj),
+                deserialize: (bson) =>
+                {
+                    var sym = Market.GetSymbolInfo(bson["Key"].AsString);
+                    if (sym == null)
+                    {
+                        sym = new SymbolInfo();
+                        DbMapper.PopulateObjectProperties(symInfoEntityMapper, sym, bson as BsonDocument);
+                    }
+                    return sym;
+                });
 
-                    );
             //---- add mapper for signals
             Signal deserializeSignal(BsonValue bson)
             {

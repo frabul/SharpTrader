@@ -55,13 +55,21 @@ namespace SharpTrader.BrokersApi.Binance
             Logger = LogManager.GetLogger("Bin" + Symbol + "Feed");
 
             HistoryId = new SymbolHistoryId(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
+             
         }
 
         internal async Task Initialize()
         {
             var book = await Client.GetOrderBook(Symbol.Key, false);
-            Ask = (double)book.Asks.First().Price;
-            Bid = (double)book.Bids.First().Price;
+
+            if (book.Asks.Count > 0)
+                Ask = (double)book.Asks.FirstOrDefault().Price;
+            else
+                Ask = float.MaxValue;
+            if (book.Bids.Count > 0)
+                Bid = (double)book.Bids.FirstOrDefault().Price;
+            else
+                Bid = 0;
             KlineListen();
             PartialDepthListen();
             DepthWatchdog.Restart();
@@ -132,16 +140,20 @@ namespace SharpTrader.BrokersApi.Binance
         private void HandlePartialDepthUpdate(BinancePartialData messageData)
         {
             DepthWatchdog.Restart();
-            var bid = (double)messageData.Bids.FirstOrDefault(b => b.Quantity > 0).Price;
-            var ask = (double)messageData.Asks.FirstOrDefault(a => a.Quantity > 0).Price;
-            if (bid != 0 && ask != 0)
-            {
-                this.Bid = bid;
-                this.Ask = ask;
-                Spread = Ask - Bid;
-                //call on data
-                //this.OnData?.Invoke(this, new QuoteTick(Bid, Ask, messageData.EventTime));
-            }
+
+            var bid = messageData.Bids.FirstOrDefault(b => b.Quantity > 0);
+            var ask = messageData.Asks.FirstOrDefault(a => a.Quantity > 0);
+             
+            if (ask!= null)
+                Ask = (double)ask.Price;
+            else
+                Ask = float.MaxValue;
+            if (bid != null)
+                Bid = (double)bid.Price;
+            else
+                Bid = 0;
+            Spread = Ask - Bid;
+
             this.Time = messageData.EventTime;
         }
 
@@ -238,7 +250,7 @@ namespace SharpTrader.BrokersApi.Binance
                     catch
                     {
                         Logger.Warn("Bad candle {0} in history {1}", symbolHistory.Ticks.Current.Time, symbolHistory.Symbol);
-                    } 
+                    }
                 }
             }
             catch (Exception ex)
@@ -297,7 +309,7 @@ namespace SharpTrader.BrokersApi.Binance
             return x;
         }
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal amount, decimal price)
-        {
+        { 
             //round price to it's maximum precision
             price = NearestRoundHigher(price, this.Symbol.PricePrecision);
 
@@ -316,8 +328,7 @@ namespace SharpTrader.BrokersApi.Binance
             return (price / 1.00000000000m, amount / 1.000000000000m);
         }
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal amount, decimal price)
-        {
-
+        { 
             //round price to it's maximum precision
             price = NearestRoundLower(price, this.Symbol.PricePrecision);
             //if amount is lower than min lot size then abort
