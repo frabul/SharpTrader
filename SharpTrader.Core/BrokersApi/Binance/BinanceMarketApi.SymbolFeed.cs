@@ -147,6 +147,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         private void HandleKlineEvent(BinanceKlineData msg)
         {
+            KlineWatchdog.Restart();
             TimeSpan resolution = TimeSpan.FromMinutes(1);
             this.Time = msg.EventTime;
             List<Candlestick> CandlesToAdd = new List<Candlestick>(10);
