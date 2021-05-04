@@ -66,12 +66,6 @@ namespace SharpTrader
 
         Task<IRequest<decimal>> GetEquity(string asset);
 
-        (decimal min, decimal step) GetMinTradable(string tradeSymbol);
-
-        decimal GetSymbolPrecision(string symbol);
-
-        decimal GetMinNotional(string asset);
-
         void DisposeFeed(ISymbolFeed feed);
         ITrade GetTradeById(string tradeId);
         IOrder GetOrderById(string asString);
