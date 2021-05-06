@@ -115,7 +115,7 @@ namespace SharpTrader.AlgoFramework
         }
 
         public async Task Update(TimeSlice slice)
-        { 
+        {
             //update selected symbols
             var changes = await SymbolsFilter.UpdateAsync(slice);
             if (changes != SelectedSymbolsChanges.None)
@@ -240,7 +240,7 @@ namespace SharpTrader.AlgoFramework
             //close operations that have been in close queue for enough time
             lock (DbLock)
             {
-                this.Db?.BeginTrans(); 
+                this.Db?.BeginTrans();
                 List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
                 foreach (var op in operationsToClose)
                 {
@@ -260,6 +260,7 @@ namespace SharpTrader.AlgoFramework
                             //update database 
                             DbActiveOperations.Delete(op.Id);
                             DbClosedOperations.Upsert(op);
+                            op.AcceptChanges();
                         }
                 }
                 this.Db?.Commit();
@@ -414,11 +415,15 @@ namespace SharpTrader.AlgoFramework
         public void ClearClosedOperations(TimeSpan keepRange)
         {
             var timeLimit = Time - keepRange;
-            foreach (var op in ClosedOperations.Where(op => op.LastInvestmentTime < timeLimit).ToArray())
+            var operationsToFlush = _ClosedOperations
+                .Where(op => op.CloseDeadTime < timeLimit && !op.IsChanged)
+                .ToArray();
+            if (operationsToFlush.Length > 0)
             {
-                _ClosedOperations.Remove(op);
+                Logger.Info("Flushing {0} operation.", operationsToFlush.Length);
+                foreach (var op in operationsToFlush)
+                    _ClosedOperations.Remove(op);
             }
         }
     }
-
 }

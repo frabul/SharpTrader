@@ -99,7 +99,7 @@ namespace SharpTrader.AlgoFramework
                         var sym = Market.GetSymbolInfo(bson["Key"].AsString);
                         if (sym == null)
                         {
-                            sym = new SymbolInfo(); 
+                            sym = new SymbolInfo();
                             DbMapper.PopulateObjectProperties(symInfoEntityMapper, sym, bson);
                         }
                         return sym;
@@ -208,11 +208,20 @@ namespace SharpTrader.AlgoFramework
 
                 Db.BeginTrans();
                 foreach (var op in ActiveOperations.Where(op => op.IsChanged))
+                {
                     DbActiveOperations.Upsert(op);
-                foreach (var op in ClosedOperations.Where(op => op.IsChanged))
-                    DbClosedOperations.Upsert(op);
-                Db.Commit();
+                    op.AcceptChanges();
+                }
 
+                foreach (var op in ClosedOperations.Where(op => op.IsChanged))
+                {
+                    DbClosedOperations.Upsert(op);
+                    op.AcceptChanges();
+                }
+                // remove closed operations that have been there for more than 1 hour
+                ClearClosedOperations(TimeSpan.FromHours(1));
+
+                Db.Commit();
                 Db.Checkpoint();
             }
         }
@@ -250,12 +259,14 @@ namespace SharpTrader.AlgoFramework
                     {
                         op.Recalculate();
                         DbClosedOperations.Upsert(op);
+                        op.AcceptChanges();
                     }
 
                     foreach (var op in DbActiveOperations.FindAll().ToArray())
                     {
                         op.Recalculate();
                         DbActiveOperations.Upsert(op);
+                        op.AcceptChanges();
                     }
 
                     Db.UserVersion = 4;
