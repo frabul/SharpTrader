@@ -323,7 +323,7 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-        public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
+        public bool IsChanged => (this.Signal?.IsChanged == true) || (this._IsChanged == true) || (ExecutorData?.IsChanged == true) || (RiskManagerData?.IsChanged == true);
 
         public void AcceptChanges()
         {
