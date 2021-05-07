@@ -458,7 +458,7 @@ namespace SharpTrader.BrokersApi.Binance
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error($"Error during order {ord.ToString()} synchronization: " + GetExceptionErrorInfo(ex));
+                        Logger.Error($"Error during order synchronization, {ord.ToString()}, binance id: {ord.OrderId}, error: " + GetExceptionErrorInfo(ex));
                     }
                 }
             }
