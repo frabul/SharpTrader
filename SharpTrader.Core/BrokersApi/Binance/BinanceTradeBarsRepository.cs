@@ -19,7 +19,6 @@ namespace SharpTrader.Core.BrokersApi.Binance
         NLog.Logger Logger = NLog.LogManager.GetLogger("BinanceTradeBarsRepository");
         private BinanceClient Client;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
-        private Dictionary<string, DateTime> LastHistoryRequest = new Dictionary<string, DateTime>();
         private readonly string MarketName = "Binance";
         private SemaphoreSlim DownloadCandlesSemaphore;
         public int ConcurrencyCount { get; set; } = 10;
@@ -27,37 +26,14 @@ namespace SharpTrader.Core.BrokersApi.Binance
         public BinanceTradeBarsRepository(string dataDir, BinanceClient cli) : base(dataDir)
         {
             Client = cli;
-            _ = CheckClosing();
             DownloadCandlesSemaphore = new SemaphoreSlim(ConcurrencyCount, ConcurrencyCount);
         }
-
 
         //--------------------------------------------
         public BinanceTradeBarsRepository(string dataDir, double rateLimitFactor = 0.4f) : base(dataDir)
         {
             Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
             DownloadCandlesSemaphore = new SemaphoreSlim(ConcurrencyCount, ConcurrencyCount);
-        }
-
-        private async Task CheckClosing()
-        {
-            while (true)
-            {
-                lock (LastHistoryRequest)
-                {
-                    foreach (var kv in LastHistoryRequest.ToArray())
-                    {
-                        var key = kv.Key;
-                        var lastReq = kv.Value;
-                        if (DateTime.Now > lastReq.AddMinutes(5))
-                        {
-                            this.SaveAndClose(SymbolHistoryId.Parse(key), true);
-                            LastHistoryRequest.Remove(key);
-                        }
-                    }
-                }
-                await Task.Delay(10000);
-            }
         }
 
         public async Task SynchSymbolsTableAsync(string DataDir)
@@ -235,8 +211,6 @@ namespace SharpTrader.Core.BrokersApi.Binance
 
         public override ISymbolHistory GetSymbolHistory(SymbolHistoryId info, DateTime startOfData, DateTime endOfData)
         {
-            lock (LastHistoryRequest)
-                LastHistoryRequest[info.Key] = DateTime.Now;
             return base.GetSymbolHistory(info, startOfData, endOfData);
         }
 
