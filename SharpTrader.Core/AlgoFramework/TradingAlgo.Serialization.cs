@@ -298,7 +298,14 @@ namespace SharpTrader.AlgoFramework
                 return l1.Select(bson => OperationFromBson(bson)).ToArray();
             }
         }
-
+        public Operation QueryClosedOperationsById(string id)
+        {
+            lock (DbLock)
+            {
+                var doclist = this.Db.GetCollection("ClosedOperations").FindOne(id);
+                return OperationFromBson(doclist);
+            }
+        }
         public Operation[] QueryOperations(Expression<Func<Operation, bool>> predicate)
         {
             lock (DbLock)
