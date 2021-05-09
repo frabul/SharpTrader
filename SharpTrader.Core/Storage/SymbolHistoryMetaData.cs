@@ -28,6 +28,7 @@ namespace SharpTrader.Storage
         /// </summary>
         public ITradeBar LastBar { get; protected set; }
     }
+
     public class SymbolHistoryMetaDataInternal : SymbolHistoryMetaData
     {
         [BsonIgnore]
@@ -115,12 +116,12 @@ namespace SharpTrader.Storage
             List<DateRange> missingData = new List<DateRange>();
             lock (this.Locker)
             {
-                if (this.View?.Ticks == null)
+                if (this.View == null)
                 {
                     this.View = new HistoryView(this.HistoryId);
                 }
                 //check if we already have some records and load them   
-                if (this.View.Ticks.Count < 1)
+                if (this.View.TicksCount < 1)
                 {
                     missingData.Add(new DateRange(startOfData, endOfData));
                 }
@@ -143,8 +144,8 @@ namespace SharpTrader.Storage
                     var dateInRange = missingData.Any(dr =>
                         (dr.start <= finfo.StartDate && dr.end >= finfo.StartDate) ||
                         (dr.start >= finfo.StartDate && dr.end <= finfo.EndDate) ||
-                        (dr.start <= finfo.EndDate && dr.end >= finfo.EndDate) 
-                        );  
+                        (dr.start <= finfo.EndDate && dr.end >= finfo.EndDate)
+                        );
                     if (dateInRange && this.View.LoadedFiles.Add(finfo)) //if is in any range and not already loaded
                     {
                         try
