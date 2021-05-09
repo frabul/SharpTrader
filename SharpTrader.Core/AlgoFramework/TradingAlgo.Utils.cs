@@ -21,7 +21,7 @@ namespace SharpTrader.AlgoFramework
                 }
                 var amount = Market.GetFreeBalance(feed.Symbol.Asset); 
                 var adj = feed.GetOrderAmountAndPriceRoundedDown(amount, (decimal)feed.Bid);
-                Logger.Info($"Try selling {adj.amount} {symbolKey } @ {adj.price}.");
+                Logger.Info($"Try selling {adj.amount} {symbolKey } @ {adj.price} because {reason}.");
                 if (adj.amount > 0)
                 {
                     //immediatly liquidate everything with a market order 
