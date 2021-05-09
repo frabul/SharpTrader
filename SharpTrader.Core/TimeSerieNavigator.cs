@@ -186,7 +186,7 @@ namespace SharpTrader
         }
 
         /// <summary>
-        /// Sets the cursor to the nearest tick after or exacty at provided time.
+        /// Sets the cursor to the nearest tick after or exactly at provided time.
         /// If the provided time is higher or lower than the know prices range it will be set to the last tick or first tick
         /// </summary> 
         public void SeekNearestAfter(DateTime time)
@@ -377,7 +377,10 @@ namespace SharpTrader
             WriteOperation(() => Items.Add(item));
             NewRecord?.Invoke(this, item);
         }
-
+        internal void Insert(int index, T item)
+        {
+            WriteOperation(() => Items.Insert(index, item));
+        }
         public void AddRange(IEnumerable<T> items)
         {
             WriteOperation(() => Items.AddRange(items));
@@ -413,7 +416,7 @@ namespace SharpTrader
                     lower = middle + 1;
             }
 
-            return ~lower;
+            return ~upper;
         }
 
         internal void Shrink(int recordsMax)
@@ -431,6 +434,9 @@ namespace SharpTrader
             }
         }
 
-
+        internal List<T> ToList()
+        {
+            return this.Items.ToList();
+        }
     }
 }

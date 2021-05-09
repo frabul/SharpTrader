@@ -95,21 +95,28 @@ namespace SharpTrader.Storage
                 {
                     DateTime startDate = new DateTime(this.Ticks[i].OpenTime.Year, this.Ticks[i].OpenTime.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                     DateTime endDate = startDate.AddMonths(1);
-                    List<Candlestick> candlesOfMont = new List<Candlestick>();
+                    TimeSerie<Candlestick> candlesOfMont = new TimeSerie<Candlestick>();
                     while (i < this.Ticks.Count && this.Ticks[i].OpenTime < endDate)
                     {
-                        candlesOfMont.Add(new Candlestick(this.Ticks[i]));
+                        candlesOfMont.AddRecord(new Candlestick(this.Ticks[i]));
                         i++;
                     }
 
+                    //load the existing file and merge candlesticks 
                     HistoryChunkId newChunkId = new HistoryChunkId(this.Id, startDate);
-                    HistoryChunk sdata = new HistoryChunk()
+                    var loadedChunk = HistoryChunk.Load(newChunkId.GetFilePath(dataDir));
+                    foreach (var candle in loadedChunk.Ticks)
+                        if (candle.Time >= startDate && candle.OpenTime <= endDate)
+                            candlesOfMont.AddRecord(candle, true);
+
+                    //finally save data 
+                    HistoryChunk dataToSave = new HistoryChunk()
                     {
                         ChunkId = newChunkId,
-                        Ticks = candlesOfMont,
+                        Ticks = candlesOfMont.ToList(),
                     };
                     using (var fs = File.Open(newChunkId.GetFilePath(dataDir), FileMode.Create))
-                        Serializer.Serialize<HistoryChunk>(fs, sdata);
+                        Serializer.Serialize<HistoryChunk>(fs, dataToSave);
 
                     this.LoadedFiles.Add(newChunkId);
                 }
