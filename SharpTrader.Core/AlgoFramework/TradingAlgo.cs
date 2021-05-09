@@ -420,9 +420,13 @@ namespace SharpTrader.AlgoFramework
                 .ToArray();
             if (operationsToFlush.Length > 0)
             {
-                Logger.Debug("Flushing {0} operation.", operationsToFlush.Length);
+                Logger.Debug("Flushing {0} operations.", operationsToFlush.Length);
                 foreach (var op in operationsToFlush)
+                {
                     _ClosedOperations.Remove(op);
+                    op.Dispose();
+                }
+
             }
         }
     }
