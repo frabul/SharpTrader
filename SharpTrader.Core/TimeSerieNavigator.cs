@@ -21,6 +21,7 @@ namespace SharpTrader
         private int _Cursor = -1;
         private Stack<int> PositionSaveStack = new Stack<int>();
         private bool disposed;
+        private TimeSerieNavigator<ITradeBar> items;
 
         protected TimeRecordCollection<T> Records { get; private set; }
 
@@ -68,6 +69,8 @@ namespace SharpTrader
             Records.NewRecord += Records_NewRecord;
             Records.OnShrink += OnRecordsShrunk;
         }
+
+      
 
         private void Records_NewRecord(TimeRecordCollection<T> sender, T rec)
         {
@@ -399,6 +402,9 @@ namespace SharpTrader
 
         private int BinarySearch_Internal(DateTime time)
         {
+            if (Items.Count < 1)
+                return -1;
+
             var list = Items;
             var lower = 0;
             var upper = list.Count - 1;
