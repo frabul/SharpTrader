@@ -83,20 +83,22 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 try
                 {
-                    if (KlineWatchdog.ElapsedMilliseconds > 90000)
+                    if (KlineWatchdog.Elapsed > TimeSpan.FromSeconds(120))
                     {
-                        if (DateTime.Now > LastKlineWarn.AddSeconds(90000))
+                        KlineWatchdog.Restart();
+                        if (DateTime.Now > LastKlineWarn.AddSeconds(900))
                         {
-                            Logger.Warn("Kline websock looked like frozen");
+                            Logger.Warn("{0} Kline websock looked like frozen", Symbol);
                             LastKlineWarn = DateTime.Now;
                         }
                         KlineListen();
                     }
-                    if (DepthWatchdog.ElapsedMilliseconds > 90000)
+                    if (DepthWatchdog.Elapsed > TimeSpan.FromSeconds(120))
                     {
-                        if (DateTime.Now > LastDepthWarn.AddSeconds(90000))
+                        DepthWatchdog.Restart();
+                        if (DateTime.Now > LastDepthWarn.AddSeconds(90))
                         {
-                            Logger.Warn("Depth websock looked like frozen");
+                            Logger.Warn("{0}Depth websock looked like frozen", Symbol);
                             LastDepthWarn = DateTime.Now;
                         }
                         PartialDepthListen();
