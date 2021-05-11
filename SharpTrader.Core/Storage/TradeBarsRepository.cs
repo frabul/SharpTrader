@@ -157,7 +157,7 @@ namespace SharpTrader.Storage
                         newSymData.AddBars(chunkData.Ticks);
                     }
                     //save data
-                    newSymData.Save(this.DataDir);
+                    newSymData.Flush(this.DataDir);
                     //update dictionary
                     SymbolsMetaData[newSymData.Id] = newSymData;
                     //update db
@@ -198,7 +198,7 @@ namespace SharpTrader.Storage
                         if (Path.GetExtension(fpath) == ".bin")
                             File.Delete(fpath);
                     }
-                    histMetadata.Save(DataDir);
+                    histMetadata.Flush(DataDir);
                 }
             }
 
@@ -249,18 +249,19 @@ namespace SharpTrader.Storage
                 throw new Exception("symbol history not found");
 
             if (save)
-                Save(meta);
-            meta.ClearView();
+            {
+                lock (DbSymbolsMetaData)
+                {
+                    meta.Flush(DataDir);
+                    DbSymbolsMetaData.Upsert(meta);
+                }
+            }
+            else
+                meta.ClearView();
+
         }
 
-        private void Save(SymbolHistoryMetaDataInternal sdata)
-        {
-            lock (DbSymbolsMetaData)
-            {
-                sdata.Save(DataDir);
-                DbSymbolsMetaData.Upsert(sdata);
-            }
-        }
+
 
         public void Delete(string market, string symbol, TimeSpan time)
         {
