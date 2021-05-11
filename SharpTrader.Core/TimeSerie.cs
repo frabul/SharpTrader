@@ -1,6 +1,7 @@
 ﻿using SharpTrader.Indicators;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -42,9 +43,17 @@ namespace SharpTrader
                     Records[index] = historyRecord;
                 else
                 {
-                    if (Records.Count > 0 && EndTime > historyRecord.Time)
+                    if (Records.Count > 0 && EndTime > historyRecord.Time) 
+                    {
                         //throw new Exception("you cannot add a tick that's preceding the last one ");
-                        Records.Insert(~index, historyRecord);
+                        var insertIndex = ~index;
+                        Records.Insert(insertIndex, historyRecord);
+
+                        if (insertIndex > 0)
+                            Debug.Assert(this.Records[insertIndex].Time > this.Records[insertIndex - 1].Time);
+                        if (insertIndex + 1 < this.Records.Count)
+                            Debug.Assert(this.Records[insertIndex].Time < this.Records[insertIndex + 1].Time);
+                    }
                     else
                         Records.Add(historyRecord);
                 }
