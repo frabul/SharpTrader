@@ -67,13 +67,17 @@ namespace SharpTrader.Core.BrokersApi.Binance
 
         public async Task AssureData(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime)
         {
+
+
             if (toTime > DateTime.Now.AddYears(10))
                 toTime = DateTime.Now.AddYears(10);
             toTime = new DateTime(toTime.Year, toTime.Month, toTime.Day, toTime.Hour, toTime.Minute, 0, DateTimeKind.Utc);
-            Logger.Info($"Assuring data for {histInfo.Symbol} from {fromTime:yyyyMMdd HH:mm} to {toTime:yyyyMMdd HH:mm}");
+            bool reported = false;
             var epoch = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
             if (fromTime < epoch)
                 fromTime = epoch;
+
+
 
             await DownloadCandlesSemaphore.WaitAsync();
             var sem = GetSemaphore(histInfo.Symbol);
@@ -87,11 +91,21 @@ namespace SharpTrader.Core.BrokersApi.Binance
                 DateTime checkTime = fromTime;
                 while (checkTime < toTime)
                 {
+                    void ReportAssure()
+                    {
+                        if (!reported)
+                            Logger.Info($"Assuring data for {histInfo.Symbol} from {fromTime:yyyyMMdd HH:mm} to {toTime:yyyyMMdd HH:mm}"); 
+                        Logger.Debug($"Hole found in {histInfo.Symbol} history from {checkTime} to {oldTicks.Time}.");
+                        reported = true;
+                    }
+
                     if (oldTicks.MoveNext())
                     {
                         if (oldTicks.Time - checkTime > histInfo.Resolution)
                         {
-                            Logger.Debug($"Hole found in {histInfo.Symbol} history from {checkTime} to {oldTicks.Time}.");
+                            ReportAssure();
+
+
                             var candles = await DownloadCandles(histInfo.Symbol, checkTime, oldTicks.Current.CloseTime);
                             this.AddCandlesticks(histInfo, candles);
                         }
@@ -101,7 +115,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                     {
                         if (oldTicks.Count < 1 || oldTicks.Current.CloseTime < checkTime)
                         {
-                            Logger.Debug($"Hole found in {histInfo.Symbol} history from {checkTime} to {toTime}.");
+                            ReportAssure();
                             //there isn't any other tick, all remaining data needs to be downloaded 
                             var candles = await DownloadCandles(histInfo.Symbol, checkTime, toTime);
                             this.AddCandlesticks(histInfo, candles);

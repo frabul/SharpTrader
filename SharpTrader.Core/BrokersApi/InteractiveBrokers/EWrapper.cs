@@ -64,7 +64,7 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
             {
                 Client.reqMarketDataType(3);
                 //start main task
-                _ = Task.Factory.StartNew(MainTask, TaskCreationOptions.LongRunning);
+                _ = Task.Run(MainTask);
             }
             else
             {
@@ -195,15 +195,15 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
         {
 
         }
-         
+
         //----------------------- market data ---------------------------------- 
-        private Dictionary<int,MarketDataSubscription> MarketDataSubs = new Dictionary<int, MarketDataSubscription>();
+        private Dictionary<int, MarketDataSubscription> MarketDataSubs = new Dictionary<int, MarketDataSubscription>();
         private List<SymbolInfo> SymbolInfo = new List<SymbolInfo>();
         private SymbolFeed GetSymbolFeed(ISymbolInfo _symbol)
-        { 
+        {
             var symbol = GetSymbol(_symbol);
             var sub = GetDataSub(symbol);
-            var feed = new SymbolFeed(symbol, sub); 
+            var feed = new SymbolFeed(symbol, sub);
             return feed;
         }
 
@@ -230,7 +230,7 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
         }
 
         public override void realtimeBar(int reqId, long time, double open, double high, double low, double close, long volume, double WAP, int count)
-        { 
+        {
             Logger.Info("RealTimeBars. " + reqId + " - Time: " + time + ", Open: " + open + ", High: " + high + ", Low: " + low + ", Close: " + close + ", Volume: " + volume + ", Count: " + count + ", WAP: " + WAP);
             if (!MarketDataSubs.TryGetValue(reqId, out MarketDataSubscription sub))
                 Logger.Error($"Missing market data subscription id {reqId}");
@@ -247,7 +247,7 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
                     QuoteAssetVolume = volume
                 };
                 sub.SignalNewData(candle);
-            } 
+            }
         }
         public override void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
         {

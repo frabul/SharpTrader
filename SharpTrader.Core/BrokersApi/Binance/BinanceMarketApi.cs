@@ -131,7 +131,7 @@ namespace SharpTrader.BrokersApi.Binance
                     MinLotSize = lotSize.MinQty,
                     MinNotional = minNotional.MinNotional,
                     PricePrecision = pricePrecision.TickSize
-                };  
+                };
 
                 if (!SymbolsByAsset.ContainsKey(symInfo.Asset))
                     SymbolsByAsset.Add(symInfo.Asset, new List<SymbolInfo>());
@@ -192,10 +192,10 @@ namespace SharpTrader.BrokersApi.Binance
                             //then finally we restart the timer and archive operations  
                             ArchiveOldOperations();
                         }
-                        catch { } 
+                        catch { }
                     }
                 };
-                OrdersAndTradesSynchTask = Task.Factory.StartNew(SynchOrdersAndTrades, TaskCreationOptions.LongRunning);
+                OrdersAndTradesSynchTask = Task.Run(SynchOrdersAndTrades);
             }
             async Task SynchTimeAndBalance()
             {
@@ -212,7 +212,7 @@ namespace SharpTrader.BrokersApi.Binance
                     await Task.Delay(BalanceAndTimeSynchPeriod);
                 }
             };
-            FastUpdatesTask = Task.Factory.StartNew(SynchTimeAndBalance, TaskCreationOptions.LongRunning);
+            FastUpdatesTask = Task.Run(SynchTimeAndBalance);
             Logger.Info("initialization complete");
         }
 
@@ -523,7 +523,7 @@ namespace SharpTrader.BrokersApi.Binance
 
                         //if has active orders want to continue update from that id until it's closed
                         if (lastOrderOpen != null)
-                        { 
+                        {
                             symData.LastOrderAtTradesSynch = lastOrderOpen.OrderId - 1;
                             SymbolsData.Update(symData);
                         }
