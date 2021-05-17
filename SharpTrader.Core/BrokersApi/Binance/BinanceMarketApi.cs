@@ -892,6 +892,13 @@ namespace SharpTrader.BrokersApi.Binance
             }
             return 0;
         }
+        public IEnumerable<AssetBalance> GetAllBalances()
+        {
+            lock (LockBalances)
+            {
+                return _Balances.Values.ToArray();
+            }
+        }
         public decimal GetTotalBalance(string asset)
         {
             lock (LockBalances)
@@ -906,14 +913,7 @@ namespace SharpTrader.BrokersApi.Binance
         {
             try
             {
-                List<SymbolPriceResponse> allPrices;
-                if (Cache.TryGetValue("allPrices", out object result))
-                    allPrices = result as List<SymbolPriceResponse>;
-                else
-                {
-                    allPrices = await Client.GetSymbolsPriceTicker();
-                    Cache.Set("allPrices", allPrices, DateTime.Now.AddSeconds(30));
-                }
+                List<SymbolPriceResponse> allPrices = await GetAllPrices();
 
                 if (asset == "ETH" || asset == "BNB" || asset == "BTC")
                 {
@@ -965,6 +965,20 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<decimal>(RequestStatus.Failed);
             }
 
+        }
+
+        public async Task<List<SymbolPriceResponse>> GetAllPrices()
+        {
+            List<SymbolPriceResponse> allPrices;
+            if (Cache.TryGetValue("allPrices", out object result))
+                allPrices = result as List<SymbolPriceResponse>;
+            else
+            {
+                allPrices = await Client.GetSymbolsPriceTicker();
+                Cache.Set("allPrices", allPrices, DateTime.Now.AddSeconds(30));
+            }
+
+            return allPrices;
         }
 
         public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)

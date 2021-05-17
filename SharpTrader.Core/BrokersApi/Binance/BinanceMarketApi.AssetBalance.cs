@@ -1,6 +1,6 @@
 ﻿namespace SharpTrader.BrokersApi.Binance
-{ 
-    class AssetBalance
+{
+    public class AssetBalance
     {
         public string Asset;
         public decimal Free;
