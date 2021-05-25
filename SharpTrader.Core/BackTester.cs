@@ -15,11 +15,6 @@ namespace SharpTrader
 {
     public class BackTester
     {
-        class TimeAndValue
-        {
-            public DateTime Time;
-            public decimal Value;
-        }
         public class Statistics
         {
             public List<IndicatorDataPoint> EquityHistory { get; set; } = new List<IndicatorDataPoint>();
