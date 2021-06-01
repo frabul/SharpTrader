@@ -18,7 +18,7 @@ namespace SharpTrader.AlgoFramework
             public string Name { get; set; } = "Unnamed v1";
             public bool SaveData { get; set; } = false;
             public bool MarginTrading { get; set; } = false;
-            public int OperationsStartupLookBackDays { get; set; } = 4;
+            public bool LiquidationOnly { get; set; } = false;
         }
         class NonVolatileVars
         {
@@ -56,7 +56,7 @@ namespace SharpTrader.AlgoFramework
         public DateTime NextUpdateTime { get; private set; } = DateTime.MinValue;
         public TimeSpan Resolution { get; set; } = TimeSpan.FromSeconds(10);
 
-        public bool EntriesSuspended => State.EntriesSuspendedByUser || EntriesStopppedByStrategy;
+        public bool EntriesSuspended => State.EntriesSuspendedByUser || EntriesStopppedByStrategy || Config.LiquidationOnly;
         public bool IsPlottingEnabled { get; set; } = false;
 
         public TradingAlgo(IMarketApi marketApi, Configuration config)
@@ -181,12 +181,12 @@ namespace SharpTrader.AlgoFramework
                         Logger.Info($"{Time} - New trade for operation {activeOp.ToString()}: {trade.ToString()}");
                 }
                 else
-                { 
+                {
                     //let's search in closed operations  
                     var opId = Operation.GetOperationIdFromClientOrderId(trade.ClientOrderId);
-                    var oldOp = DbClosedOperations.FindById(opId); 
+                    var oldOp = DbClosedOperations.FindById(opId);
                     if (oldOp != null)
-                    { 
+                    {
                         if (oldOp.AddTrade(trade))
                             Logger.Info($"{Time} - New trade for 'old' operation {activeOp}: {trade.ToString()}");
                         //check if it got resumed by this new trade
@@ -203,7 +203,7 @@ namespace SharpTrader.AlgoFramework
                         Logger.Debug($"{Time} - New trade {trade.ToString()} without any associated operation");
                 }
             }
-              
+
             // call OnUpdate
             await OnUpdate(slice);
 
