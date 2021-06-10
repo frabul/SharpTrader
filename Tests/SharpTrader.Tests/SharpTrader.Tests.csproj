@@ -1,74 +1,17 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323}</ProjectGuid>
+    <TargetFramework>net5.0-windows7.0</TargetFramework>
     <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SharpTrader.Tests</RootNamespace>
-    <AssemblyName>SharpTrader.Tests</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="log4net" Version="2.0.8" />
-    <PackageReference Include="MvvmFoundation.Wpf" Version="1.0.0" />
-    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+    <ProjectReference Include="..\..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj" />
+    <ProjectReference Include="..\..\SharpTrader.Core\SharpTrader.Core.csproj" />
+    <ProjectReference Include="..\..\SharpTrader.Plotting\SharpTrader.Plotting.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="TestBinanceMarketApi.cs" />
-    <Compile Include="TestCombinedWebSocketClient.cs" />
-    <Compile Include="TestHistoryDB.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj">
-      <Project>{2A8F66F5-44A4-4618-B21E-3D9D1B86FB2D}</Project>
-      <Name>BinanceExchange.API</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\SharpTrader.Core\SharpTrader.Core.csproj">
-      <Project>{320b1902-461a-4b88-8852-d881dc4e5293}</Project>
-      <Name>SharpTrader.Core</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\SharpTrader.Plotting\SharpTrader.Plotting.csproj">
-      <Project>{6f67b4ab-53fb-4665-9116-c14f9256c0fa}</Project>
-      <Name>SharpTrader.Plotting</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="MarketsSimulator.json" />
-    <None Include="NLog.config">
+    <None Update="NLog.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <ItemGroup />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
