@@ -7,11 +7,11 @@ namespace SharpTrader.Storage
     public class SymbolHistoryId
     {
         [ProtoMember(1)]
-        public string Symbol { get; private set; }
+        public string Symbol { get; set; }
         [ProtoMember(2)]
-        public string Market { get; private set; }
+        public string Market { get; set; }
         [ProtoMember(3)]
-        public TimeSpan Resolution { get; private set; }
+        public TimeSpan Resolution { get; set; }
 
         internal string Key => $"{this.Market}_{this.Symbol}_{(int)this.Resolution.TotalMilliseconds}";
         /// <summary>

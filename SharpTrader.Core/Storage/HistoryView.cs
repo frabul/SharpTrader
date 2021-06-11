@@ -137,7 +137,7 @@ namespace SharpTrader.Storage
                     }
 
                     //load the existing file and merge candlesticks 
-                    HistoryChunkId newChunkId = new HistoryChunkId(this.Id, startDate);
+                    HistoryChunkId newChunkId = new HistoryChunkIdV2(this.Id, startDate);
                     var fileToLoad = newChunkId.GetFilePath(dataDir);
                     if (File.Exists(fileToLoad))
                     {

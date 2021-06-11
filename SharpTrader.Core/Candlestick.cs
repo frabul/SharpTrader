@@ -33,17 +33,21 @@ namespace SharpTrader
         [ProtoMember(7)]
         public virtual double QuoteAssetVolume { get; set; }
 
-        [ProtoIgnore]
+        [ProtoIgnore][BinaryPack.Attributes.IgnoredMember]
         public TimeSpan Timeframe => CloseTime - OpenTime;
 
         [ProtoIgnore]
+        [BinaryPack.Attributes.IgnoredMember]
         public DateTime Time => CloseTime;
 
         [ProtoIgnore]
+        [BinaryPack.Attributes.IgnoredMember]
         public virtual double Length { get { return this.High - this.Low; } }
         [ProtoIgnore]
+        [BinaryPack.Attributes.IgnoredMember]
         public double Value => this.Close;
         [ProtoIgnore]
+        [BinaryPack.Attributes.IgnoredMember]
         public MarketDataKind Kind => MarketDataKind.TradeBar;
 
         public Candlestick() { }

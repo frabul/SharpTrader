@@ -74,9 +74,10 @@ namespace SharpTrader.Storage
         public HistoryChunk(SymbolHistoryFile_Legacy old)
         {
             this.Ticks = old.Ticks;
-            ChunkId = new HistoryChunkId(
+            ChunkId = new HistoryChunkIdV3(
                     new SymbolHistoryId(old.Market, old.Symbol, old.Timeframe),
-                    old.Ticks.First().Time
+                    old.Ticks.First().Time,
+                    old.Ticks.First().Time.AddMonths(1)
                 );
         }
 
@@ -95,10 +96,99 @@ namespace SharpTrader.Storage
                     HistoryChunk fdata = Serializer.Deserialize<HistoryChunk>(fs);
                     return fdata;
                 }
+                else if (fileExtension == ".bin3")
+                {
+                    using (FileStream fileStream = File.Open(filePath, FileMode.Open))
+                    {
+                        HistoryChunkId chunkId = BinaryPack.BinaryConverter.Deserialize<HistoryChunkIdV3>(fileStream);
+                        List<Candlestick> candles = BinaryPack.BinaryConverter.Deserialize<List<Candlestick>>(fileStream);
+                        return new HistoryChunk() { ChunkId = chunkId, Ticks = candles };
+                    }
+                }
                 else
                 {
                     throw new InvalidOperationException("Wrong extension for loading HistoryChunk.");
                 }
+            }
+        }
+
+        public void Save(string filePath)
+        {
+            using (FileStream fileStream = File.Open(filePath, FileMode.Create, FileAccess.Write))
+            {
+                //BinaryPack.BinaryConverter.Serialize<HistoryChunkIdV3>(this.ChunkId as HistoryChunkIdV3, fileStream);
+
+                //var asd = BinaryPack.BinaryConverter.Serialize(this.Ticks );
+                BinaryPack.BinaryConverter.Serialize(this, fileStream);
+            }
+        }
+    }
+    [ProtoContract]
+    public class HistoryChunkV3
+    {
+        private List<Candlestick> _Ticks;
+        [ProtoMember(1)]
+        public HistoryChunkIdV3 ChunkId { get; set; }
+
+        [ProtoMember(2)]
+        public List<Candlestick> Ticks
+        {
+            get { return _Ticks; }
+            set
+            {
+                if (_Ticks != null)
+                    throw new Exception("Modification not allowed.");
+                else
+                {
+                    _Ticks = value;
+                }
+            }
+        }
+
+        public HistoryChunkV3()
+        {
+        }
+
+
+
+        public static HistoryChunkV3 Load(string filePath)
+        {
+            var fileExtension = Path.GetExtension(filePath);
+            using (var fs = File.Open(filePath, FileMode.Open))
+            {
+                if (fileExtension == ".bin")
+                {
+                    throw new NotImplementedException();
+                }
+                else if (fileExtension == ".bin2")
+                {
+                    throw new NotImplementedException();
+                }
+                else if (fileExtension == ".bpack")
+                {
+
+                    //HistoryChunkIdV3 chunkId = BinaryPack.BinaryConverter.Deserialize<HistoryChunkIdV3>(fs);
+                    //List<Candlestick> candles = BinaryPack.BinaryConverter.Deserialize<List<Candlestick>>(fs);
+
+                    //return new HistoryChunkV3() { ChunkId = chunkId, Ticks = candles };
+                    return BinaryPack.BinaryConverter.Deserialize<HistoryChunkV3>(fs);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Wrong extension for loading HistoryChunk.");
+                }
+            }
+        }
+
+        public void Save(string filePath)
+        {
+            using (FileStream fileStream = File.Open(filePath, FileMode.Create, FileAccess.Write))
+            {
+                //BinaryPack.BinaryConverter.Serialize<HistoryChunkIdV3>(this.ChunkId as HistoryChunkIdV3, fileStream);
+
+                //var asd = BinaryPack.BinaryConverter.Serialize(this.Ticks );
+                BinaryPack.BinaryConverter.Serialize(this, fileStream);
+                fileStream.Close();
             }
         }
     }

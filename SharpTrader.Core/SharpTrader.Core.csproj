@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\BinaryPack\src\BinaryPack\BinaryPack.csproj" />
     <ProjectReference Include="..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj" />
     <ProjectReference Include="..\InteractiveBrokers\TWSClient\TWSClient.csproj" />
   </ItemGroup>

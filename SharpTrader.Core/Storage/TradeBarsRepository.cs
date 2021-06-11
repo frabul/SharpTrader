@@ -143,7 +143,7 @@ namespace SharpTrader.Storage
                         Logger.Error("Error: history file {0} does not exist.", newPath);
                     }
                     if (canAddChunk)
-                        symData.Chunks.Add(new HistoryChunkId(chunk.HistoryId, chunk.StartDate));
+                        symData.Chunks.Add(new HistoryChunkIdV2(chunk.HistoryId, chunk.StartDate));
                 }
                 //rebuild history if needed
                 if (ok == false)
@@ -183,13 +183,13 @@ namespace SharpTrader.Storage
                 filesGrouped = files.GroupBy(
                     f =>
                         {
-                            var info = HistoryChunkId.Parse(f);
+                            var info = HistoryChunkIdV2.Parse(f);
                             return info.HistoryId.Key;
                         }
                 );
                 foreach (var group in filesGrouped)
                 {
-                    var info = HistoryChunkId.Parse(group.First());
+                    var info = HistoryChunkIdV2.Parse(group.First());
                     var histMetadata = new SymbolHistoryMetaDataInternal(info.HistoryId);
                     foreach (var fpath in group)
                     {
@@ -212,7 +212,7 @@ namespace SharpTrader.Storage
 
             foreach (var filePath in files)
             {
-                var fileInfo = HistoryChunkId.Parse(filePath);
+                var fileInfo = HistoryChunkIdV2.Parse(filePath);
                 //-- get metaData --
                 if (!data.ContainsKey(fileInfo.HistoryId.Key))
                     data.Add(fileInfo.HistoryId.Key, new SymbolHistoryMetaDataInternal(fileInfo.HistoryId));
