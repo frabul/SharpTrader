@@ -1,13 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net5.0-windows7.0</TargetFramework>
-    <OutputType>Library</OutputType>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <TargetFramework>net5.0</TargetFramework>
+    <OutputType>Library</OutputType> 
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.0" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj" />
     <ProjectReference Include="..\..\SharpTrader.Core\SharpTrader.Core.csproj" />
-    <ProjectReference Include="..\..\SharpTrader.Plotting\SharpTrader.Plotting.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="NLog.config">

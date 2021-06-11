@@ -1,18 +1,23 @@
-﻿using ProtoBuf;
+﻿using MessagePack;
+using ProtoBuf;
 using System;
 
 namespace SharpTrader.Storage
 {
     [ProtoContract]
+    [MessagePackObject]
     public class SymbolHistoryId
     {
         [ProtoMember(1)]
-        public string Symbol { get; private set; }
+        [Key(0)]
+        public string Symbol { get; set; }
         [ProtoMember(2)]
-        public string Market { get; private set; }
+        [Key(1)]
+        public string Market { get; set; }
         [ProtoMember(3)]
-        public TimeSpan Resolution { get; private set; }
-
+        [Key(2)]
+        public TimeSpan Resolution { get; set; }
+        [IgnoreMember]
         internal string Key => $"{this.Market}_{this.Symbol}_{(int)this.Resolution.TotalMilliseconds}";
         /// <summary>
         /// Constructor used only by serialization
