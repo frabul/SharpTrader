@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.IO;
-using ProtoBuf;
+using System.IO; 
 using System.Globalization;
 using System.Diagnostics;
 using LiteDB;
@@ -20,7 +19,6 @@ namespace SharpTrader.Storage
         private Logger Logger = LogManager.GetLogger("TradeBarsRepository");
         private static readonly CandlestickTimeComparer<Candlestick> CandlestickTimeComparer = new CandlestickTimeComparer<Candlestick>();
         private string DataDir;
-
         private LiteDatabase Db;
         private ILiteCollection<SymbolHistoryMetaDataInternal> DbSymbolsMetaData;
         private Dictionary<string, SymbolHistoryMetaDataInternal> SymbolsMetaData;
@@ -153,7 +151,7 @@ namespace SharpTrader.Storage
                     var newSymData = new SymbolHistoryMetaDataInternal(symData.HistoryId);
                     foreach (var chunk in symData.Chunks)
                     {
-                        var chunkData = HistoryChunk.Load(chunk.GetFilePath(DataDir));
+                        var chunkData = HistoryChunk.Load(chunk.GetFilePath(DataDir)).Result;
                         newSymData.AddBars(chunkData.Ticks);
                     }
                     //save data
@@ -193,7 +191,7 @@ namespace SharpTrader.Storage
                     var histMetadata = new SymbolHistoryMetaDataInternal(info.HistoryId);
                     foreach (var fpath in group)
                     {
-                        var fdata = HistoryChunk.Load(fpath);
+                        var fdata = HistoryChunk.Load(fpath).Result;
                         histMetadata.AddBars(fdata.Ticks);
                         if (Path.GetExtension(fpath) == ".bin")
                             File.Delete(fpath);
@@ -221,7 +219,7 @@ namespace SharpTrader.Storage
                 symData.Chunks.Add(fileInfo);
 
                 //update first and last tick time
-                HistoryChunk fileData = HistoryChunk.Load(filePath);
+                HistoryChunk fileData = HistoryChunk.Load(filePath).Result;
                 if (fileData.Ticks.Count > 0)
                 {
                     symData.UpdateLastBar(fileData.Ticks.First());

@@ -4,13 +4,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using NLog;
-using ProtoBuf;
 
 namespace SharpTrader.Storage
 {
     class HistoryView
     {
         Logger Logger = LogManager.GetLogger("HistoryView");
+        private SymbolHistoryMetaDataInternal SymbolHistory;
         private List<Candlestick> _Ticks = new List<Candlestick>();
         public SymbolHistoryId Id { get; set; }
         public HashSet<HistoryChunkId> LoadedFiles { get; set; } = new HashSet<HistoryChunkId>();
@@ -120,7 +120,7 @@ namespace SharpTrader.Storage
         /// Saves all data to disk and updates LoadedFiles list
         /// </summary>
         /// <param name="dataDir"></param>
-        public void Save_Protobuf(string dataDir)
+        public void SaveV2(string dataDir)
         {
             lock (_Ticks)
             {
@@ -141,7 +141,7 @@ namespace SharpTrader.Storage
                     var fileToLoad = newChunkId.GetFilePath(dataDir);
                     if (File.Exists(fileToLoad))
                     {
-                        var loadedChunk = HistoryChunk.Load(fileToLoad);
+                        var loadedChunk = HistoryChunk.Load(fileToLoad).Result;
                         foreach (var candle in loadedChunk.Ticks)
                             if (candle.Time >= startDate && candle.OpenTime <= endDate)
                                 candlesOfMont.AddRecord(candle, true);
@@ -149,15 +149,64 @@ namespace SharpTrader.Storage
 
 
                     //finally save data 
-                    HistoryChunk dataToSave = new HistoryChunk()
+                    HistoryChunk dataToSave = new HistoryChunkV3()
                     {
                         ChunkId = newChunkId,
                         Ticks = candlesOfMont.ToList(),
                     };
-                    using (var fs = File.Open(newChunkId.GetFilePath(dataDir), FileMode.Create))
-                        Serializer.Serialize<HistoryChunk>(fs, dataToSave);
+
+                    dataToSave.SaveAsync(dataDir);
 
                     this.LoadedFiles.Add(newChunkId);
+                }
+            }
+        }
+
+        public void SaveV3(string dataDir)
+        {
+            lock (_Ticks)
+            {
+                int i = 0;
+                while (i < this.Ticks.Count)
+                {
+                    var curTick = this.Ticks[i];
+                    DateTime startDate = new DateTime(curTick.Time.Year, curTick.Time.Month, curTick.Time.Day, 0, 0, 0, DateTimeKind.Utc);
+                    DateTime endDate = startDate.AddDays(1);
+                    TimeSerie<Candlestick> chunkBars = new TimeSerie<Candlestick>();
+
+
+                    //todo load all the chunks that overlap this period
+                    //todo delete loaded chunks
+
+                    //load the existing file and merge candlesticks 
+                    HistoryChunkId newChunkId = new HistoryChunkIdV3(this.Id, startDate, endDate);
+                    var fileToLoad = newChunkId.GetFilePath(dataDir); 
+                    if (!LoadedFiles.Contains(newChunkId) && File.Exists(fileToLoad))
+                    { 
+                        var loadedChunk = HistoryChunk.Load(fileToLoad).Result;
+                        foreach (var candle in loadedChunk.Ticks)
+                            if (candle.Time > startDate && candle.OpenTime < endDate)
+                                chunkBars.AddRecord(candle, true);
+                    }
+
+
+                    //add bars from this view
+                    while (i < this.Ticks.Count && this.Ticks[i].OpenTime < endDate)
+                    {
+                        chunkBars.AddRecord(new Candlestick(this.Ticks[i]));
+                        i++;
+                    }
+
+                    //finally save data 
+                    HistoryChunk dataToSave = new HistoryChunkV3()
+                    {
+                        ChunkId = newChunkId,
+                        Ticks = chunkBars.ToList(),
+                    };
+
+                    dataToSave.SaveAsync(dataDir);
+
+                    this.LoadedFiles.Add(dataToSave.ChunkId);
                 }
             }
         }

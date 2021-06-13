@@ -17,9 +17,9 @@ namespace SharpTrader.Tests
         public static void Run()
         {
             var test = new TestHistoryDB();
-            test.Test();
+            test.TestValidation();
         }
-        public void Test()
+        public void TestValidation()
         {
             HistoryDB = new TradeBarsRepository(DataDir);
 
@@ -44,7 +44,12 @@ namespace SharpTrader.Tests
             }
         }
 
-
+            
+        public void TestDbV3()
+        {
+            TradeBarsRepository dbv2 = new TradeBarsRepository(@"D:\ProgettiBck\SharpTraderBots\Bin\Data2");
+            TradeBarsRepository dbv3 = new TradeBarsRepository(@"D:\ProgettiBck\SharpTraderBots\Bin\Data3");
+        }
         void Shuffle<T>(List<T> a)
         {
             Random Random = new Random();

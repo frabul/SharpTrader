@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using MessagePack;
+using ProtoBuf;
 using System;
 using System.Diagnostics;
 using System.Globalization;
@@ -6,31 +7,68 @@ using System.IO;
 
 namespace SharpTrader.Storage
 {
-
-    public interface HistoryChunkId
+    [Union(0, typeof(HistoryChunkIdV3))]
+    [MessagePackObject]
+    public abstract class HistoryChunkId
     {
-        public SymbolHistoryId HistoryId { get; }
-        DateTime StartDate { get; }
+        [Key(0)]
+        public abstract SymbolHistoryId HistoryId { get; set; }
+        [Key(1)]
+        public abstract DateTime StartDate { get; set; }
+        [Key(2)]
+        public abstract DateTime EndDate { get; set; }
+        public abstract string GetFileName();
 
-        DateTime EndDate { get; }
-        string GetFilePath(string dataDir);
+        [IgnoreMember] public abstract string Key { get; }
+        public static HistoryChunkId Parse(string filePath)
+        {
+            var extension = Path.GetExtension(filePath);
+            if (extension == ".bin2")
+                return HistoryChunkIdV2.Parse(filePath);
+            else if (extension == ".bin3")
+                return HistoryChunkIdV3.Parse(filePath);
+            else
+                throw new InvalidOperationException($"Unknown file extension {extension}");
+        }
+
+        public override int GetHashCode()
+        {
+            return this.Key.GetHashCode();
+        }
+        public override bool Equals(object obj)
+        {
+            var other = obj as HistoryChunkIdV3;
+            return other != null && this.Key == other.Key;
+        }
+        public override string ToString()
+        {
+            return this.Key;
+        }
+
+        public string GetFilePath(string dataDir)
+        {
+            return Path.Combine(dataDir, GetFileName());
+        }
     }
     [ProtoContract]
     public class HistoryChunkIdV2 : HistoryChunkId
     {
         private DateTime startDate;
-
+        private DateTime endDate;
         [ProtoMember(1)]
-        public SymbolHistoryId HistoryId { get; private set; }
+        public override SymbolHistoryId HistoryId { get; set; }
 
         [ProtoMember(2)]
-        public DateTime StartDate { get => startDate; private set => startDate = value.ToUniversalTime(); }
+        public override DateTime StartDate
+        {
+            get => startDate; set { startDate = value.ToUniversalTime(); endDate = startDate.AddMonths(1); }
+        }
 
-        public DateTime EndDate => StartDate.AddMonths(1);
+        public override DateTime EndDate { get => endDate; set { throw new InvalidOperationException("HistoryChunkIdV2 doesn't allow to set EndDate"); } }
 
-        public string GetFilePath(string dataDir) => Path.Combine(dataDir, Key + ".bin2");
+        public override string GetFileName() => Key + ".bin2";
 
-        public string Key => HistoryId.Key + $"_{StartDate:yyyyMM}";
+        public override string Key => HistoryId.Key + $"_{StartDate:yyyyMM}";
 
         /// <summary>
         /// Constructor used only by serialization
@@ -46,17 +84,7 @@ namespace SharpTrader.Storage
             this.StartDate = date;
         }
 
-        public override int GetHashCode()
-        {
-            return this.Key.GetHashCode();
-        }
-        public override bool Equals(object obj)
-        {
-            var other = obj as HistoryChunkIdV2;
-            return other != null && this.Key == other.Key;
-        }
-
-        public static HistoryChunkIdV2 Parse(string filePath)
+        public static new HistoryChunkIdV2 Parse(string filePath)
         {
             HistoryChunkIdV2 ret = null;
             try
@@ -90,32 +118,32 @@ namespace SharpTrader.Storage
     /// <summary>
     /// Data contained is > startDate and  <= endDate
     /// </summary>
+    [MessagePackObject]
     public class HistoryChunkIdV3 : HistoryChunkId
     {
-        public SymbolHistoryId HistoryId { get; private set; }
+
         private DateTime startDate;
+
         private DateTime endDate;
 
-        public string Symbol { get => HistoryId.Symbol; private set => HistoryId.Symbol = value; }
+        [IgnoreMember]
+        public override SymbolHistoryId HistoryId { get; set; }
 
-        public string Market { get => HistoryId.Market; private set => HistoryId.Market = value; }
+        [IgnoreMember]
+        public override DateTime StartDate { get => startDate; set => startDate = value.ToUniversalTime(); }
 
-        public TimeSpan Resolution { get => HistoryId.Resolution; private set => HistoryId.Resolution = value; }
+        [IgnoreMember]
+        public override DateTime EndDate { get => endDate; set => endDate = value.ToUniversalTime(); }
 
-        public DateTime StartDate { get => startDate; private set => startDate = value.ToUniversalTime(); }
-
-        public DateTime EndDate { get => endDate; private set => endDate = value.ToUniversalTime(); }
-
-        public string GetFilePath(string dataDir) => Path.Combine(dataDir, Key + ".bin3");
-
-        public string Key => HistoryId.Key + $"_{StartDate:yyyyMMddHHmmss}_{EndDate:yyyyMMddHHmmss}";
+        [IgnoreMember]
+        public override string Key => HistoryId.Key + $"_{StartDate:yyyyMMddHHmmss}_{EndDate:yyyyMMddHHmmss}";
 
         /// <summary>
         /// Constructor used only by serialization
         /// </summary>
         public HistoryChunkIdV3()
         {
-            HistoryId = new SymbolHistoryId();
+
         }
 
         public HistoryChunkIdV3(SymbolHistoryId id, DateTime date, DateTime endDate)
@@ -125,17 +153,14 @@ namespace SharpTrader.Storage
             this.endDate = endDate;
         }
 
-        public override int GetHashCode()
+        public HistoryChunkIdV3(HistoryChunkId chunkId)
         {
-            return this.Key.GetHashCode();
-        }
-        public override bool Equals(object obj)
-        {
-            var other = obj as HistoryChunkIdV3;
-            return other != null && this.Key == other.Key;
+            this.HistoryId = chunkId.HistoryId;
+            this.StartDate = chunkId.StartDate;
+            this.endDate = chunkId.EndDate;
         }
 
-        public static HistoryChunkIdV3 Parse(string filePath)
+        public static new HistoryChunkIdV3 Parse(string filePath)
         {
 
             HistoryChunkIdV3 ret = null;
@@ -158,10 +183,7 @@ namespace SharpTrader.Storage
             return ret;
 
         }
-        public override string ToString()
-        {
-            return this.Key;
-        }
+        public override string GetFileName() => Key + ".bin3";
     }
 
 }

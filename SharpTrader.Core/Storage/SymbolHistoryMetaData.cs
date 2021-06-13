@@ -105,7 +105,7 @@ namespace SharpTrader.Storage
             //save the view
             if (oldView != null)
             {
-                oldView.Save_Protobuf(dataDir);
+                oldView.SaveByMonth(dataDir);
                 lock (this.Locker)
                 {
                     //check that saved chucks are present in chunks cache
@@ -156,7 +156,7 @@ namespace SharpTrader.Storage
                         try
                         {
 
-                            HistoryChunk fdata = HistoryChunk.Load(finfo.GetFilePath(dataDir));
+                            HistoryChunk fdata = HistoryChunk.Load(finfo.GetFilePath(dataDir)).Result;
                             this.AddBars(fdata.Ticks.Where(tick => tick.Time >= startOfData && tick.Time <= endOfData));
                         }
                         catch (Exception ex)
