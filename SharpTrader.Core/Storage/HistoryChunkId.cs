@@ -37,7 +37,7 @@ namespace SharpTrader.Storage
         }
         public override bool Equals(object obj)
         {
-            var other = obj as HistoryChunkIdV3;
+            var other = obj as HistoryChunkId;
             return other != null && this.Key == other.Key;
         }
         public override string ToString()
@@ -64,7 +64,7 @@ namespace SharpTrader.Storage
             get => startDate; set { startDate = value.ToUniversalTime(); endDate = startDate.AddMonths(1); }
         }
 
-        public override DateTime EndDate { get => endDate; set { throw new InvalidOperationException("HistoryChunkIdV2 doesn't allow to set EndDate"); } }
+        public override DateTime EndDate { get => endDate; set { endDate = value; } }
 
         public override string GetFileName() => Key + ".bin2";
 

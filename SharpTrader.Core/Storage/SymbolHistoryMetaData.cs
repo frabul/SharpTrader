@@ -52,6 +52,8 @@ namespace SharpTrader.Storage
 
         public HashSet<HistoryChunkId> Chunks { get; set; }
         public bool Validated { get; internal set; } = false;
+        public ChunkFileVersion ChunkFileVersion { get; private set; }
+        public ChunkSpan ChunkSpan { get; private set; }
 
         public SymbolHistoryMetaDataInternal(SymbolHistoryId historyId)
         {
@@ -105,7 +107,7 @@ namespace SharpTrader.Storage
             //save the view
             if (oldView != null)
             {
-                oldView.SaveByMonth(dataDir);
+                oldView.Save(dataDir, ChunkFileVersion, ChunkSpan);
                 lock (this.Locker)
                 {
                     //check that saved chucks are present in chunks cache
@@ -167,6 +169,12 @@ namespace SharpTrader.Storage
                 }
             }
 
+        }
+
+        internal void SetSaveMode(ChunkFileVersion chunkFileVersion, ChunkSpan chunkSpan)
+        {
+            ChunkFileVersion = chunkFileVersion;
+            ChunkSpan = chunkSpan;
         }
 
         public void ClearView()

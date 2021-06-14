@@ -15,6 +15,13 @@ namespace TestConsole
     {
         static async Task Main(string[] args)
         {
+            HistoryDB_Benchmark.Run();
+            await SharpTrader.Tests.TestHistoryDB.RunAsync();
+            await TestMessagePack();
+        }
+
+        private static async Task TestMessagePack()
+        {
             DateTime time = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
             List<Candlestick> candles = new List<Candlestick>();
             for (int i = 0; i < 1000; i++)
@@ -57,8 +64,6 @@ namespace TestConsole
             sw.Stop();
             Console.WriteLine($"Elapsed {sw.ElapsedTicks}");
             Console.ReadLine();
-            //--------------------
-            SharpTrader.Tests.TestHistoryDB.Run();
         }
     }
 

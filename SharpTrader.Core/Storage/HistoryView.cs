@@ -116,11 +116,65 @@ namespace SharpTrader.Storage
 
         }
 
+        internal void Save(string dataDir, ChunkFileVersion chunkFileVersion, ChunkSpan chunkSpan)
+        {
+            Func<HistoryChunkId, List<Candlestick>, HistoryChunk> chunkFactory;
+            Func<SymbolHistoryId, DateTime, DateTime, HistoryChunkId> idFactory;
+
+
+            switch (chunkFileVersion)
+            {
+                case ChunkFileVersion.V2:
+                    chunkFactory = (newChunkId, candles) =>
+                    {
+                        return new HistoryChunkV2()
+                        {
+                            ChunkId = newChunkId,
+                            Ticks = candles,
+                        };
+                    };
+                    idFactory = (symId, t1, t2) => new HistoryChunkIdV2(symId, t1);
+                    if (chunkSpan != ChunkSpan.OneMonth)
+                        throw new InvalidOperationException("The chunk file version V2 supports only OneMonth span");
+                    break;
+                case ChunkFileVersion.V3:
+                    chunkFactory = (newChunkId, candles) =>
+                    {
+                        return new HistoryChunkV3()
+                        {
+                            ChunkId = newChunkId,
+                            Ticks = candles,
+                        };
+                    };
+                    idFactory = (symId, t1, t2) => new HistoryChunkIdV3(symId, t1, t2);
+                    break;
+                default:
+                    throw new NotImplementedException($"Unknown ChunkFileVersion {chunkFileVersion}");
+            }
+
+            switch (chunkSpan)
+            {
+                case ChunkSpan.OneMonth:
+                    Save_month(dataDir, idFactory, chunkFactory);
+                    break;
+                case ChunkSpan.OneDay:
+                    Save_daily(dataDir, idFactory, chunkFactory);
+                    break;
+            }
+
+
+
+
+        }
+
         /// <summary>
         /// Saves all data to disk and updates LoadedFiles list
         /// </summary>
         /// <param name="dataDir"></param>
-        public void SaveV2(string dataDir)
+        public void Save_month(
+            string dataDir,
+            Func<SymbolHistoryId, DateTime, DateTime, HistoryChunkId> idFactory,
+            Func<HistoryChunkId, List<Candlestick>, HistoryChunk> chunkFactory)
         {
             lock (_Ticks)
             {
@@ -137,32 +191,31 @@ namespace SharpTrader.Storage
                     }
 
                     //load the existing file and merge candlesticks 
-                    HistoryChunkId newChunkId = new HistoryChunkIdV2(this.Id, startDate);
+                    HistoryChunkId newChunkId = idFactory(this.Id, startDate, endDate);
                     var fileToLoad = newChunkId.GetFilePath(dataDir);
                     if (File.Exists(fileToLoad))
                     {
                         var loadedChunk = HistoryChunk.Load(fileToLoad).Result;
                         foreach (var candle in loadedChunk.Ticks)
-                            if (candle.Time >= startDate && candle.OpenTime <= endDate)
+                            if (candle.Time > startDate && candle.OpenTime < endDate)
                                 candlesOfMont.AddRecord(candle, true);
                     }
+                    HistoryChunk dataToSave = chunkFactory(newChunkId, candlesOfMont.ToList());
 
-
-                    //finally save data 
-                    HistoryChunk dataToSave = new HistoryChunkV3()
-                    {
-                        ChunkId = newChunkId,
-                        Ticks = candlesOfMont.ToList(),
-                    };
-
-                    dataToSave.SaveAsync(dataDir);
+                    dataToSave.SaveAsync(dataDir).Wait();
 
                     this.LoadedFiles.Add(newChunkId);
                 }
             }
         }
 
-        public void SaveV3(string dataDir)
+
+
+
+        public void Save_daily(
+            string dataDir,
+            Func<SymbolHistoryId, DateTime, DateTime, HistoryChunkId> idFactory,
+            Func<HistoryChunkId, List<Candlestick>, HistoryChunk> chunkFactory)
         {
             lock (_Ticks)
             {
@@ -179,10 +232,10 @@ namespace SharpTrader.Storage
                     //todo delete loaded chunks
 
                     //load the existing file and merge candlesticks 
-                    HistoryChunkId newChunkId = new HistoryChunkIdV3(this.Id, startDate, endDate);
-                    var fileToLoad = newChunkId.GetFilePath(dataDir); 
+                    HistoryChunkId newChunkId = idFactory(this.Id, startDate, endDate);
+                    var fileToLoad = newChunkId.GetFilePath(dataDir);
                     if (!LoadedFiles.Contains(newChunkId) && File.Exists(fileToLoad))
-                    { 
+                    {
                         var loadedChunk = HistoryChunk.Load(fileToLoad).Result;
                         foreach (var candle in loadedChunk.Ticks)
                             if (candle.Time > startDate && candle.OpenTime < endDate)
@@ -198,13 +251,9 @@ namespace SharpTrader.Storage
                     }
 
                     //finally save data 
-                    HistoryChunk dataToSave = new HistoryChunkV3()
-                    {
-                        ChunkId = newChunkId,
-                        Ticks = chunkBars.ToList(),
-                    };
+                    HistoryChunk dataToSave = chunkFactory(newChunkId, chunkBars.ToList());
 
-                    dataToSave.SaveAsync(dataDir);
+                    dataToSave.SaveAsync(dataDir).Wait();
 
                     this.LoadedFiles.Add(dataToSave.ChunkId);
                 }

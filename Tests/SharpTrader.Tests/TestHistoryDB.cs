@@ -1,24 +1,34 @@
-﻿using SharpTrader.Storage;
+﻿using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Engines;
+using BenchmarkDotNet.Running;
+using SharpTrader.Core.BrokersApi.Binance;
+using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace SharpTrader.Tests
 {
+   
     public class TestHistoryDB
     {
         private const string MarketName = "Binance";
         private TradeBarsRepository HistoryDB;
-
+        private BinanceTradeBarsRepository Benchmark_DbV2;
+        private BinanceTradeBarsRepository Benchmark_DbV3;
+        private SymbolHistoryId BenchMark_Symbol;
         private const string DataDir = @"D:\ProgettiBck\SharpTraderBots\Bin\Data";
 
-        public static void Run()
+        public static async Task RunAsync()
         {
             var test = new TestHistoryDB();
-            test.TestValidation();
+            await test.TestDbV3Async();
         }
+
         public void TestValidation()
         {
             HistoryDB = new TradeBarsRepository(DataDir);
@@ -44,12 +54,41 @@ namespace SharpTrader.Tests
             }
         }
 
-            
-        public void TestDbV3()
+
+        public async Task TestDbV3Async()
         {
-            TradeBarsRepository dbv2 = new TradeBarsRepository(@"D:\ProgettiBck\SharpTraderBots\Bin\Data2");
-            TradeBarsRepository dbv3 = new TradeBarsRepository(@"D:\ProgettiBck\SharpTraderBots\Bin\Data3");
+            Benchmark_DbV2 = new BinanceTradeBarsRepository(@"C:\projects\temp\Data2", ChunkFileVersion.V2, ChunkSpan.OneMonth);
+            Benchmark_DbV3 = new BinanceTradeBarsRepository(@"C:\projects\temp\Data3", ChunkFileVersion.V3, ChunkSpan.OneMonth);
+            BenchMark_Symbol = new SymbolHistoryId("Binance", "ETHBTC", TimeSpan.FromSeconds(60));
+            var startTime = new DateTime(2020, 06, 01);
+            var endTime = new DateTime(2021, 06, 01);
+            await Benchmark_DbV2.AssureData(BenchMark_Symbol, startTime, endTime);
+
+            var data = Benchmark_DbV2.GetSymbolHistory(BenchMark_Symbol, startTime, endTime);
+
+            List<Candlestick> candles = new List<Candlestick>();
+            while (data.Ticks.MoveNext())
+                candles.Add(new Candlestick(data.Ticks.Current));
+
+            Benchmark_DbV3.AddCandlesticks(BenchMark_Symbol, candles);
+            Benchmark_DbV2.SaveAndClose(BenchMark_Symbol);
+            Benchmark_DbV3.SaveAndClose(BenchMark_Symbol);
+
+            var data3 = Benchmark_DbV3.GetSymbolHistory(BenchMark_Symbol, startTime, endTime);
+
+            data.Ticks.SeekFirst();
+            data3.Ticks.SeekFirst();
+
+            do
+            {
+                var tick1 = data.Ticks.Current;
+                var tick2 = data3.Ticks.Current;
+                var ok = tick1.Equals(tick2);
+                Debug.Assert(ok, $"Error at {tick1.Time}");
+            } while (data.Ticks.MoveNext() && data3.Ticks.MoveNext());
         }
+
+
         void Shuffle<T>(List<T> a)
         {
             Random Random = new Random();

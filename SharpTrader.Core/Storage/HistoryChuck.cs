@@ -46,7 +46,7 @@ namespace SharpTrader.Storage
         public virtual double Spread { get; set; }
 
     }
-    [Union(0, typeof(HistoryChunkV3))] 
+    [Union(0, typeof(HistoryChunkV3))]
     [MessagePackObject]
     public abstract class HistoryChunk
     {
@@ -147,7 +147,7 @@ namespace SharpTrader.Storage
     [MessagePackObject]
     public class HistoryChunkV3 : HistoryChunk
     {
-         
+
         private List<Candlestick> _Ticks;
         [IgnoreMember]
         public override HistoryChunkId ChunkId { get => Id; set => Id = (HistoryChunkIdV3)value; }
@@ -177,19 +177,17 @@ namespace SharpTrader.Storage
             var filePath = Id.GetFilePath(fileDir);
             using (FileStream fileStream = File.Open(filePath, FileMode.Create, FileAccess.Write))
             {
-                var lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
-
+                var lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray); 
                 await MessagePackSerializer.SerializeAsync<HistoryChunkV3>(fileStream, this);
-        
+
             }
-        } 
+        }
 
         public static async Task<HistoryChunkV3> LoadFromAsync(string filePath)
         {
             using (var fileStream = File.Open(filePath, FileMode.Open))
             {
                 var lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
-
                 return await MessagePackSerializer.DeserializeAsync<HistoryChunkV3>(fileStream);
             }
         }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.IO; 
+using System.IO;
 using System.Globalization;
 using System.Diagnostics;
 using LiteDB;
@@ -13,6 +13,12 @@ using NLog;
 
 namespace SharpTrader.Storage
 {
+    public enum ChunkFileVersion
+    {
+        V2,
+        V3
+    }
+    public enum ChunkSpan { OneMonth, OneDay }
     //TODO make thread safe
     public class TradeBarsRepository
     {
@@ -22,14 +28,22 @@ namespace SharpTrader.Storage
         private LiteDatabase Db;
         private ILiteCollection<SymbolHistoryMetaDataInternal> DbSymbolsMetaData;
         private Dictionary<string, SymbolHistoryMetaDataInternal> SymbolsMetaData;
-
-        public TradeBarsRepository(string dataDir)
+        public ChunkFileVersion ChunkFileVersion { get; private set; }
+        public ChunkSpan ChunkSpan { get; private set; }
+        public TradeBarsRepository(string dataDir) : this(dataDir, ChunkFileVersion.V3, ChunkSpan.OneDay)
         {
+
+        }
+        public TradeBarsRepository(string dataDir, ChunkFileVersion cv, ChunkSpan chunkSpan)
+        {
+            this.ChunkFileVersion = cv;
+            this.ChunkSpan = chunkSpan;
             DataDir = Path.Combine(dataDir, "RatesDB");
             if (!Directory.Exists(DataDir))
                 Directory.CreateDirectory(DataDir);
 
             Init();
+
         }
 
         public SymbolHistoryMetaData GetMetaData(SymbolHistoryId historyInfo) => GetMetaDataInternal(historyInfo);
@@ -41,6 +55,7 @@ namespace SharpTrader.Storage
                 {
                     metaData = new SymbolHistoryMetaDataInternal(historyInfo);
                     SymbolsMetaData.Add(historyInfo.Key, metaData);
+                    metaData.SetSaveMode(ChunkFileVersion, ChunkSpan);
                 }
                 return metaData;
             }
@@ -99,6 +114,9 @@ namespace SharpTrader.Storage
             }
 
             SymbolsMetaData = DbSymbolsMetaData.FindAll().ToDictionary(md => md.Id);
+            foreach (var item in SymbolsMetaData)
+                item.Value.SetSaveMode(ChunkFileVersion, ChunkSpan);
+
             ValidateSymbolsMetadata();
         }
 
@@ -141,7 +159,7 @@ namespace SharpTrader.Storage
                         Logger.Error("Error: history file {0} does not exist.", newPath);
                     }
                     if (canAddChunk)
-                        symData.Chunks.Add(new HistoryChunkIdV2(chunk.HistoryId, chunk.StartDate));
+                        symData.Chunks.Add(chunk);
                 }
                 //rebuild history if needed
                 if (ok == false)
@@ -154,6 +172,7 @@ namespace SharpTrader.Storage
                         var chunkData = HistoryChunk.Load(chunk.GetFilePath(DataDir)).Result;
                         newSymData.AddBars(chunkData.Ticks);
                     }
+                    // todo discover chunk files in directory and for each of them, load file, add data, delete file
                     //save data
                     newSymData.Flush(this.DataDir);
                     //update dictionary
