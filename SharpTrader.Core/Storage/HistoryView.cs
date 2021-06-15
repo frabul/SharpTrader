@@ -210,9 +210,6 @@ namespace SharpTrader.Storage
             }
         }
 
-
-
-
         public void Save_daily(
             string dataDir,
             Func<SymbolHistoryId, DateTime, DateTime, HistoryChunkId> idFactory,
@@ -228,8 +225,6 @@ namespace SharpTrader.Storage
                     DateTime startDate = new DateTime(curTick.Time.Year, curTick.Time.Month, curTick.Time.Day, 0, 0, 0, DateTimeKind.Utc);
                     DateTime endDate = startDate.AddDays(1);
                     TimeSerie<Candlestick> chunkBars = new TimeSerie<Candlestick>();
-
-
                     //load all the chunks that overlap this period
                     //delete loaded chunks
                     var chunks = this.SymbolHistory.Chunks.Where(c => c.Overlaps(startDate, endDate));
@@ -244,6 +239,7 @@ namespace SharpTrader.Storage
                                     chunkBars.AddRecord(candle, true);
 
                         }
+                        LoadedFiles.Remove(chunkToLoad);
                         if (File.Exists(filePath))
                             File.Delete(filePath);
                     }
@@ -251,15 +247,13 @@ namespace SharpTrader.Storage
                     //add bars from this view
                     while (i < this.Ticks.Count && this.Ticks[i].OpenTime < endDate)
                     {
-                        chunkBars.AddRecord(new Candlestick(this.Ticks[i]));
+                        chunkBars.AddRecord(new Candlestick(this.Ticks[i]), true);
                         i++;
                     }
 
                     //finally save data 
-                    HistoryChunk dataToSave = chunkFactory(newChunkId, chunkBars.ToList());
-
-                    dataToSave.SaveAsync(dataDir).Wait();
-
+                    HistoryChunk dataToSave = chunkFactory(idFactory(SymbolHistory.HistoryId, startDate, endDate), chunkBars.ToList()); 
+                    dataToSave.SaveAsync(dataDir).Wait(); 
                     this.LoadedFiles.Add(dataToSave.ChunkId);
                 }
             }
