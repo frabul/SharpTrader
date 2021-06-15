@@ -178,7 +178,7 @@ namespace SharpTrader.Storage
             using (FileStream fileStream = File.Open(filePath, FileMode.Create, FileAccess.Write))
             {
                 var lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray); 
-                await MessagePackSerializer.SerializeAsync<HistoryChunkV3>(fileStream, this);
+                await MessagePackSerializer.SerializeAsync<HistoryChunkV3>(fileStream, this, lz4Options);
 
             }
         }
@@ -188,7 +188,7 @@ namespace SharpTrader.Storage
             using (var fileStream = File.Open(filePath, FileMode.Open))
             {
                 var lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
-                return await MessagePackSerializer.DeserializeAsync<HistoryChunkV3>(fileStream);
+                return await MessagePackSerializer.DeserializeAsync<HistoryChunkV3>(fileStream, lz4Options);
             }
         }
     }

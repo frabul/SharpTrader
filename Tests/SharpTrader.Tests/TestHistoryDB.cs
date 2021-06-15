@@ -7,13 +7,15 @@ using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace SharpTrader.Tests
 {
-   
+
     public class TestHistoryDB
     {
         private const string MarketName = "Binance";
@@ -27,7 +29,31 @@ namespace SharpTrader.Tests
         {
             var test = new TestHistoryDB();
             await test.TestDbV3Async();
+            Console.ReadLine();
         }
+
+        public static Task RebuildDb()
+        {
+            var dir = "C:/projects/temp/bigdb/";
+            var dbv2 = Path.Combine(dir, "RatesDB/DatabaseV2.db");
+            var dbv3 = Path.Combine(dir, "RatesDB/DatabaseV3.db");
+            if (File.Exists(dbv2))
+                File.Delete(dbv2);
+            if (File.Exists(dbv3))
+                File.Delete(dbv3);
+            Stopwatch sw = Stopwatch.StartNew();
+            var chunks = TradeBarsRepository.DiscoverChunks(dir + "RatesDB/");
+            sw.Report("DiscoverChunks init");
+
+            sw.Restart();
+            var db = new TradeBarsRepository(dir);
+            sw.Report("Repo init");
+
+            Console.WriteLine("Press Enter to continue.");
+            Console.ReadLine();
+            return Task.CompletedTask;
+        }
+
 
         public void TestValidation()
         {
@@ -107,4 +133,22 @@ namespace SharpTrader.Tests
             }
         }
     }
+
+    public static class MethodTimeLogger
+    {
+        public static void Log(MethodBase methodBase, TimeSpan elapsed, string message)
+        {
+            Console.WriteLine($"{methodBase.Name} execution took {elapsed.TotalMilliseconds} ms.");
+        }
+    }
+
+    public static class Extensions
+    {
+        public static void Report(this Stopwatch sw, string taskName)
+        {
+            sw.Stop();
+            Console.WriteLine($"{taskName} took {sw.Elapsed.TotalSeconds} ms.");
+        }
+    }
+
 }

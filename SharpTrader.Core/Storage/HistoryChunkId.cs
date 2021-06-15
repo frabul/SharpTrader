@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace SharpTrader.Storage
 {
@@ -20,15 +21,17 @@ namespace SharpTrader.Storage
         public abstract string GetFileName();
 
         [IgnoreMember] public abstract string Key { get; }
-        public static HistoryChunkId Parse(string filePath)
+        public static bool TryParse(string filePath, out HistoryChunkId retVal)
         {
             var extension = Path.GetExtension(filePath);
+            retVal = null;
             if (extension == ".bin2")
-                return HistoryChunkIdV2.Parse(filePath);
+                return HistoryChunkIdV2.TryParse(filePath, out retVal);
             else if (extension == ".bin3")
-                return HistoryChunkIdV3.Parse(filePath);
+                return HistoryChunkIdV3.TryParse(filePath, out retVal);
             else
-                throw new InvalidOperationException($"Unknown file extension {extension}");
+                return false;
+            //throw new InvalidOperationException($"Unknown file extension {extension}"); 
         }
 
         public override int GetHashCode()
@@ -84,7 +87,7 @@ namespace SharpTrader.Storage
             this.StartDate = date;
         }
 
-        public static new HistoryChunkIdV2 Parse(string filePath)
+        public static new bool TryParse(string filePath, out HistoryChunkId retVal)
         {
             HistoryChunkIdV2 ret = null;
             try
@@ -95,18 +98,21 @@ namespace SharpTrader.Storage
                 string datestr = fileName.Substring(lastDivisor + 1);
                 var symId = SymbolHistoryId.Parse(key);
                 var date = DateTime.ParseExact(datestr, "yyyyMM", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
-                ret = new HistoryChunkIdV2()
+                retVal = new HistoryChunkIdV2()
                 {
                     HistoryId = symId,
                     StartDate = date
                 };
+                return true;
             }
             catch (Exception _ex)
             {
-                Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
+                retVal = null;
+                return false;
+                //Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
             }
 
-            return ret;
+
 
         }
         public override string ToString()
@@ -160,10 +166,8 @@ namespace SharpTrader.Storage
             this.endDate = chunkId.EndDate;
         }
 
-        public static new HistoryChunkIdV3 Parse(string filePath)
-        {
-
-            HistoryChunkIdV3 ret = null;
+        public static new bool TryParse(string filePath, out HistoryChunkId retVal)
+        { 
             try
             {
                 var fileName = Path.GetFileNameWithoutExtension(filePath);
@@ -173,16 +177,18 @@ namespace SharpTrader.Storage
                 var symId = SymbolHistoryId.Parse(key);
                 var startDate = DateTime.ParseExact(datestr, "yyyyMMddHHss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
                 var endDate = DateTime.ParseExact(datestr, "yyyyMMddHHss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
-                ret = new HistoryChunkIdV3(symId, startDate, endDate);
+                retVal = new HistoryChunkIdV3(symId, startDate, endDate);
+                return true;
             }
             catch (Exception _ex)
             {
-                Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
+                retVal = null;
+                return false;
+                //Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
             }
-
-            return ret;
-
+             
         }
+          
         public override string GetFileName() => Key + ".bin3";
     }
 

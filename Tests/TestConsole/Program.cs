@@ -1,5 +1,6 @@
 ﻿using SharpTrader;
 using SharpTrader.Storage;
+using SharpTrader.Tests;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,7 +16,8 @@ namespace TestConsole
     {
         static async Task Main(string[] args)
         {
-            HistoryDB_Benchmark.Run();
+            await TestHistoryDB.RebuildDb();
+            //HistoryDB_Benchmark.Run();
             await SharpTrader.Tests.TestHistoryDB.RunAsync();
             await TestMessagePack();
         }
