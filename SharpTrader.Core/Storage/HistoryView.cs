@@ -17,9 +17,10 @@ namespace SharpTrader.Storage
         public DateTime StartOfData { get; set; } = DateTime.MaxValue;
         public DateTime EndOfData { get; set; } = DateTime.MinValue;
 
-        public HistoryView(SymbolHistoryId id)
+        public HistoryView(SymbolHistoryMetaDataInternal index)
         {
-            Id = id;
+            SymbolHistory = index;
+            Id = SymbolHistory.HistoryId;
             _Ticks = new List<Candlestick>();
         }
 
@@ -217,6 +218,7 @@ namespace SharpTrader.Storage
             Func<SymbolHistoryId, DateTime, DateTime, HistoryChunkId> idFactory,
             Func<HistoryChunkId, List<Candlestick>, HistoryChunk> chunkFactory)
         {
+
             lock (_Ticks)
             {
                 int i = 0;
@@ -228,20 +230,23 @@ namespace SharpTrader.Storage
                     TimeSerie<Candlestick> chunkBars = new TimeSerie<Candlestick>();
 
 
-                    //todo load all the chunks that overlap this period
-                    //todo delete loaded chunks
-
-                    //load the existing file and merge candlesticks 
-                    HistoryChunkId newChunkId = idFactory(this.Id, startDate, endDate);
-                    var fileToLoad = newChunkId.GetFilePath(dataDir);
-                    if (!LoadedFiles.Contains(newChunkId) && File.Exists(fileToLoad))
+                    //load all the chunks that overlap this period
+                    //delete loaded chunks
+                    var chunks = this.SymbolHistory.Chunks.Where(c => c.Overlaps(startDate, endDate));
+                    foreach (var chunkToLoad in chunks)
                     {
-                        var loadedChunk = HistoryChunk.Load(fileToLoad).Result;
-                        foreach (var candle in loadedChunk.Ticks)
-                            if (candle.Time > startDate && candle.OpenTime < endDate)
-                                chunkBars.AddRecord(candle, true);
-                    }
+                        var filePath = chunkToLoad.GetFilePath(dataDir);
+                        if (!LoadedFiles.Contains(chunkToLoad) && File.Exists(filePath))
+                        {
+                            var loadedChunk = HistoryChunk.Load(filePath).Result;
+                            foreach (var candle in loadedChunk.Ticks)
+                                if (candle.Time > startDate && candle.OpenTime < endDate)
+                                    chunkBars.AddRecord(candle, true);
 
+                        }
+                        if (File.Exists(filePath))
+                            File.Delete(filePath);
+                    }
 
                     //add bars from this view
                     while (i < this.Ticks.Count && this.Ticks[i].OpenTime < endDate)

@@ -52,6 +52,14 @@ namespace SharpTrader.Storage
         {
             return Path.Combine(dataDir, GetFileName());
         }
+
+        public bool Overlaps(DateTime startDate, DateTime endDate)
+        {
+            return
+                (this.StartDate >= startDate && this.StartDate <= endDate) ||
+                (this.EndDate >= startDate && this.EndDate <= endDate) ||
+                (startDate >= this.StartDate && startDate <= this.EndDate);
+        }
     }
     [ProtoContract]
     public class HistoryChunkIdV2 : HistoryChunkId
@@ -167,7 +175,7 @@ namespace SharpTrader.Storage
         }
 
         public static new bool TryParse(string filePath, out HistoryChunkId retVal)
-        { 
+        {
             try
             {
                 var fileName = Path.GetFileNameWithoutExtension(filePath);
@@ -186,9 +194,9 @@ namespace SharpTrader.Storage
                 return false;
                 //Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
             }
-             
+
         }
-          
+
         public override string GetFileName() => Key + ".bin3";
     }
 

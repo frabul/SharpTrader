@@ -44,7 +44,7 @@ namespace SharpTrader.Storage
             get
             {
                 if (_View == null)
-                    _View = new HistoryView(HistoryId);
+                    _View = new HistoryView(this);
                 return _View;
             }
             private set { _View = value; }
@@ -62,7 +62,7 @@ namespace SharpTrader.Storage
             Chunks = new HashSet<HistoryChunkId>();
             GapsConfirmed = new List<DateRange>();
             GapsUnconfirmed = new List<DateRange>();
-            View = new HistoryView(historyId);
+            View = new HistoryView(this);
 
         }
         /// <summary>
@@ -101,7 +101,7 @@ namespace SharpTrader.Storage
             lock (this.Locker)
             {
                 oldView = this.View;
-                View = new HistoryView(View.Id);
+                View = new HistoryView(this);
             }
 
             //save the view
@@ -125,7 +125,7 @@ namespace SharpTrader.Storage
             {
                 if (this.View == null)
                 {
-                    this.View = new HistoryView(this.HistoryId);
+                    this.View = new HistoryView(this);
                 }
                 //check if we already have some records and load them   
                 if (this.View.TicksCount < 1)
@@ -148,16 +148,11 @@ namespace SharpTrader.Storage
                 foreach (var finfo in this.Chunks)
                 {
                     Debug.Assert(HistoryId.Key == finfo.HistoryId.Key, $"Hist id {HistoryId.Key} - finfo {finfo.HistoryId.Key}");
-                    var dateInRange = missingData.Any(dr =>
-                        (dr.start <= finfo.StartDate && dr.end >= finfo.StartDate) ||
-                        (dr.start >= finfo.StartDate && dr.end <= finfo.EndDate) ||
-                        (dr.start <= finfo.EndDate && dr.end >= finfo.EndDate)
-                        );
+                    var dateInRange = missingData.Any(dr => dr.Overlaps(finfo.StartDate, finfo.EndDate));
                     if (dateInRange && this.View.LoadedFiles.Add(finfo)) //if is in any range and not already loaded
                     {
                         try
                         {
-
                             HistoryChunk fdata = HistoryChunk.Load(finfo.GetFilePath(dataDir)).Result;
                             this.AddBars(fdata.Ticks.Where(tick => tick.Time >= startOfData && tick.Time <= endOfData));
                         }
@@ -179,7 +174,7 @@ namespace SharpTrader.Storage
 
         public void ClearView()
         {
-            View = new HistoryView(View.Id);
+            View = new HistoryView(this);
         }
     }
 }
