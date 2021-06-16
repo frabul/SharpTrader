@@ -174,23 +174,28 @@ namespace SharpTrader.Storage
             this.endDate = chunkId.EndDate;
         }
 
+        static Regex FileNameRegex = new Regex(@"([A-Za-z0-9]+_[A-Z0-9]+_[0-9]+)_(\d+)_(\d+)[.]bin3", RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.CultureInvariant);
         public static new bool TryParse(string filePath, out HistoryChunkId retVal)
         {
+            retVal = null;
             try
             {
-                var fileName = Path.GetFileNameWithoutExtension(filePath);
-                var lastDivisor = fileName.IndexOf("_");
-                string key = fileName.Substring(0, lastDivisor);
-                string datestr = fileName.Substring(lastDivisor + 1);
-                var symId = SymbolHistoryId.Parse(key);
-                var startDate = DateTime.ParseExact(datestr, "yyyyMMddHHss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
-                var endDate = DateTime.ParseExact(datestr, "yyyyMMddHHss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
-                retVal = new HistoryChunkIdV3(symId, startDate, endDate);
-                return true;
+                var match = FileNameRegex.Match(filePath);
+                if (match.Success)
+                {
+                    var symId = SymbolHistoryId.Parse(match.Groups[1].Value);
+                    var startDate = DateTime.ParseExact(match.Groups[2].Value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+                    var endDate = DateTime.ParseExact(match.Groups[3].Value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+                    retVal = new HistoryChunkIdV3(symId, startDate, endDate);
+                    return true;
+                }
+                else
+                {
+                    return false;
+                } 
             }
             catch (Exception _ex)
-            {
-                retVal = null;
+            { 
                 return false;
                 //Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
             }
