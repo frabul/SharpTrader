@@ -1,0 +1,25 @@
+{
+  "name": "charts",
+  "version": "1.0.0",
+  "description": "Charts module",
+  "private": true,
+  "dependencies": {
+    "lightweight-charts": "^3.3.0",
+    "tsify": "^5.0.4"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.14.170",
+    "live-server": "^1.2.1",
+    "ts-loader": "^9.2.3",
+    "typescript": "^4.3.4",
+    "webpack": "^5.39.1",
+    "webpack-cli": "^4.7.2"
+  },
+  
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "wpk": "webpack"
+  },
+  "author": "Francesco Buldo",
+  "license": "ISC"
+}
