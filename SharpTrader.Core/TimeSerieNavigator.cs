@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -20,7 +21,7 @@ namespace SharpTrader
 
         private int _Cursor = -1;
         private Stack<int> PositionSaveStack = new Stack<int>();
-        private bool disposed; 
+        private bool disposed;
         protected TimeRecordCollection<T> Records { get; private set; }
 
         public int Count { get { return Records.Count; } }
@@ -278,6 +279,8 @@ namespace SharpTrader
 
             disposed = true;
         }
+
+
     }
 
     public class TimeRecordCollection<T> where T : ITimeRecord

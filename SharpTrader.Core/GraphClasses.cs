@@ -166,6 +166,15 @@ namespace SharpTrader
             var b = (byte)(color >> 0);
             return new ColorARGB(a, r, g, b);
         }
+
+        public string ToString(string format)
+        {
+            if (format == "#")
+            {
+                return $"#{R:x}{G:x}{B:x}{A:x}";
+            }
+            return this.ToString();
+        }
     }
 
     public static class ARGBColors
