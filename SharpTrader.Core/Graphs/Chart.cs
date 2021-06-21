@@ -22,6 +22,31 @@ namespace SharpTrader.Drawing
         {
             Series.Add(series);
         }
+
+        public void PlotLine(IEnumerable<IBaseData> values, ColorARGB color)
+        {
+            var points = values.Select(v => new Point(v.Time, (decimal)v.Value)).ToList();
+            var chartLine = new Line() { Points = points, Color = color };
+            this.AddSeries(chartLine);
+        }
+
+        public void PlotCandlesticks(IEnumerable<ITradeBar> candles)
+        {
+            var series = new CandlestickSeries();
+            series.Points.AddRange(candles.Select(c => new ChartCandlestick(c)));
+            this.AddSeries(series);
+        }
+
+        public void PlotCandlesticks(string name, TimeSerieNavigator<ITradeBar> ticks)
+        {
+            var candles = new CandlestickSeries() { Name = name };
+            this.AddSeries(candles);
+
+            TimeSerieNavigator<ITradeBar> mySeries = new TimeSerieNavigator<ITradeBar>(ticks);
+            while (mySeries.MoveNext())
+                candles.Points.Add(new ChartCandlestick(mySeries.Current));
+            mySeries.OnNewRecord += rec => candles.Points.Add(new ChartCandlestick(rec));
+        }
     }
 
     public abstract class Series
@@ -58,9 +83,9 @@ namespace SharpTrader.Drawing
 
     public struct Point
     {
-        public Point(DateTime x, decimal y) { Time = x; Value = y; }
-        public DateTime Time { get; }
-        public Decimal Value { get; }
+        public Point(DateTime x, decimal y) { time = x; value = y; }
+        public DateTime time { get; }
+        public Decimal value { get; }
     }
 
     public class Line : Series
@@ -109,37 +134,17 @@ namespace SharpTrader.Drawing
     public class Chart
     {
         public List<Figure> Figures { get; set; } = new List<Figure>();
-        Figure MainFigure => Figures[0];
+
 
         public Chart()
         {
-            Figures.Add(new Figure());
+
         }
 
-        public void PlotCandlesticks(IEnumerable<ITradeBar> candles)
-        {
-            var series = new CandlestickSeries();
-            series.Points.AddRange(candles.Select(c => new ChartCandlestick(c)));
-            MainFigure.AddSeries(series);
-        }
 
-        public void PlotCandlesticks(string name, TimeSerieNavigator<ITradeBar> ticks)
-        {
-            var candles = new CandlestickSeries() { Name = name };
-            MainFigure.AddSeries(candles);
 
-            TimeSerieNavigator<ITradeBar> mySeries = new TimeSerieNavigator<ITradeBar>(ticks);
-            while (mySeries.MoveNext())
-                candles.Points.Add(new ChartCandlestick(mySeries.Current));
-            mySeries.OnNewRecord += rec => candles.Points.Add(new ChartCandlestick(rec));
-        }
 
-        public void PlotLine(IEnumerable<IBaseData> values, ColorARGB color)
-        {
-            var points = values.Select(v => new Point(v.Time, (decimal)v.Value)).ToList();
-            var chartLine = new Line() { Points = points, Color = color };
-            MainFigure.AddSeries(chartLine);
-        }
+
 
         public void PlotHorizontalLine()
         {
@@ -148,9 +153,10 @@ namespace SharpTrader.Drawing
 
         public void Serialize(string filePath)
         {
-            using var fs = File.OpenWrite(filePath);
+            using var fs = File.Open(filePath, FileMode.Create);
             using var tw = new StreamWriter(fs);
             var serializer = new JsonSerializer();
+            serializer.Formatting = Formatting.Indented;
             serializer.NullValueHandling = NullValueHandling.Ignore;
             serializer.Converters.Add(new StringEnumConverter());
             serializer.Converters.Add(new ChartPointDateTimeConverter());
@@ -159,7 +165,12 @@ namespace SharpTrader.Drawing
 
         }
 
-
+        public Figure NewFigure()
+        {
+            var fig = new Figure();
+            this.Figures.Add(fig);
+            return fig;
+        }
 
         public class ChartPointDateTimeConverter : JsonConverter<DateTime>
         {

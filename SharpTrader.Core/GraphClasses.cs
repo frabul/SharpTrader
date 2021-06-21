@@ -171,7 +171,7 @@ namespace SharpTrader
         {
             if (format == "#")
             {
-                return $"#{R:x}{G:x}{B:x}{A:x}";
+                return $"#{R:x2}{G:x2}{B:x2}{A:x2}";
             }
             return this.ToString();
         }

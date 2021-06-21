@@ -14,15 +14,20 @@ function AddCandlesSerie(chart: IChartApi, seriesData: any) {
 
 function AddLineSerie(chart: IChartApi, series: any) {
     var lineSeries = chart.addLineSeries();
+    lineSeries.applyOptions({ color: series.Color})
     lineSeries.setData(series.Points);
 }
 
 function CreateFigure(figureData) {
-    var box = document.getElementById("chartBox").getElementsByTagName("div")[figuresCount++];   // Get the element with id="demo"
+    var container = document.getElementById("chartBox");   // Get the element with id="demo"
+    var box = document.createElement('div');
+    container.appendChild(box)
+    box.className = "grid-item";
+    container.style.gridTemplateRows += " " + figureData.HeightRelative + "fr";
     var chart = createChart(box, { width: box.clientWidth, height: box.clientHeight });
     chart.applyOptions(
         {
-            localization: { 
+            localization: {
                 timeFormatter: businessDayOrTimestamp => {
                     if (typeof (businessDayOrTimestamp) == 'number') {
                         var date = new Date(businessDayOrTimestamp * 1000);
@@ -30,9 +35,9 @@ function CreateFigure(figureData) {
                     } else
                         return businessDayOrTimestamp;
                 },
-               
+
             },
-            timeScale:{
+            timeScale: {
                 timeVisible: true
             }
         }
@@ -60,9 +65,10 @@ function CreateFigure(figureData) {
 //   add data
 
 
-
+var searchParams = new URLSearchParams( window.location.search );
+var chartFile = searchParams.get('chart');
 var request = new XMLHttpRequest();
-request.open("GET", "chart.json", false);
+request.open("GET", chartFile, false);
 request.send(null);
 var jsonData = JSON.parse(request.responseText);
 
