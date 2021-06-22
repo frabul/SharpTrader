@@ -1,22 +1,34 @@
 import { chartData } from './data';
-import { createChart, IChartApi } from 'lightweight-charts';
+import { createChart, IChartApi, TimeRange } from 'lightweight-charts';
+
+var figuresCount = 0;
+var charts: IChartApi[] = [];
+var inhibitSynchUntil: Date = new Date();
+var lastVisibleRangeSet: TimeRange = { from: "", to: "" };
 
 chartData.figures[0].series[1].points.forEach(point => {
     point.value = point.value * 1.1;
 });
 
-var figuresCount = 0;
-
 function AddCandlesSerie(chart: IChartApi, seriesData: any) {
-    var lineSeries = chart.addCandlestickSeries();
+    var lineSeries = chart.addCandlestickSeries({
+        priceLineVisible: false,
+        lastValueVisible: false
+    });
     lineSeries.setData(seriesData.Points);
 }
 
 function AddLineSerie(chart: IChartApi, series: any) {
-    var lineSeries = chart.addLineSeries();
-    lineSeries.applyOptions({ color: series.Color})
+    var lineSeries = chart.addLineSeries({
+        color: series.Color,
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false
+    });
+    lineSeries.applyOptions({ color: series.Color })
     lineSeries.setData(series.Points);
 }
+
 
 function CreateFigure(figureData) {
     var container = document.getElementById("chartBox");   // Get the element with id="demo"
@@ -35,13 +47,31 @@ function CreateFigure(figureData) {
                     } else
                         return businessDayOrTimestamp;
                 },
-
+                priceFormatter: price => price.toFixed(7)
             },
+
             timeScale: {
                 timeVisible: true
             }
         }
     )
+
+
+    function onVisibleTimeRangeChanged(newVisibleTimeRange: TimeRange) {
+
+        var now = new Date();
+        //if (now > inhibitSynchUntil) {
+        if (lastVisibleRangeSet.from != newVisibleTimeRange.from || lastVisibleRangeSet.to != newVisibleTimeRange.to) {
+            inhibitSynchUntil = new Date(now.getTime() + 50);
+            charts.forEach(e => {
+                if (e != chart)
+                    e.timeScale().setVisibleRange(newVisibleTimeRange)
+            });
+            lastVisibleRangeSet = newVisibleTimeRange;
+        }
+    }
+
+    chart.timeScale().subscribeVisibleTimeRangeChange(onVisibleTimeRangeChanged);
     figureData.Series.forEach(series => {
         switch (series.Type) {
             case "Candlestick":
@@ -59,20 +89,39 @@ function CreateFigure(figureData) {
         chart.resize(box.clientWidth, box.clientHeight);
     }, 250);
 
-
+    charts.push(chart);
 }
-//   create a serie on the charts ( of required type0)
-//   add data
-
-
-var searchParams = new URLSearchParams( window.location.search );
+ 
+var searchParams = new URLSearchParams(window.location.search);
 var chartFile = searchParams.get('chart');
 var request = new XMLHttpRequest();
 request.open("GET", chartFile, false);
-request.send(null);
+request.send(null); 
 var jsonData = JSON.parse(request.responseText);
 
 //create the main chart
 //for each serie that is in main area
 jsonData.Figures.forEach(CreateFigure);
 
+ 
+
+var intervalId = setInterval(function () {
+    var event = new MouseEvent('mouseenter', {
+        'view': window,
+        'bubbles': true,
+        'cancelable': false,
+        'clientX': 500,
+        'clientY': 100, 
+      });
+    var div1 = document.getElementById("chartBox").getElementsByTagName("div")[1];   // Get the element with id="demo"
+    div1.dispatchEvent(event); 
+    var event = new MouseEvent('mouseenter', {
+        'view': window,
+        'bubbles': true,
+        'cancelable': false,
+        'clientX': 500,
+        'clientY': 100, 
+      });
+    var div2 = div1.getElementsByTagName("div")[0];   // Get the element with id="demo"
+    div2.dispatchEvent(event); 
+}, 500);
