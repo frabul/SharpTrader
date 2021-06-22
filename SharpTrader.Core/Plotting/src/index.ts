@@ -1,5 +1,5 @@
 import { chartData } from './data';
-import { createChart, IChartApi, TimeRange } from 'lightweight-charts';
+import { createChart, IChartApi, TimeRange, MouseEventParams } from 'lightweight-charts';
 
 var figuresCount = 0;
 var charts: IChartApi[] = [];
@@ -91,37 +91,24 @@ function CreateFigure(figureData) {
 
     charts.push(chart);
 }
- 
+
 var searchParams = new URLSearchParams(window.location.search);
 var chartFile = searchParams.get('chart');
 var request = new XMLHttpRequest();
 request.open("GET", chartFile, false);
-request.send(null); 
+request.send(null);
 var jsonData = JSON.parse(request.responseText);
 
 //create the main chart
 //for each serie that is in main area
 jsonData.Figures.forEach(CreateFigure);
 
- 
+let theChart = charts[0];
+charts[0].subscribeCrosshairMove(function (par: MouseEventParams) {
+    charts.forEach(c => {
+        if (c != theChart)
+            c.setCrosshair(par.point.x, par.point.y)
+    });
+});
 
-var intervalId = setInterval(function () {
-    var event = new MouseEvent('mouseenter', {
-        'view': window,
-        'bubbles': true,
-        'cancelable': false,
-        'clientX': 500,
-        'clientY': 100, 
-      });
-    var div1 = document.getElementById("chartBox").getElementsByTagName("div")[1];   // Get the element with id="demo"
-    div1.dispatchEvent(event); 
-    var event = new MouseEvent('mouseenter', {
-        'view': window,
-        'bubbles': true,
-        'cancelable': false,
-        'clientX': 500,
-        'clientY': 100, 
-      });
-    var div2 = div1.getElementsByTagName("div")[0];   // Get the element with id="demo"
-    div2.dispatchEvent(event); 
-}, 500);
+ 

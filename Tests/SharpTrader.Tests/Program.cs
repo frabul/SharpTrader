@@ -18,6 +18,7 @@ namespace TestConsole
         {
             Console.WriteLine("Running charts test");
             await ChartsTest.Run();
+            Console.WriteLine("Completed. Press enter to continue.");
             Console.ReadLine();
             await TestHistoryDB.RebuildDb();
             //HistoryDB_Benchmark.Run();
