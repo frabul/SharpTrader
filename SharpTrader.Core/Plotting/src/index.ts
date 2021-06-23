@@ -1,14 +1,20 @@
-import { chartData } from './data';
-import { createChart, IChartApi, TimeRange, MouseEventParams } from 'lightweight-charts';
 
-var figuresCount = 0;
-var charts: IChartApi[] = [];
-var inhibitSynchUntil: Date = new Date();
+import { createChart, IChartApi, TimeRange, MouseEventParams, Point, Coordinate } from 'lightweight-charts';
+
+
+class Figure {
+    Chart: IChartApi;
+    LastCrosshairForcedPoint: Point;
+    Container: HTMLElement;
+    constructor(chart: IChartApi, container: HTMLElement) {
+        this.Chart = chart;
+        this.Container = container;
+        this.LastCrosshairForcedPoint = { x: 0 as Coordinate, y: 0 as Coordinate };
+    }
+}
+
+var charts: Figure[] = [];
 var lastVisibleRangeSet: TimeRange = { from: "", to: "" };
-
-chartData.figures[0].series[1].points.forEach(point => {
-    point.value = point.value * 1.1;
-});
 
 function AddCandlesSerie(chart: IChartApi, seriesData: any) {
     var lineSeries = chart.addCandlestickSeries({
@@ -22,12 +28,14 @@ function AddCandlesSerie(chart: IChartApi, seriesData: any) {
 function AddLineSerie(chart: IChartApi, series: any) {
     var lineSeries = chart.addLineSeries({
         color: series.Color,
-        lineWidth: 1,
+        lineWidth: series.LineWidth,
+        
         priceLineVisible: false,
         lastValueVisible: false
     });
     lineSeries.applyOptions({ color: series.Color })
     lineSeries.setData(series.Points);
+    lineSeries.setMarkers(series.Markers);
 }
 
 
@@ -58,23 +66,6 @@ function CreateFigure(figureData) {
             }
         }
     )
-
-
-    function onVisibleTimeRangeChanged(newVisibleTimeRange: TimeRange) {
-
-        var now = new Date();
-        //if (now > inhibitSynchUntil) {
-        if (lastVisibleRangeSet.from != newVisibleTimeRange.from || lastVisibleRangeSet.to != newVisibleTimeRange.to) {
-            inhibitSynchUntil = new Date(now.getTime() + 50);
-            charts.forEach(e => {
-                if (e != chart)
-                    e.timeScale().setVisibleRange(newVisibleTimeRange)
-            });
-            lastVisibleRangeSet = newVisibleTimeRange;
-        }
-    }
-
-    chart.timeScale().subscribeVisibleTimeRangeChange(onVisibleTimeRangeChanged);
     figureData.Series.forEach(series => {
         switch (series.Type) {
             case "Candlestick":
@@ -86,13 +77,39 @@ function CreateFigure(figureData) {
         }
     });
 
+    charts.push(new Figure(chart, box));
 
-    chart.options
+    function onVisibleTimeRangeChanged(newVisibleTimeRange: TimeRange) {
+
+        var now = new Date();
+        //if (now > inhibitSynchUntil) {
+        if (lastVisibleRangeSet.from != newVisibleTimeRange.from || lastVisibleRangeSet.to != newVisibleTimeRange.to) {
+            charts.forEach(e => {
+                if (e.Chart != chart)
+                    e.Chart.timeScale().setVisibleRange(newVisibleTimeRange)
+            });
+            lastVisibleRangeSet = newVisibleTimeRange;
+        }
+    }
+
+    chart.timeScale().subscribeVisibleTimeRangeChange(onVisibleTimeRangeChanged);
+
+    chart.subscribeCrosshairMove(function (par: MouseEventParams) {
+        charts.forEach(c => {
+            if (c.Chart != chart && par.point != undefined) {
+                if (c.LastCrosshairForcedPoint.x != par.point.x
+                    || c.LastCrosshairForcedPoint.y != par.point.y) {
+
+                    c.LastCrosshairForcedPoint = par.point;
+                    c.Chart.setCrosshair(par.point.x, par.point.y);
+                }
+            }
+        });
+    });
+
     var intervalId = setInterval(function () {
         chart.resize(box.clientWidth, box.clientHeight);
-    }, 250);
-
-    charts.push(chart);
+    }, 200);
 }
 
 var searchParams = new URLSearchParams(window.location.search);
@@ -106,11 +123,5 @@ var jsonData = JSON.parse(request.responseText);
 //for each serie that is in main area
 jsonData.Figures.forEach(CreateFigure);
 
-let theChart = charts[0];
-charts[0].subscribeCrosshairMove(function (par: MouseEventParams) {
-    charts.forEach(c => {
-        if (c != theChart)
-            c.setCrosshair(par.point.x, par.point.y)
-    });
-});
+
 
