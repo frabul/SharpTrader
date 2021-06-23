@@ -14,7 +14,7 @@ namespace SharpTrader
         DateTime Time { get; }
     }
 
-    public class TimeSerieNavigator<T> : IDisposable where T : ITimeRecord
+    public class TimeSerieNavigator<T> : IEnumerable<T>, IDisposable where T : ITimeRecord
     {
         private object Locker = new object();
         public event Action<T> OnNewRecord;
@@ -280,7 +280,21 @@ namespace SharpTrader
             disposed = true;
         }
 
+        public IEnumerator<T> GetEnumerator()
+        {
+            for (int i = 0; i < Records.Count; i++)
+            {
+                yield return Records[i];
+            }
+        }
 
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            for (int i = 0; i < Records.Count; i++)
+            {
+                yield return Records[i];
+            }
+        }
     }
 
     public class TimeRecordCollection<T> where T : ITimeRecord
