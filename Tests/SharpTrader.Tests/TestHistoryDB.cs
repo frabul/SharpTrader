@@ -28,6 +28,10 @@ namespace SharpTrader.Tests
         public static async Task RunAsync()
         {
             var test = new TestHistoryDB();
+            Console.WriteLine("Running test TestBinanceDownloadedData.");
+            test.TestBinanceDownloadedData();
+            Console.WriteLine("Test TestBinanceDownloadedData completed.");
+            Console.ReadLine();
             await test.TestDbV3Async();
             Console.ReadLine();
         }
@@ -115,6 +119,7 @@ namespace SharpTrader.Tests
         }
 
 
+
         void Shuffle<T>(List<T> a)
         {
             Random Random = new Random();
@@ -132,7 +137,19 @@ namespace SharpTrader.Tests
                 a[rnd] = temp;
             }
         }
+
+        public void TestBinanceDownloadedData()
+        {
+            var db = new TradeBarsRepository(@"C:\Projects\temp\DataBinance\");
+            foreach (var id in db.ListAvailableData())
+            {
+                var allData = db.GetSymbolHistory(id);
+                Console.WriteLine($"{id.Market} - {id.Symbol} - {id.Resolution} - ticks count:{allData.Ticks.Count}");
+                db.SaveAndClose(id, false);
+            }
+        }
     }
+
 
     public static class MethodTimeLogger
     {

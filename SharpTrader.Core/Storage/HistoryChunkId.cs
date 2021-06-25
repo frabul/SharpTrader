@@ -29,6 +29,8 @@ namespace SharpTrader.Storage
                 return HistoryChunkIdV2.TryParse(filePath, out retVal);
             else if (extension == ".bin3")
                 return HistoryChunkIdV3.TryParse(filePath, out retVal);
+            else if (extension == ".zip")
+                return ChunkId_BinancePublic.TryParse(filePath, out retVal);
             else
                 return false;
             //throw new InvalidOperationException($"Unknown file extension {extension}"); 
@@ -61,6 +63,7 @@ namespace SharpTrader.Storage
                 (startDate >= this.StartDate && startDate < this.EndDate);
         }
     }
+
     [ProtoContract]
     public class HistoryChunkIdV2 : HistoryChunkId
     {
@@ -192,10 +195,10 @@ namespace SharpTrader.Storage
                 else
                 {
                     return false;
-                } 
+                }
             }
             catch (Exception _ex)
-            { 
+            {
                 return false;
                 //Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
             }
