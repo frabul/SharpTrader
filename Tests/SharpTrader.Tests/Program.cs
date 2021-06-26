@@ -16,15 +16,20 @@ namespace TestConsole
     {
         static async Task Main(string[] args)
         {
-            await SharpTrader.Tests.TestHistoryDB.RunAsync();
-
             Console.WriteLine("Running charts test");
             await ChartsTest.Run();
             Console.WriteLine("Completed. Press enter to continue.");
             Console.ReadLine();
+
+            Console.WriteLine("Running TestHistoryDB");
+            await SharpTrader.Tests.TestHistoryDB.RunAsync();
+            Console.WriteLine("TestHistoryDB Completed. Press enter to continue.");
+            Console.ReadLine();
+
+            Console.ReadLine();
             await TestHistoryDB.RebuildDb();
             //HistoryDB_Benchmark.Run();
-           
+
             await TestMessagePack();
         }
 

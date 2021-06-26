@@ -295,6 +295,11 @@ namespace SharpTrader
                 yield return Records[i];
             }
         }
+
+        public T this[int index]
+        {
+            get => Records[index];
+        }
     }
 
     public class TimeRecordCollection<T> where T : ITimeRecord

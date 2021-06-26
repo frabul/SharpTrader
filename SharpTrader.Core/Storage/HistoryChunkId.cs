@@ -122,9 +122,6 @@ namespace SharpTrader.Storage
                 return false;
                 //Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
             }
-
-
-
         }
         public override string ToString()
         {

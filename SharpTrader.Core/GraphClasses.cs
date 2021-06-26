@@ -21,8 +21,8 @@ namespace SharpTrader
         public PlotHelper(string title)
         {
             this.Title = title;
-
         }
+
         public void PlotTrade(ITrade newTrade)
         {
             lock (Locker)

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpTrader.AlgoFramework;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -26,7 +27,7 @@ namespace SharpTrader.Charts
             Series.First().Markers.Add(marker);
         }
 
-        public void PlotLine(IEnumerable<IBaseData> values, ColorARGB color,
+        public void PlotLine(string name, IEnumerable<IBaseData> values, ColorARGB color,
                             string axis = null,
                             int lineWidth = 1,
                             LineStyle style = LineStyle.Solid,
@@ -36,14 +37,65 @@ namespace SharpTrader.Charts
 
             var options = new SeriesOptions()
             {
+
                 color = color,
                 lineWidth = lineWidth,
                 priceScaleId = axis,
                 style = style,
                 margins = margins,
             };
-            var chartLine = new LineSeries() { Points = points, Options = options };
+            var chartLine = new LineSeries(points, options) { Name = name };
             this.AddSeries(chartLine);
+        }
+
+        public void PlotOperation(
+            Operation op,
+            int lineWidth = 3,
+            LineStyle style = LineStyle.Solid)
+        {
+            var entry = op.Entries.First();
+            var exit = op.Exits.First();
+
+            var p1 = new ChartPoint(entry.Time, entry.Price);
+            var p2 = new ChartPoint(exit.Time, exit.Price);
+
+            ColorARGB color;
+
+            if (op.EntryTradeDirection == TradeDirection.Buy)
+                color = exit.Price > entry.Price ? ARGBColors.Blue : ARGBColors.MediumVioletRed;
+            else
+                color = entry.Price < exit.Price ? ARGBColors.Blue : ARGBColors.MediumVioletRed;
+
+            var options = new SeriesOptions()
+            {
+                color = color,
+                lineWidth = lineWidth,
+                priceScaleId = "right",
+                style = style
+            };
+            var chartLine = new LineSeries(new ChartPoint[] { p1, p2 }, options);
+
+
+            var candles = this.Series.FirstOrDefault(s => s.Type == ChartSeriesType.Candlestick);
+            if(candles!= null)
+            { 
+                candles.Markers.Add(GetMarekerForTrade(entry));
+                candles.Markers.Add(GetMarekerForTrade(exit));
+            }
+        
+
+            this.AddSeries(chartLine);
+        }
+
+        private SeriesMarker GetMarekerForTrade(ITrade entry)
+        {
+            return new SeriesMarker(
+                        entry.Time,
+                        entry.Direction == TradeDirection.Buy ? ARGBColors.Green : ARGBColors.Red,
+                        entry.Direction == TradeDirection.Buy ? SeriesMarkerPosition.aboveBar : SeriesMarkerPosition.aboveBar,
+                        entry.Direction == TradeDirection.Buy ? SeriesMarkerShape.arrowUp : SeriesMarkerShape.arrowDown,
+                        2,
+                        entry.Id );
         }
 
         public void PlotCandlesticks(string name, IEnumerable<ITradeBar> candles)

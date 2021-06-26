@@ -1,6 +1,8 @@
 ﻿using Newtonsoft.Json;
+using SharpTrader.AlgoFramework;
 using SharpTrader.Core.BrokersApi.Binance;
 using SharpTrader.Indicators;
+using SharpTrader.MarketSimulator;
 using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
@@ -29,9 +31,11 @@ namespace SharpTrader.Tests
 
         public void TestSmall()
         {
-            var data = HostoryDb.GetSymbolHistory(DbSymbol, startTime, startTime.AddDays(1));
+            var data = HostoryDb.GetSymbolHistory(DbSymbol, startTime, startTime.AddDays(15));
 
-            SharpTrader.Drawing.Chart chart = new Drawing.Chart();
+            SharpTrader.Charts.Chart chart = new Charts.Chart(); 
+            var mainFigure = chart.NewFigure();
+            mainFigure.HeightRelative = 2;
 
             List<ITradeBar> bars = new List<ITradeBar>();
             var aggregator = new TradeBarConsolidator(TimeSpan.FromMinutes(10));
@@ -39,9 +43,14 @@ namespace SharpTrader.Tests
             foreach (var c in data.Ticks)
                 aggregator.Update(c);
 
-            var mainFigure = chart.NewFigure();
-            mainFigure.HeightRelative = 2;
-            mainFigure.PlotCandlesticks("ETHBTC", bars);
+            mainFigure.PlotCandlesticks("ETHBTC", data.Ticks);
+             
+            var op = new Operation("123", new Signal(), null, OperationType.SellThenBuy);
+            var tick = data.Ticks[35];
+            op.AddTrade(new Trade(data.Market, data.Symbol, tick.Time.AddSeconds(-30), TradeDirection.Buy, (decimal)tick.Low, 10, null));
+            tick = data.Ticks[105];
+            op.AddTrade(new Trade(data.Market, data.Symbol, tick.Time.AddSeconds(-30), TradeDirection.Sell, (decimal)tick.Low, 10, null)); 
+            mainFigure.PlotOperation(op);
 
             List<IBaseData> l1 = new List<IBaseData>();
             List<IBaseData> l2 = new List<IBaseData>();
@@ -56,7 +65,7 @@ namespace SharpTrader.Tests
             filter3.Updated += (source, rec) => l3.Add(rec);
 
             while (data.Ticks.MoveNext())
-            {
+            { 
                 filter1.Update(data.Ticks.Current);
                 filter2.Update(data.Ticks.Current);
                 filter3.Update(data.Ticks.Current);
@@ -65,19 +74,20 @@ namespace SharpTrader.Tests
             var figure = chart.NewFigure();
 
             figure.HeightRelative = 1;
-            figure.PlotLine(l1, ARGBColors.BlueViolet);
-            figure.PlotLine(l2, ARGBColors.Red);
-            figure.PlotLine(l3, ARGBColors.Green);
+            figure.PlotLine("hp15", l1, ARGBColors.BlueViolet);
+            figure.PlotLine("hp30", l2, ARGBColors.Red);
+            figure.PlotLine("hp120", l3, ARGBColors.Green);
 
             //mainFigure.PlotLine(l3, ARGBColors.CornflowerBlue, axis: "left");
 
-            figure.AddMarker(startTime.AddHours(10), ARGBColors.CadetBlue, Drawing.SeriesMarkerPosition.aboveBar);
-            figure.AddMarker(startTime.AddHours(10).AddMinutes(1), ARGBColors.CadetBlue, Drawing.SeriesMarkerPosition.belowBar);
-            figure.AddMarker(startTime.AddHours(10).AddMinutes(2.5), ARGBColors.CadetBlue, Drawing.SeriesMarkerPosition.aboveBar);
+            figure.AddMarker(startTime.AddHours(10), ARGBColors.CadetBlue, Charts.SeriesMarkerPosition.aboveBar);
+            figure.AddMarker(startTime.AddHours(10).AddMinutes(1), ARGBColors.CadetBlue, Charts.SeriesMarkerPosition.belowBar);
+            figure.AddMarker(startTime.AddHours(10).AddMinutes(2.5), ARGBColors.CadetBlue, Charts.SeriesMarkerPosition.aboveBar);
 
             chart.Serialize(@"D:\ProgettiBck\SharpTraderBots\SharpTrader\SharpTrader.Core\Plotting\dist\chart.json");
             var str = JsonConvert.SerializeObject(chart);
         }
+
         public static async Task Run()
         {
             var test = new ChartsTest();
