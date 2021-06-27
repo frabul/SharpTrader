@@ -28,6 +28,13 @@ namespace SharpTrader.Tests
         public static async Task RunAsync()
         {
             var test = new TestHistoryDB();
+
+            Console.WriteLine("Running TestBootstrap.");
+            test.TestBootstrap();
+            Console.WriteLine("TestBootstrap completed.");
+            Console.ReadLine();
+
+
             Console.WriteLine("Running test TestBinanceDownloadedData.");
             test.TestBinanceDownloadedData();
             Console.WriteLine("Test TestBinanceDownloadedData completed.");
@@ -118,6 +125,13 @@ namespace SharpTrader.Tests
             } while (data.Ticks.MoveNext() && data3.Ticks.MoveNext());
         }
 
+        public void TestBootstrap()
+        {
+            var db = new TradeBarsRepository(@"D:\SharpTrader\Data_V3_1M", ChunkFileVersion.V3, ChunkSpan.OneMonth);
+            db.Bootstrap(@"D:\ProgettiBck\binance-public-data-master\python\data\spot\monthly");
+
+
+        }
 
 
         void Shuffle<T>(List<T> a)

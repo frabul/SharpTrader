@@ -137,7 +137,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
 
         }
-
+         
         private async Task<List<Candlestick>> DownloadCandles(string symbol, DateTime startTime, DateTime endTime)
         {
             Logger.Debug($"Downloading candles for {symbol} from {startTime} to {endTime}");

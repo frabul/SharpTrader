@@ -42,7 +42,7 @@ namespace SharpTrader.Storage
             if (!Directory.Exists(DataDir))
                 Directory.CreateDirectory(DataDir);
 
-            Init(); 
+            Init();
         }
 
         public SymbolHistoryMetaData GetMetaData(SymbolHistoryId historyInfo) => GetMetaDataInternal(historyInfo);
@@ -108,7 +108,7 @@ namespace SharpTrader.Storage
 
             if (DbSymbolsMetaData.FindOne(e => true) == null)
             {
-                RebuildAllDatabase();
+                RebuildAllDatabase(DataDir, true);
             }
 
             SymbolsMetaData = DbSymbolsMetaData.FindAll().ToDictionary(md => md.Id);
@@ -117,10 +117,9 @@ namespace SharpTrader.Storage
 
             ValidateIndex();
         }
-
         private void ValidateIndex()
         {
-            List<HistoryChunkId> allChunks = DiscoverChunks(DataDir);
+            IEnumerable<HistoryChunkId> allChunks = DiscoverChunks(DataDir).Values;
 
             foreach (var symData in SymbolsMetaData.Values.ToArray())
             {
@@ -190,14 +189,16 @@ namespace SharpTrader.Storage
             }
         }
 
-        public static List<HistoryChunkId> DiscoverChunks(string dataDir)
+
+
+        public static Dictionary<string, HistoryChunkId> DiscoverChunks(string dataDir)
         {
             // discover ass chunk files in directory  
-            List<HistoryChunkId> allChunks = new List<HistoryChunkId>();
-            foreach (var file in Directory.GetFiles(dataDir))
+            Dictionary<string, HistoryChunkId> allChunks = new Dictionary<string, HistoryChunkId>();
+            foreach (var file in Directory.EnumerateFiles(dataDir, "*.*", SearchOption.AllDirectories))
             {
                 if (HistoryChunkId.TryParse(file, out var chunkId))
-                    allChunks.Add(chunkId);
+                    allChunks.Add(file, chunkId);
             }
             return allChunks;
         }
@@ -205,24 +206,24 @@ namespace SharpTrader.Storage
         /// <summary>
         /// Loads all files then saves them again ( so format is updates )
         /// </summary>
-        private void RebuildAllDatabase()
+        private void RebuildAllDatabase(string filesPath, bool deleteLoadedFiles)
         {
             //get a
-            var chunks = DiscoverChunks(DataDir);
-            IEnumerable<IGrouping<string, HistoryChunkId>> filesGrouped;
-            filesGrouped = chunks.GroupBy(c => c.HistoryId.Key);
+            var chunks = DiscoverChunks(filesPath); 
+            var filesGrouped = chunks.GroupBy(c => c.Value.HistoryId.Key);
 
             var data = new List<SymbolHistoryMetaDataInternal>();
             foreach (var group in filesGrouped)
             {
-                var histMetadata = new SymbolHistoryMetaDataInternal(group.First().HistoryId);
+                var histMetadata = new SymbolHistoryMetaDataInternal(group.First().Value.HistoryId);
                 histMetadata.SetSaveMode(ChunkFileVersion, ChunkSpan);
                 foreach (var chunk in group)
                 {
-                    var chunkFilePath = chunk.GetFilePath(DataDir);
+                    var chunkFilePath = chunk.Key;
                     var fdata = HistoryChunk.Load(chunkFilePath).Result;
                     histMetadata.AddBars(fdata.Ticks);
-                    //File.Delete(chunkFilePath);
+                    if (deleteLoadedFiles) 
+                        File.Delete(chunkFilePath);
                 }
                 histMetadata.Flush(DataDir);
                 data.Add(histMetadata);
@@ -235,6 +236,13 @@ namespace SharpTrader.Storage
             Db.Checkpoint();
         }
 
+        public void Bootstrap(string boostrapDirectory)
+        {
+            if (DbSymbolsMetaData.FindOne(e => true) == null)
+                RebuildAllDatabase(boostrapDirectory, false);
+            else
+                throw new InvalidOperationException("Unable to bootstrap: db is not empty.");
+        }
 
 
         public SymbolHistoryId[] ListAvailableData()
