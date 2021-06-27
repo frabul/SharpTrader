@@ -86,8 +86,8 @@ namespace SharpTrader.Storage
                 ITradeBar lastCandle = this.Ticks.Count > 0 ? this.Ticks[this.Ticks.Count - 1] : null;
                 if (c.Timeframe != this.Id.Resolution)
                 {
-                    throw new InvalidOperationException("Bad timeframe for candle");
                     Logger.Error("Bad timeframe for candle");
+                    throw new InvalidOperationException("Bad timeframe for candle"); 
                 }
                 else
                 {

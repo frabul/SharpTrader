@@ -100,7 +100,6 @@ namespace SharpTrader.Storage
 
         public static new bool TryParse(string filePath, out HistoryChunkId retVal)
         {
-            HistoryChunkIdV2 ret = null;
             try
             {
                 var fileName = Path.GetFileNameWithoutExtension(filePath);
@@ -116,7 +115,7 @@ namespace SharpTrader.Storage
                 };
                 return true;
             }
-            catch (Exception _ex)
+            catch (Exception)
             {
                 retVal = null;
                 return false;

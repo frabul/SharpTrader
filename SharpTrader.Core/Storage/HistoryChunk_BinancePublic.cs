@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using MessagePack;
 
@@ -75,7 +76,7 @@ namespace SharpTrader.Storage
                     return false;
                 }
             }
-            catch (Exception _ex)
+            catch (Exception )
             {
                 return false;
                 //Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
@@ -140,6 +141,7 @@ namespace SharpTrader.Storage
 
         private static List<Candlestick> ParseFile(Stream s)
         {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
             StreamReader reader = new StreamReader(s);
             List<Candlestick> result = new List<Candlestick>();
             string line;

@@ -16,8 +16,7 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
 {
     class SymbolFeed : ISymbolFeed, IDisposable
     {
-        public event Action<ISymbolFeed, IBaseData> OnData;
-        private Logger Logger;
+        public event Action<ISymbolFeed, IBaseData> OnData; 
 
         public DateTime Time { get; private set; }
         public double Ask { get; private set; }

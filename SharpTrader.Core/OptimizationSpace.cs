@@ -78,6 +78,16 @@ namespace SharpTrader
             }
         }
 
+        private static IEnumerable<PropertyInfo> GetPublicProperties(  Type type)
+        {
+            if (!type.IsInterface)
+                return type.GetProperties();
+
+            return (new Type[] { type })
+                   .Concat(type.GetInterfaces())
+                   .SelectMany(i => i.GetProperties());
+        }
+
         private object ConvertType(object obj, Type target) {
             if (target == typeof(TimeSpan))
                 return TimeSpan.Parse(obj as string);

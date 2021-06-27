@@ -189,8 +189,6 @@ namespace SharpTrader.Storage
             }
         }
 
-
-
         public static Dictionary<string, HistoryChunkId> DiscoverChunks(string dataDir)
         {
             // discover ass chunk files in directory  
@@ -209,7 +207,7 @@ namespace SharpTrader.Storage
         private void RebuildAllDatabase(string filesPath, bool deleteLoadedFiles)
         {
             //get a
-            var chunks = DiscoverChunks(filesPath); 
+            var chunks = DiscoverChunks(filesPath);
             var filesGrouped = chunks.GroupBy(c => c.Value.HistoryId.Key);
 
             var data = new List<SymbolHistoryMetaDataInternal>();
@@ -222,7 +220,7 @@ namespace SharpTrader.Storage
                     var chunkFilePath = chunk.Key;
                     var fdata = HistoryChunk.Load(chunkFilePath).Result;
                     histMetadata.AddBars(fdata.Ticks);
-                    if (deleteLoadedFiles) 
+                    if (deleteLoadedFiles)
                         File.Delete(chunkFilePath);
                 }
                 histMetadata.Flush(DataDir);
@@ -269,8 +267,6 @@ namespace SharpTrader.Storage
 
         }
 
-
-
         public void Delete(string market, string symbol, TimeSpan time)
         {
             var histInfo = new SymbolHistoryId(market, symbol, time);
@@ -311,6 +307,11 @@ namespace SharpTrader.Storage
 
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            this.Db.Dispose();
         }
     }
 }
