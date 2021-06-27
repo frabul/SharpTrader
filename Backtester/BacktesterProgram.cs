@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
 using SharpTrader;
 using SharpTrader.Indicators;
-using SharpTrader.Plotting;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,8 +14,7 @@ namespace BacktesterProgram
     {
         static void ShowPlot(PlotHelper plot)
         {
-            PlottingHelper.Show(plot);
-            Console.ReadLine();
+            //todo implement html plots
         }
         static Type dummy;
         static void Main(string[] args)

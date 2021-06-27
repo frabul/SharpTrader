@@ -38,11 +38,18 @@ namespace SharpTrader.Charts
 
     public class Chart
     {
-        public List<ChartFigure> Figures { get; set; } = new List<ChartFigure>();
+        public string Name { get; private set; }
 
+        public List<ChartFigure> Figures { get; set; } = new List<ChartFigure>();
+  
         public Chart()
         {
 
+        }
+
+        public Chart(string name)
+        {
+            this.Name = name;
         }
 
         public void PlotHorizontalLine()

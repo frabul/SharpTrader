@@ -56,7 +56,10 @@ namespace SharpTrader
             HistoryDB = new TradeBarsRepository(Config.BacktesterConfig.HistoryDb);
             for (int i = Session.Lastexecuted + 1; i < BaseSpace.Configurations.Count; i++)
             {
-                RunOne(BaseSpace.Configurations[i]);
+                Logger.Info($"-------------------------- {i} of {BaseSpace.Configurations.Count} --------------------------");
+               
+                 
+                RunOne(BaseSpace.Configurations[i], i);
                 Session.Lastexecuted = i;
                 File.WriteAllText(SessionFile, JsonConvert.SerializeObject(Session));
             }
@@ -64,15 +67,15 @@ namespace SharpTrader
             //Parallel.ForEach(paramSets, new ParallelOptions { MaxDegreeOfParallelism = 2 }, act);
         }
 
-        void RunOne(object algoConfig)
+        void RunOne(object algoConfig, int index)
         {
             var backtesterConfig = JsonConvert.DeserializeObject<BackTester.Configuration>(JsonConvert.SerializeObject(Config.BacktesterConfig));
             backtesterConfig.AlgoConfig = JObject.FromObject(algoConfig);
+            backtesterConfig.SessionName = $"{this.Config.SessionName}_{index}";
             var backTester = new BackTester(backtesterConfig, HistoryDB)
             {
                 ShowPlotCallback = ShowPlotCallback,
-                Logger = this.Logger,
-
+                Logger = this.Logger
             };
             backTester.Start();
         }
