@@ -180,7 +180,7 @@ namespace SharpTrader
             Started = true;
 
             this.Algo.Start(true).Wait();
-
+            this.Algo.RequestResumeEntries();
             int steps = 1; 
 
 
