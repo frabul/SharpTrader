@@ -7,14 +7,14 @@ namespace SharpTrader.AlgoFramework
     public class StaticSymbolsSelector : SymbolsSelector
     {
         public string[] SymbolsKeys { get; }
-        public SymbolInfo[] Symbols { get; private set; }
+        public ISymbolInfo[] Symbols { get; private set; }
 
         public StaticSymbolsSelector(IEnumerable<string> symbolsKeys)
         {
             SymbolsKeys = symbolsKeys.ToArray();
         }
 
-        protected override SymbolInfo[] OnUpdate(TimeSlice slice)
+        protected override ISymbolInfo[] OnUpdate(TimeSlice slice)
         {
             return Symbols;
         }

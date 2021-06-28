@@ -10,7 +10,7 @@ namespace SharpTrader.AlgoFramework
     {
         private HashSet<Operation> _ActiveOperations { get; } = new HashSet<Operation>();
  
-        public SymbolInfo Symbol { get; set; }
+        public ISymbolInfo Symbol { get; set; }
         [BsonId] public string Id => Symbol.Key;
       
         /// <summary>
@@ -29,7 +29,7 @@ namespace SharpTrader.AlgoFramework
 
         [BsonIgnore] public bool IsSelectedForTrading { get; internal set; } = false;
 
-        public SymbolData(SymbolInfo symbol)
+        public SymbolData(ISymbolInfo symbol)
         {
             Symbol = symbol;
         }

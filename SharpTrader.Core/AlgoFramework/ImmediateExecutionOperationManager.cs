@@ -40,7 +40,7 @@ namespace SharpTrader.AlgoFramework
             return Task.CompletedTask;
         }
 
-        public override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
+        public override decimal GetInvestedOrLockedAmount(ISymbolInfo symbol, string asset)
         {
             return 0m;
         }

@@ -2,15 +2,17 @@
 {
     public interface ISymbolInfo
     {
-        string Asset { get;  }
-        bool IsBorrowAllowed { get;  }
-        bool IsMarginTadingAllowed { get;  }
-        bool IsSpotTadingAllowed { get;  }
-        string Key { get;  }
+        string Asset { get; }
+        bool IsMarginTadingAllowed { get; }
+        bool IsCrossMarginAllowed { get; }
+        bool IsIsolatedMarginAllowed { get; }
+        bool IsSpotTadingAllowed { get; }
+        bool IsTradingEnabled { get; }
+        string Key { get; }
         decimal LotSizeStep { get; }
-        decimal MinLotSize { get;   }
-        decimal MinNotional { get;   }
-        decimal PricePrecision { get;  }
-        string QuoteAsset { get;   }
+        decimal MinLotSize { get; }
+        decimal MinNotional { get; }
+        decimal PricePrecision { get; }
+        string QuoteAsset { get; }
     }
 }

@@ -19,7 +19,7 @@ namespace SharpTrader.AlgoFramework
         public abstract Task CancelAllOrders(Operation op); 
         public abstract Task CancelEntryOrders();
         
-        public abstract decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset);
+        public abstract decimal GetInvestedOrLockedAmount(ISymbolInfo symbol, string asset);
            
         public virtual void RegisterCustomSerializers(BsonMapper mapper) { }
 

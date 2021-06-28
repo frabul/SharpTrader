@@ -39,7 +39,7 @@ namespace SharpTrader.Indicators
         private RollingWindow<ITradeBar> Inputs;
         private RollingWindow<ZeroLagMARecord> Outputs;
 
-        public ZeroLagMA(SymbolInfo symbol, int period ) :
+        public ZeroLagMA(ISymbolInfo symbol, int period ) :
            base($"ZLMA {symbol.Key} {period}" )
         { 
             Period = period;
@@ -50,7 +50,7 @@ namespace SharpTrader.Indicators
         /// <summary>
         /// Initializes a new instance of the <see cref="MeanAndVariance"/> class using the specified period.
         /// </summary>  
-        public ZeroLagMA(SymbolInfo symbol, int period, TimeSerieNavigator<ITradeBar> chart, DateTime warmUpTime) :
+        public ZeroLagMA(ISymbolInfo symbol, int period, TimeSerieNavigator<ITradeBar> chart, DateTime warmUpTime) :
             this($"ZLMA {symbol.Key} {period}", period, chart, warmUpTime)
         {
         }

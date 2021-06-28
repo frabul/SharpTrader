@@ -60,7 +60,6 @@ namespace SharpTrader.MarketSimulator
                 {
                     Key = token.Key,
                     Asset = token.Value["Asset"].ToObject<string>(),
-                    IsBorrowAllowed = token.Value["IsMarginTadingAllowed"].ToObject<bool>(),
                     IsMarginTadingAllowed = token.Value["IsMarginTadingAllowed"].ToObject<bool>(),
                     IsSpotTadingAllowed = token.Value["IsSpotTadingAllowed"].ToObject<bool>(),
                     IsCrossMarginAllowed = token.Value["IsCrossMarginAllowed"].ToObject<bool>(),
@@ -216,7 +215,7 @@ namespace SharpTrader.MarketSimulator
             }
         }
 
-        public   bool FistTickPassed { get; set; } = false;
+        public bool FistTickPassed { get; set; } = false;
 
         internal void RaisePendingEvents()
         {
@@ -435,7 +434,7 @@ namespace SharpTrader.MarketSimulator
                 return new MarketRequest<IOrder>(RequestStatus.Failed, ord);
         }
 
-        public IEnumerable<SymbolInfo> GetSymbols()
+        public IEnumerable<ISymbolInfo> GetSymbols()
         {
             return SymbolsTable.Values;
         }
@@ -494,9 +493,9 @@ namespace SharpTrader.MarketSimulator
             mapper.RegisterType<Trade>(SerializeTrade, DeserializeTrade);
         }
 
-        public SymbolInfo GetSymbolInfo(string asString)
+        public ISymbolInfo GetSymbolInfo(string asString)
         {
-            return Feeds.Where(f => f.Symbol.Key == asString).Select(f => f.Symbol).FirstOrDefault() as SymbolInfo;
+            return Feeds.Where(f => f.Symbol.Key == asString).Select(f => f.Symbol).FirstOrDefault();
         }
     }
 }

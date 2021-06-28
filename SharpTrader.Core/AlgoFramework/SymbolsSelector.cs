@@ -7,13 +7,13 @@ namespace SharpTrader.AlgoFramework
 {
     public abstract class SymbolsSelector
     {
-        private Dictionary<string, SymbolInfo> _SymbolsSelected = new Dictionary<string, SymbolInfo>();
+        private Dictionary<string, ISymbolInfo> _SymbolsSelected = new Dictionary<string, ISymbolInfo>();
 
-        public IReadOnlyDictionary<string, SymbolInfo> SymbolsSelected => _SymbolsSelected;
+        public IReadOnlyDictionary<string, ISymbolInfo> SymbolsSelected => _SymbolsSelected;
         public TradingAlgo Algo { get; private set; }
         public DateTime NextSwapTime { get; private set; }
         public TimeSpan UpdatePeriod { get; set; } = TimeSpan.FromHours(24);
-        protected abstract SymbolInfo[] OnUpdate(TimeSlice slice);
+        protected abstract ISymbolInfo[] OnUpdate(TimeSlice slice);
 
         protected abstract Task OnInitialize();
 
@@ -45,8 +45,8 @@ namespace SharpTrader.AlgoFramework
                 //add new symbols
                 foreach (var sym in added)
                 {
-                    ISymbolFeed feed = await Algo.GetSymbolFeed(sym.Key); 
-                    _SymbolsSelected.Add(feed.Symbol.Key, feed.Symbol as SymbolInfo);
+                    ISymbolFeed feed = await Algo.GetSymbolFeed(sym.Key);
+                    _SymbolsSelected.Add(feed.Symbol.Key, feed.Symbol);
                 }
                 var retVal = new SelectedSymbolsChanges(added.ToArray(), removedSymbols.ToArray());
                 return retVal;
@@ -58,12 +58,12 @@ namespace SharpTrader.AlgoFramework
 
     public class SelectedSymbolsChanges
     {
-        public SymbolInfo[] AddedSymbols { get; private set; }
-        public SymbolInfo[] RemovedSymbols { get; private set; }
-        public static SelectedSymbolsChanges None { get; internal set; } = new SelectedSymbolsChanges(new SymbolInfo[0], new SymbolInfo[0]);
+        public ISymbolInfo[] AddedSymbols { get; private set; }
+        public ISymbolInfo[] RemovedSymbols { get; private set; }
+        public static SelectedSymbolsChanges None { get; internal set; } = new SelectedSymbolsChanges(new ISymbolInfo[0], new ISymbolInfo[0]);
         public int Count => AddedSymbols.Length + RemovedSymbols.Length;
 
-        public SelectedSymbolsChanges(SymbolInfo[] addedSymbols, SymbolInfo[] removedSymbols)
+        public SelectedSymbolsChanges(ISymbolInfo[] addedSymbols, ISymbolInfo[] removedSymbols)
         {
             AddedSymbols = addedSymbols;
             RemovedSymbols = removedSymbols;
