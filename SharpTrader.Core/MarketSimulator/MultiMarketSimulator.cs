@@ -11,7 +11,7 @@ namespace SharpTrader.MarketSimulator
     public partial class MultiMarketSimulator : IMarketsManager
     {
         private static string ConfigFile = "MarketsSimulator.json";
-        private Market[] _Markets;
+        private MarketEmulator[] _Markets;
 
         private TradeBarsRepository HistoryDb;
         private Configuration Config;
@@ -29,11 +29,11 @@ namespace SharpTrader.MarketSimulator
 
             Config = config;
             HistoryDb = historyDb;
-            this._Markets = new Market[Config.Markets.Length];
+            this._Markets = new MarketEmulator[Config.Markets.Length];
             int i = 0;
             foreach (var mc in Config.Markets)
             {
-                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
+                var market = new MarketEmulator(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
                 market.AllowBorrow = mc.AllowBorrow;
                 _Markets[i++] = market;
             }
@@ -52,11 +52,11 @@ namespace SharpTrader.MarketSimulator
             var text = File.ReadAllText(Path.Combine(dataDirectory, ConfigFile));
             Config = Newtonsoft.Json.JsonConvert.DeserializeObject<Configuration>(text);
 
-            this._Markets = new Market[Config.Markets.Length];
+            this._Markets = new MarketEmulator[Config.Markets.Length];
             int i = 0;
             foreach (var mc in Config.Markets)
             {
-                var market = new Market(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
+                var market = new MarketEmulator(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
                 market.AllowBorrow = mc.AllowBorrow;
                 _Markets[i++] = market;
             }
@@ -145,7 +145,7 @@ namespace SharpTrader.MarketSimulator
             return nextTick <= this.EndTime && NoMoreDataCount < 10;
         }
 
-        private void InitializeDataSourceCallBack(Market market, SymbolFeed feed)
+        private void InitializeDataSourceCallBack(MarketEmulator market, SymbolFeed feed)
         {
             if (!IncrementalHistoryLoading)
                 if (feed.DataSource == null)

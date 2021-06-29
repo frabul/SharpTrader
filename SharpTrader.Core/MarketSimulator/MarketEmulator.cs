@@ -15,7 +15,7 @@ using SharpTrader.Core.BrokersApi.Binance;
 
 namespace SharpTrader.MarketSimulator
 {
-    public class Market : IMarketApi
+    public class MarketEmulator : IMarketApi
     {
         object LockObject = new object();
         //private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
@@ -44,7 +44,7 @@ namespace SharpTrader.MarketSimulator
         public IEnumerable<ITrade> Trades => this._Trades;
 
 
-        public Market(string name, decimal makerFee, decimal takerFee, string dataDir, Action<Market, SymbolFeed> initializeDataSourceCallBack)
+        public MarketEmulator(string name, decimal makerFee, decimal takerFee, string dataDir, Action<MarketEmulator, SymbolFeed> initializeDataSourceCallBack)
         {
             this.initializeDataSourceCallBack = initializeDataSourceCallBack;
             Logger = LogManager.GetLogger("Market");
@@ -69,11 +69,6 @@ namespace SharpTrader.MarketSimulator
                 };
                 this.SymbolsTable.Add(simInfo.Key, simInfo);
             }
-        }
-
-        public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol, DateTime warmup)
-        {
-            throw new NotImplementedException();
         }
 
         public Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)
@@ -161,10 +156,6 @@ namespace SharpTrader.MarketSimulator
                     return new MarketRequest<IOrder>(RequestStatus.Failed, null) { ErrorInfo = res.error };
                 }
             }
-
-
-
-
         }
 
         private (bool result, string error) RegisterOrder(Order order)
@@ -457,7 +448,7 @@ namespace SharpTrader.MarketSimulator
 
         private List<Order> DeserializedOrders = new List<Order>();
         private List<Trade> DeserializedTrades = new List<Trade>();
-        private Action<Market, SymbolFeed> initializeDataSourceCallBack;
+        private Action<MarketEmulator, SymbolFeed> initializeDataSourceCallBack;
 
         public void RegisterCustomSerializers(BsonMapper mapper)
         {
@@ -494,9 +485,9 @@ namespace SharpTrader.MarketSimulator
             mapper.RegisterType<Trade>(SerializeTrade, DeserializeTrade);
         }
 
-        public ISymbolInfo GetSymbolInfo(string asString)
-        {
-            return Feeds.Where(f => f.Symbol.Key == asString).Select(f => f.Symbol).FirstOrDefault();
+        public ISymbolInfo GetSymbolInfo(string symbolKey)
+        { 
+            return SymbolsFeeds[symbolKey].Symbol;
         }
     }
 }
