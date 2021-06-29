@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using SymbolsTable = System.Collections.Generic.Dictionary<string, SharpTrader.SymbolInfo>;
+using SymbolsTable = System.Collections.Generic.Dictionary<string, SharpTrader.Core.BrokersApi.Binance.BinanceSymbolInfo>;
 
 #pragma warning disable CS1998
 using NLog;
@@ -11,6 +11,7 @@ using Newtonsoft.Json.Linq;
 using System.IO;
 using LiteDB;
 using SharpTrader.Storage;
+using SharpTrader.Core.BrokersApi.Binance;
 
 namespace SharpTrader.MarketSimulator
 {
@@ -56,7 +57,7 @@ namespace SharpTrader.MarketSimulator
             SymbolsTable = new SymbolsTable();
             foreach (var token in table)
             {
-                var simInfo = new SymbolInfo()
+                var simInfo = new BinanceSymbolInfo()
                 {
                     Key = token.Key,
                     Asset = token.Value["Asset"].ToObject<string>(),

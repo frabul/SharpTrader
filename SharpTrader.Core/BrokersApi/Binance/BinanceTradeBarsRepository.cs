@@ -38,20 +38,11 @@ namespace SharpTrader.Core.BrokersApi.Binance
 
         public async Task SynchSymbolsTableAsync(string DataDir)
         {
-            Dictionary<string, SymbolInfo> dict = new Dictionary<string, SymbolInfo>();
+            Dictionary<string, BinanceSymbolInfo> dict = new Dictionary<string, BinanceSymbolInfo>();
             var tradingRules = await Client.GetExchangeInfo();
             foreach (var symb in tradingRules.Symbols)
             {
-                dict.Add(symb.symbol,
-                    new SymbolInfo
-                    {
-                        Asset = symb.baseAsset,
-                        QuoteAsset = symb.quoteAsset,
-                        Key = symb.symbol,
-                        IsMarginTadingAllowed = symb.isMarginTradingAllowed,
-                        IsSpotTadingAllowed = symb.isSpotTradingAllowed 
-                    });
-
+                dict.Add(symb.symbol, new BinanceSymbolInfo(symb)); 
             }
             var crossPairs = await Client.GetAllCrossMarginPairs();
             foreach (var pair in crossPairs)
@@ -59,8 +50,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                 if (dict.ContainsKey(pair.symbol))
                     dict[pair.symbol].IsCrossMarginAllowed = true;
             }
-            var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict);
-            var deserialized = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, SymbolInfo>>(json);
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict); 
             System.IO.File.WriteAllText(System.IO.Path.Combine(DataDir, "BinanceSymbolsTable.json"), json);
         }
 
@@ -93,7 +83,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                     void ReportAssure()
                     {
                         if (!reported)
-                            Logger.Info($"Assuring data for {histInfo.Symbol} from {fromTime:yyyyMMdd HH:mm} to {toTime:yyyyMMdd HH:mm}"); 
+                            Logger.Info($"Assuring data for {histInfo.Symbol} from {fromTime:yyyyMMdd HH:mm} to {toTime:yyyyMMdd HH:mm}");
                         Logger.Debug($"Hole found in {histInfo.Symbol} history from {checkTime} to {oldTicks.Time}.");
                         reported = true;
                     }
@@ -136,7 +126,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
 
         }
-         
+
         private async Task<List<Candlestick>> DownloadCandles(string symbol, DateTime startTime, DateTime endTime)
         {
             Logger.Debug($"Downloading candles for {symbol} from {startTime} to {endTime}");
