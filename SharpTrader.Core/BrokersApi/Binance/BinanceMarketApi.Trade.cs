@@ -14,6 +14,7 @@ namespace SharpTrader.BrokersApi.Binance
         {
 
         }
+
         public Trade(string symbol, AccountTradeReponse tr)
         {
             Market = "Binance";
@@ -63,10 +64,10 @@ namespace SharpTrader.BrokersApi.Binance
 
         public override string ToString()
         {
-            if( string.IsNullOrEmpty(ClientOrderId) )
-                return $"{{ Id: {Id} - {Symbol}, Direction:{Direction}, Time:{Time} - Price:{this.Price:0.########} - QAmount:{this.Amount*Price:0.######} }}";
+            if (string.IsNullOrEmpty(ClientOrderId))
+                return $"{{ {Id} - {Time} - {Symbol} {Direction} {Amount} @ {this.Price:0.########} - QAmount:{this.Amount * Price:0.######} }}";
             else
-                return $"{{ Id: {ClientOrderId} - {Symbol}, Direction:{Direction}, Time:{Time} - Price:{this.Price:0.########} - QAmount:{this.Amount * Price:0.######} }}";
+                return $"{{ {ClientOrderId}- {Time} - {Symbol} {Direction} {Amount} @ {this.Price:0.########} - QAmount:{this.Amount * Price:0.######} }}";
         }
         public override int GetHashCode()
         {
