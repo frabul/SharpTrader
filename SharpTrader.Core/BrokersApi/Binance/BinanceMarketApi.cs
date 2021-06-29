@@ -64,9 +64,9 @@ namespace SharpTrader.BrokersApi.Binance
         private Task FastUpdatesTask;
         private Task OrdersAndTradesSynchTask;
 
-        private Dictionary<string, SymbolInfo> Symbols = new Dictionary<string, SymbolInfo>();
-        private Dictionary<string, List<SymbolInfo>> SymbolsByAsset = new Dictionary<string, List<SymbolInfo>>();
-        private Dictionary<string, List<SymbolInfo>> SymbolsByQuoteAsset = new Dictionary<string, List<SymbolInfo>>();
+        private Dictionary<string, BinanceSymbolInfo> Symbols = new Dictionary<string, BinanceSymbolInfo>();
+        private Dictionary<string, List<BinanceSymbolInfo>> SymbolsByAsset = new Dictionary<string, List<BinanceSymbolInfo>>();
+        private Dictionary<string, List<BinanceSymbolInfo>> SymbolsByQuoteAsset = new Dictionary<string, List<BinanceSymbolInfo>>();
 
         public DateTime StartOperationDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         public BinanceClient Client { get; private set; }
@@ -116,28 +116,13 @@ namespace SharpTrader.BrokersApi.Binance
             //---- initialize symbols dictionary ---
             foreach (var binanceSymbol in exchangeInfo.Symbols)
             {
-                var lotSize = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterLotSize) as ExchangeInfoSymbolFilterLotSize;
-                var minNotional = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterMinNotional) as ExchangeInfoSymbolFilterMinNotional;
-                var pricePrecision = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterPrice) as ExchangeInfoSymbolFilterPrice;
-                var symInfo = new SymbolInfo()
-                {
-                    Key = binanceSymbol.symbol,
-                    Asset = binanceSymbol.baseAsset,
-                    QuoteAsset = binanceSymbol.quoteAsset,
-                    IsTradingEnabled = binanceSymbol.status == "TRADING",
-                    IsMarginTadingAllowed = binanceSymbol.isMarginTradingAllowed,
-                    IsSpotTadingAllowed = binanceSymbol.isSpotTradingAllowed,
-                    LotSizeStep = lotSize.StepSize,
-                    MinLotSize = lotSize.MinQty,
-                    MinNotional = minNotional.MinNotional,
-                    PricePrecision = pricePrecision.TickSize
-                };
+                BinanceSymbolInfo symInfo = new BinanceSymbolInfo(binanceSymbol);
 
                 if (!SymbolsByAsset.ContainsKey(symInfo.Asset))
-                    SymbolsByAsset.Add(symInfo.Asset, new List<SymbolInfo>());
+                    SymbolsByAsset.Add(symInfo.Asset, new List<BinanceSymbolInfo>());
 
                 if (!SymbolsByQuoteAsset.ContainsKey(symInfo.QuoteAsset))
-                    SymbolsByQuoteAsset.Add(symInfo.QuoteAsset, new List<SymbolInfo>());
+                    SymbolsByQuoteAsset.Add(symInfo.QuoteAsset, new List<BinanceSymbolInfo>());
 
                 Symbols.Add(symInfo.Key, symInfo);
                 SymbolsByAsset[symInfo.Asset].Add(symInfo);
@@ -216,6 +201,7 @@ namespace SharpTrader.BrokersApi.Binance
             Logger.Info("initialization complete");
         }
 
+  
         private void ArchiveOldOperations()
         {
 
@@ -1231,7 +1217,10 @@ namespace SharpTrader.BrokersApi.Binance
                     return order;
                 }
             }
-            mapper.Entity<Order>().Ctor(BsonToOrder);
+            mapper.RegisterType<Order>(
+                serialize: (obj) => defaultMapper.Serialize<Order>(obj),
+                deserialize: BsonToOrder
+            );
 
             Trade DeserializeTrade(BsonValue value)
             {
@@ -1242,7 +1231,23 @@ namespace SharpTrader.BrokersApi.Binance
                     result = defaultMapper.Deserialize<Trade>(value);
                 return result;
             }
-            mapper.Entity<Trade>().Ctor(DeserializeTrade);
+            mapper.RegisterType<Trade>(
+                serialize: (obj) => defaultMapper.Serialize<Trade>(obj),
+                deserialize: DeserializeTrade
+                );
+
+            //---- add mapper for BinanceSymbolInfo 
+            mapper.RegisterType<BinanceSymbolInfo>(
+                serialize: (obj) => defaultMapper.Serialize<BinanceSymbolInfo>(obj),
+                deserialize: (bson) =>
+                {
+                    var sym = this.GetSymbolInfo(bson["Key"].AsString) as BinanceSymbolInfo;
+                    if (sym == null)
+                        sym = defaultMapper.Deserialize<BinanceSymbolInfo>(bson);
+                    return sym;
+                }
+            );
+
         }
 
 
