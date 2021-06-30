@@ -71,7 +71,7 @@ namespace SharpTrader
                 if (tclose == FormingCandle.Time)
                 {
                     OnConsolidated?.Invoke(FormingCandle);
-                    FormingCandle = default;
+                    FormingCandle = new Candlestick();
                 }
             }
         }
