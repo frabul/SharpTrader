@@ -32,7 +32,7 @@ namespace SharpTrader.BrokersApi.Binance
         private BinanceKline FormingCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
         private static Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private SymbolHistoryId HistoryId;
-        private Candlestick LastFullCandle;
+        private Candlestick LastFullCandle = new Candlestick();
 
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
         public BinanceSymbolInfo Symbol { get; private set; }
@@ -168,7 +168,7 @@ namespace SharpTrader.BrokersApi.Binance
             var kline = msg.Kline;
 
             //check if there could be a gap
-            if (LastFullCandle != null && FormingCandle != null && kline.StartTime > FormingCandle.StartTime)
+            if (!LastFullCandle.IsDefault() && FormingCandle != null && kline.StartTime > FormingCandle.StartTime)
             {
                 if (FormingCandle.StartTime > LastFullCandle.OpenTime)
                 {
