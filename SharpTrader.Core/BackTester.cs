@@ -265,15 +265,18 @@ namespace SharpTrader
 
                 for (int i = 0; i < BotStats.EquityHistory.Count; i += skipCount)
                 {
-                    var e = BotStats.EquityHistory[i];
-                    botPoints.Add(new IndicatorDataPoint(e.Time, e.Value));
-                    if (BenchmarkStats.EquityHistory.Count > i)
+                    var eqPoint = BotStats.EquityHistory[i];
+                    botPoints.Add(new IndicatorDataPoint(eqPoint.Time, eqPoint.Value));
+                    //--- add bench point ---
+                    var bpIndex = BenchmarkStats.EquityHistory.BinarySearch(eqPoint, CandlestickTimeComparer.Instance);
+                    if (bpIndex >= 0)
                     {
-                        e = BenchmarkStats.EquityHistory[i];
-                        benchPoints.Add(new IndicatorDataPoint(e.Time, e.Value));
+                        var benchPoint = BenchmarkStats.EquityHistory[bpIndex];
+                        benchPoints.Add(benchPoint);
                     }
                 }
-                plot.PlotLine("Equity", botPoints, ARGBColors.Purple);
+
+                plot.PlotLine("Equity", botPoints, ARGBColors.Blue);
                 plot.PlotLine("Benchmark", benchPoints, ARGBColors.MediumPurple);
 
                 Directory.CreateDirectory(Config.LogDir);

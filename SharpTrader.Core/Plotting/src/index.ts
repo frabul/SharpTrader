@@ -1,7 +1,6 @@
 
 import { createChart, IChartApi, TimeRange, MouseEventParams, Point, Coordinate, BarPrice, BarData, BarPrices, ISeriesApi } from 'lightweight-charts';
 
-
 class Figure {
     Chart: IChartApi;
     LastCrosshairForcedPoint: Point;
@@ -24,7 +23,7 @@ function AddCandlesSerie(figure: Figure, seriesData: any) {
         priceLineVisible: false,
         lastValueVisible: true,
         baseLineVisible: false,
-        priceFormat:{ precision: 7, minMove: 0.000001}
+        priceFormat: { precision: 7, minMove: 0.000001 }
     });
     series.setData(seriesData.Points);
     series.setMarkers(seriesData.Markers);
@@ -35,8 +34,8 @@ function AddLineSerie(figure: Figure, seriesData: any) {
     var chart = figure.Chart;
     let series = chart.addLineSeries({
         priceLineVisible: false,
-        lastValueVisible: false, 
-        priceFormat:{ precision: 7, minMove: 0.000001}
+        lastValueVisible: false,
+        priceFormat: { precision: 7, minMove: 0.000001 }
     });
 
     series.applyOptions(seriesData.Options)
@@ -45,13 +44,8 @@ function AddLineSerie(figure: Figure, seriesData: any) {
     figure.SeriesMap.set(series, seriesData);
 }
 
-
-function CreateFigure(figureData) {
-    var container = document.getElementById("chartBox");   // Get the element with id="demo"
-    var box = document.createElement('div');
-    container.appendChild(box)
-    box.className = "grid-item";
-    container.style.gridTemplateRows += " " + figureData.HeightRelative + "fr";
+function CreateFigure( figureData, box:HTMLDivElement ) { 
+   
     var chart = createChart(box, { width: box.clientWidth, height: box.clientHeight });
     chart.applyOptions(
         {
@@ -87,7 +81,6 @@ function CreateFigure(figureData) {
                 break;
         }
     });
-
 
     function onVisibleTimeRangeChanged(newVisibleTimeRange: TimeRange) {
 
@@ -149,16 +142,55 @@ function CreateFigure(figureData) {
     }, 200);
 }
 
-var searchParams = new URLSearchParams(window.location.search);
-var chartFile = searchParams.get('chart');
-var request = new XMLHttpRequest();
-request.open("GET", chartFile, false);
-request.send(null);
-var jsonData = JSON.parse(request.responseText);
+function CreateChart(chartData) { 
+    let figures : Array<any> = chartData.Figures;
+    var container = document.getElementById("chartBox");   
+    container.innerHTML = "";
+    container.style.gridTemplateRows = "";
+
+    figures.forEach( figData => { 
+        var box = document.createElement('div');
+        box.className = "grid-item";  
+        container.appendChild(box);
+        container.style.gridTemplateRows += " " + figData.HeightRelative + "fr"; 
+        CreateFigure(figData, box); 
+    });
+}
+
+function openFile(e) {
+    document.getElementById('inputFile').click();
+}
+
+function readSingleFile(e: Event) {
+    var file = (e as any).target.files[0];
+    if (!file) {
+        return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var contents = e.target.result;
+        var jsonData = JSON.parse(contents as string); 
+        //create the main chart 
+        CreateChart(jsonData)
+    };
+    reader.readAsText(file)
+}
+
+function displayContents(contents) {
+    var element = document.getElementById('file-content');
+    element.textContent = contents;
+}
+
+document.getElementById('buttonOpenFile').addEventListener("click", openFile, false);
+document.getElementById('inputFile').addEventListener("change", readSingleFile, false);
+
+// var searchParams = new URLSearchParams(window.location.search);
+// var chartFile = searchParams.get('chart');
+// var request = new XMLHttpRequest();
+// request.open("GET", chartFile, false);
+// request.send(null);
+//var jsonData = JSON.parse(request.responseText);
 
 //create the main chart
 //for each serie that is in main area
-jsonData.Figures.forEach(CreateFigure);
-
-
-
+//jsonData.Figures.forEach(CreateFigure);
