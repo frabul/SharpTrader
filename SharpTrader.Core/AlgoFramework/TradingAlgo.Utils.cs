@@ -14,18 +14,18 @@ namespace SharpTrader.AlgoFramework
             try
             {
                 var feed = await Market.GetSymbolFeedAsync(symbolKey);
-                if(feed == null)
+                if (feed == null)
                 {
                     Logger.Error($"Error while selling {symbolKey}: symbol not found.");
                     return;
                 }
-                var amount = Market.GetFreeBalance(feed.Symbol.Asset); 
+                var amount = Market.GetFreeBalance(feed.Symbol.Asset);
                 var adj = feed.GetOrderAmountAndPriceRoundedDown(amount, (decimal)feed.Bid);
                 Logger.Info($"Try selling {adj.amount} {symbolKey } @ {adj.price} because {reason}.");
                 if (adj.amount > 0)
                 {
                     //immediatly liquidate everything with a market order 
-                    
+
                     var orderInfo = new OrderInfo()
                     {
                         Symbol = symbolKey,
@@ -36,13 +36,13 @@ namespace SharpTrader.AlgoFramework
                         Direction = TradeDirection.Sell
                     };
                     var request = await Market.PostNewOrder(orderInfo);
-                    if (!request.IsSuccessful) 
+                    if (!request.IsSuccessful)
                     {
                         Logger.Info($"Error while selling {adj.amount} {symbolKey } @ {adj.price}.");
                     }
                 }
                 else
-                { 
+                {
                     Logger.Error($"Unable to sell {symbolKey } because amount ( {amount} ) is too low");
                 }
             }
@@ -112,14 +112,15 @@ namespace SharpTrader.AlgoFramework
                 }
                 else
                 {
+
                     var freeAmount = Market.GetFreeBalance(symData.Symbol.Asset);
                     if (adj.amount > freeAmount)
                     {
-                        if (!symData.Symbol.IsMarginTadingAllowed)
+                        if (!symData.Symbol.IsMarginTadingAllowed || !this.DoMarginTrading)
                             adj.amount = freeAmount;
-                        if (adj.amount > 0)
-                            adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(adj.amount, adj.price);
                     }
+                    if (adj.amount > 0)
+                        adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(adj.amount, adj.price);
                 }
             }
             return adj;

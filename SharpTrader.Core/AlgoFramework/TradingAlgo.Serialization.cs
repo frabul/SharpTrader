@@ -1,4 +1,6 @@
 ﻿using LiteDB;
+using SharpTrader.Core.BrokersApi.Binance;
+
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
@@ -81,9 +83,29 @@ namespace SharpTrader.AlgoFramework
         private Dictionary<string, Signal> SignalsDeserialized = new Dictionary<string, Signal>();
         private BsonMapperCustom NaiveMapper = new BsonMapperCustom();
 
-
         public void ConfigureSerialization()
         {
+            var defaultMapper = new BsonMapperCustom();
+            NaiveMapper.Entity<ISymbolInfo>().Ctor((doc) => new BinanceSymbolInfo());
+            NaiveMapper.RegisterType<IOrder>(
+                serialize: null,
+                deserialize: bson =>
+                {
+                    if (bson["_type"] != BsonValue.Null)
+                        return defaultMapper.Deserialize<IOrder>(bson);
+                    return defaultMapper.Deserialize<SharpTrader.MarketSimulator.Order>(bson);
+                }
+            ); 
+            NaiveMapper.RegisterType<ITrade>(
+               serialize: null,
+               deserialize: bson =>
+               {
+                   if (bson["_type"] != BsonValue.Null)
+                       return defaultMapper.Deserialize<ITrade>(bson); 
+                   return defaultMapper.Deserialize<SharpTrader.MarketSimulator.Trade>(bson);
+               }
+            ); 
+
             DbMapper = new BsonMapperCustom();
 
             Market.RegisterCustomSerializers(DbMapper);
@@ -91,18 +113,20 @@ namespace SharpTrader.AlgoFramework
             this.RiskManager?.RegisterCustomSerializers(DbMapper);
             this.Sentry?.RegisterCustomSerializers(DbMapper);
 
-            //---- add mapper for signals 
+            //---- add mapper for signals  
+            var signalMapper = DbMapper.BuildEntityMapper(typeof(Signal));
             DbMapper.RegisterType<Signal>(
-                serialize: null,
+                serialize: (obj) => NaiveMapper.Serialize<Signal>(obj),
                 deserialize: (bson) =>
                 {
                     var id = bson["Id"].AsString ?? bson["_id"].AsString;
                     //we must assure that there is only one instance of the same signal
 
-                    if (SignalsDeserialized.TryGetValue(id, out var signal))
+                    if (!SignalsDeserialized.TryGetValue(id, out var signal))
                     {
                         signal = new Signal(id);
                         SignalsDeserialized.Add(id, signal);
+                        DbMapper.PopulateObjectProperties(signalMapper, signal, bson as BsonDocument);
                     }
                     return signal;
 
