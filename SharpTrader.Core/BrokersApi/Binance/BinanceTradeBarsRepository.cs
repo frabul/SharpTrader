@@ -42,7 +42,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             var tradingRules = await Client.GetExchangeInfo();
             foreach (var symb in tradingRules.Symbols)
             {
-                dict.Add(symb.symbol, new BinanceSymbolInfo(symb)); 
+                dict.Add(symb.symbol, new BinanceSymbolInfo(symb));
             }
             var crossPairs = await Client.GetAllCrossMarginPairs();
             foreach (var pair in crossPairs)
@@ -50,7 +50,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                 if (dict.ContainsKey(pair.symbol))
                     dict[pair.symbol].IsCrossMarginAllowed = true;
             }
-            var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict); 
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(dict);
             System.IO.File.WriteAllText(System.IO.Path.Combine(DataDir, "BinanceSymbolsTable.json"), json);
         }
 
@@ -213,42 +213,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         {
             return base.GetSymbolHistory(info, startOfData, endOfData);
         }
-
-        public void DownloadSymbols(Func<ExchangeInfoSymbol, bool> filter, TimeSpan redownloadSpan)
-        {
-            var exchangeInfo = Client.GetExchangeInfo().Result;
-            var symbols = exchangeInfo.Symbols;
-
-            var toDownload = symbols
-                .Where(filter)
-                .Select(sp => sp.symbol).ToList();
-            var downloadQueue = new Queue<string>(toDownload);
-            List<Task> tasks = new List<Task>();
-            Stopwatch swReportRate = new Stopwatch();
-            swReportRate.Start();
-            while (downloadQueue.Count > 0)
-            {
-                if (tasks.Count < ConcurrencyCount)
-                {
-                    var symbol = downloadQueue.Dequeue();
-                    var task = DownloadHistoryAsync(symbol, DateTime.UtcNow.Subtract(TimeSpan.FromDays(360)), redownloadSpan);
-                    tasks.Add(task);
-
-                }
-                foreach (var t in tasks.Where(t => t.IsCompleted).ToArray())
-                {
-                    tasks.Remove(t);
-                    if (t.Exception != null)
-                        Console.WriteLine("A task terminated with an exception");
-                }
-
-
-                System.Threading.Thread.Sleep(1);
-            }
-            while (tasks.Any(t => !t.IsCompleted))
-                System.Threading.Thread.Sleep(1);
-        }
-
+         
         public async Task AssureFilter(Func<string, bool> filter, DateTime fromTime, DateTime toTime)
         {
             var exchangeInfo = Client.GetExchangeInfo().Result;
@@ -269,94 +234,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             await Task.WhenAll(tasks);
         }
 
-        public async Task DownloadHistoryAsync(string symbol, DateTime fromTime, TimeSpan redownloadStart)
-        {
-            //we must assure that there is only one downloading action ongoing for each symbol!
-            var semaphore = GetSemaphore(symbol);
-            try
-            {
-                await semaphore.WaitAsync();
-                Console.WriteLine($"Downloading {symbol} history ");
-                DateTime endTime = DateTime.UtcNow.Subtract(TimeSpan.FromSeconds(60));
-
-                //we need to convert all in UTC time 
-                var startTime = fromTime; //  
-                var epoch = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
-                if (startTime < epoch)
-                    startTime = epoch;
-
-                //try to get the first candle - use these functions for performance improvement
-                var symId = new SymbolHistoryId(MarketName, symbol, TimeSpan.FromSeconds(60));
-                var metaData = this.GetMetaData(symId);
-
-                if (metaData.FirstBar != null && metaData.LastBar != null)
-                {
-
-                    if (startTime > metaData.FirstBar.OpenTime)
-                    {
-                        //if startTime is after the first recorded bar then 
-                        // then we can start downloading from last recorded bar  
-                        if (endTime <= metaData.LastBar.Time)
-                            endTime = startTime;
-                        startTime = new DateTime(metaData.LastBar.OpenTime.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
-
-                    }
-                    else
-                    {
-                        if (metaData.FirstKnownData == null)
-                        {
-                            //start time is earlier than first known candle.. we start download from first candle on server
-                            var firstAvailable = (await Client.GetKlinesCandlesticks(
-                                new GetKlinesCandlesticksRequest
-                                {
-                                    Symbol = symbol,
-                                    StartTime = startTime,
-                                    Interval = KlineInterval.OneMinute,
-                                    EndTime = startTime.AddYears(3),
-                                    Limit = 10
-                                })).FirstOrDefault();
-                            this.UpdateFirstKnownData(metaData.HistoryId, KlineToCandlestick(firstAvailable));
-                        }
-
-                        //if we already downloaded the first available we can start download from the last known
-                        //otherwise we leave start time as it is to avoid creating holes 
-                        if (metaData.FirstKnownData.CloseTime.AddSeconds(1) >= metaData.FirstBar.OpenTime)
-                        {
-                            startTime = new DateTime(metaData.LastBar.Time.Ticks, DateTimeKind.Utc).Subtract(redownloadStart);
-                        }
-
-                        // avoid downloading again some data if possible
-                        if (endTime <= metaData.LastBar.Time)
-                            endTime = metaData.FirstBar.Time;
-                    }
-                }
-
-                //download and add bars if needed
-                if (endTime > startTime)
-                {
-                    var candlesDownloaded = await DownloadCandles(symbol, startTime, endTime);
-                    //---
-                    this.AddCandlesticks(symId, candlesDownloaded);
-                    this.ValidateData(symId);
-                    this.SaveAndClose(symId);
-                }
-
-                Console.WriteLine($"{symbol} history downloaded");
-            }
-            catch (Exception ex)
-            {
-                var msg = $"Fatal Exception during {symbol} history download: ";
-                if (ex is BinanceException binException)
-                    msg += binException.ErrorDetails;
-                else
-                    msg += ex.Message;
-                Console.WriteLine(msg);
-            }
-            finally
-            {
-                semaphore.Release();
-            }
-        }
+ 
 
     }
 }

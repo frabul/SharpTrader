@@ -14,19 +14,7 @@ namespace SharpTrader.Storage
         public string Id { get; protected set; }
         public SymbolHistoryId HistoryId { get; protected set; }
         public List<DateRange> GapsConfirmed { get; protected set; }
-        public List<DateRange> GapsUnconfirmed { get; protected set; }
-        /// <summary>
-        /// First absolute data for this symbol
-        /// </summary>
-        public ITradeBar FirstKnownData { get; internal set; }
-        /// <summary>
-        /// First bar recorded in database
-        /// </summary>
-        public ITradeBar FirstBar { get; protected set; }
-        /// <summary>
-        /// Last bar recorded in database
-        /// </summary>
-        public ITradeBar LastBar { get; protected set; }
+        public List<DateRange> GapsUnconfirmed { get; protected set; } 
     }
 
     public class SymbolHistoryMetaDataInternal : SymbolHistoryMetaData
@@ -73,23 +61,13 @@ namespace SharpTrader.Storage
         {
 
         }
-
-        public void UpdateLastBar(ITradeBar bar)
-        {
-            if (LastBar == null || this.LastBar.Time < bar.Time)
-                this.LastBar = bar;
-
-            if (FirstBar == null || this.FirstBar.Time > bar.Time)
-                this.FirstBar = bar;
-        }
-
+  
         public void AddBars(IEnumerable<Candlestick> candles)
         {
             lock (this.Locker)
             {
                 foreach (var c in candles)
                 {
-                    this.UpdateLastBar(c);
                     View.AddBar(c);
                 }
             }
