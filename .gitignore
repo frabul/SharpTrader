@@ -16,3 +16,4 @@ packages/
 /Tests/SharpTrader.Tests/obj
 /Tests/TestConsole/obj
 /SharpTrader.Core/Plotting/node_modules/
+/SharpTrader.Core/Plotting/dist

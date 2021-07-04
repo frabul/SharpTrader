@@ -1210,6 +1210,17 @@ namespace SharpTrader.BrokersApi.Binance
                     return sym;
                 }
             );
+            mapper.RegisterType<ISymbolInfo>(
+                serialize: (obj) => defaultMapper.Serialize<ISymbolInfo>(obj),
+                deserialize: (bson) =>
+                {
+                    var sym = this.GetSymbolInfo(bson["Key"].AsString) as BinanceSymbolInfo;
+                    if (sym == null)
+                        sym = defaultMapper.Deserialize<BinanceSymbolInfo>(bson);
+
+                    return sym;
+                }
+            );
 
             Order BsonToOrder(BsonValue value)
             {
