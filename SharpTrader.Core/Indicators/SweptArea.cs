@@ -11,8 +11,8 @@ namespace SharpTrader.Indicators
         public int Period { get; set; }
 
         private RollingWindow<IBaseData> Inputs;
-        public override bool IsReady => Inputs.Count > Period;
-        public SweptArea(string name, int period, TimeSerieNavigator<ITradeBar> candles)
+        public override bool IsReady => Inputs.Count >= Period;
+        public SweptArea(string name, int period)
             : base(name)
         {
             Period = period;
@@ -27,7 +27,7 @@ namespace SharpTrader.Indicators
             double min = double.MaxValue;
             double max = double.MinValue;
             double swept = 0;
-            foreach (var candle in Enumerable.Range(0, Period).Select(i => Inputs[i]))
+            foreach (var candle in Inputs)
             {
                 min = Math.Min(min, candle.Low);
                 max = Math.Max(max, candle.High);
