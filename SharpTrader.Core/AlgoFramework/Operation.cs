@@ -199,7 +199,7 @@ namespace SharpTrader.AlgoFramework
             {
                 var dash = clientOrderId.IndexOf("-");
                 if (dash > -1)
-                    return clientOrderId.Substring(0, dash); 
+                    return clientOrderId.Substring(0, dash);
             }
             return "null";
         }
@@ -303,6 +303,25 @@ namespace SharpTrader.AlgoFramework
             {
                 return $"{{ Id: {Id} -  Symbol: {Symbol.Key} }}";
             }
+        }
+
+        public decimal CalculateGain()
+        {
+            if (_Entries.Count > 0 && _Exits.Count > 0)
+            {
+                if (this.Type == OperationType.BuyThenSell)
+                {
+                    if (Exits.First().CommissionAsset == Symbol.QuoteAsset && Entries.First().CommissionAsset == Symbol.Asset)
+                        return this.Exits.Sum(e => e.Amount * e.Price - e.Commission) - this.Entries.Sum(e => e.Amount - e.Commission);
+                    else
+                        throw new NotImplementedException();
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                }
+            }
+            return 0;
         }
 
         public void ScheduleClose(DateTime deadTime)
