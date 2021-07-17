@@ -6,7 +6,7 @@ namespace SharpTrader
     {
         public TimeSpan Resolution { get; }
       
-        private Candlestick FormingCandle;
+        private Candlestick FormingCandle = new Candlestick();
 
         DateTime BaseTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 

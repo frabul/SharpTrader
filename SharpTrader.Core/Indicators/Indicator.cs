@@ -11,6 +11,7 @@ namespace SharpTrader.Indicators
         IBaseData Current { get; }
         double Value { get; }
         void Update(IBaseData datum);
+        bool IsReady { get; }
     }
     public abstract class Indicator<TIn, TOut> : IIndicator where TIn : IBaseData where TOut : IBaseData
     {

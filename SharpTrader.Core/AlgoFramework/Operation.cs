@@ -305,14 +305,14 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-        public decimal CalculateGain()
+        public decimal CalculateGainAsQuteAsset()
         {
             if (_Entries.Count > 0 && _Exits.Count > 0)
             {
                 if (this.Type == OperationType.BuyThenSell)
                 {
-                    if (Exits.First().CommissionAsset == Symbol.QuoteAsset && Entries.First().CommissionAsset == Symbol.Asset)
-                        return this.Exits.Sum(e => e.Amount * e.Price - e.Commission) - this.Entries.Sum(e => e.Amount - e.Commission);
+                    if (Exits.First().CommissionAsset == Symbol.QuoteAsset && Entries.First().CommissionAsset == Symbol.QuoteAsset)
+                        return this.Exits.Sum(e => e.Amount * e.Price - e.Commission) - this.Entries.Sum(e => e.Amount * e.Price - e.Commission);
                     else
                         throw new NotImplementedException();
                 }

@@ -14,6 +14,8 @@ namespace SharpTrader.Indicators
         public AverageTrueRange(int period) : base("AverageTrueRange")
         {
             Period = period;
+            TrueRange = new TrueRange($"{Name} Companion");
+            TrueRanges = new RollingWindow<IndicatorDataPoint>(period + 1);
         }
 
         public AverageTrueRange(string name, int period, TimeSerieNavigator<ITradeBar> chart, DateTime warmUpTime) :
@@ -33,7 +35,7 @@ namespace SharpTrader.Indicators
                 TrueRanges.Add(TrueRange.Current);
                 int stepsCnt = Math.Min(TrueRanges.Count, Period);
                 RollingSum += TrueRange.Current.Value;
-                if (TrueRanges.Count >= Period)
+                if (TrueRanges.Count > Period)
                 {
                     RollingSum -= TrueRanges[Period].Value;
                 }
