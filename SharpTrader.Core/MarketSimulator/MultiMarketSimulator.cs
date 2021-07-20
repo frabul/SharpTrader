@@ -106,7 +106,7 @@ namespace SharpTrader.MarketSimulator
                             feed.DataSource = this.HistoryDb.GetSymbolHistory(
                                 histInfo,
                                 this.Time,
-                                new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1).AddMilliseconds(-1));
+                                new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1));
                             this.HistoryDb.SaveAndClose(histInfo, false);
                             market.FistTickPassed = true;
                         }

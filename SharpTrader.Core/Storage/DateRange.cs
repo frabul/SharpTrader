@@ -12,9 +12,6 @@ namespace SharpTrader.Storage
             this.start = start;
             this.end = end;
         }
-        public bool Overlaps(DateTime start, DateTime end)
-        {
-            return start >= this.start || start <= this.end || end >= this.start || end <= this.end;
-        }
+       
     }
 }
