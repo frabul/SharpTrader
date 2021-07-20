@@ -35,7 +35,9 @@ namespace SharpTrader.Indicators
                 swept += candle.High - candle.Low;
             }
             var area = (max - min) * Period;
-            var ret = swept / area;
+            var ret = 1.0;
+            if(area > 0 )
+                ret = swept / area;
             return new IndicatorDataPoint(input.Time, ret);
         }
 
