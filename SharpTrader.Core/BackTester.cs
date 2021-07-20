@@ -84,47 +84,9 @@ namespace SharpTrader
         public NLog.Logger Logger { get; set; }
         public Action<PlotHelper> ShowPlotCallback { get; set; }
 
-        public BackTester(Configuration config)
+        public BackTester(Configuration config) : this(config, new TradeBarsRepository(config.HistoryDb))
         {
-            Config = config;
 
-            if (Logger == null)
-                Logger = NLog.LogManager.GetLogger("BackTester_" + Config.SessionName);
-
-            var HistoryDB = new TradeBarsRepository(Config.HistoryDb);
-            this.MarketSimulator = new MultiMarketSimulator(Config.DataDir, HistoryDB, Config.StartTime, Config.EndTime);
-            if (config.IncrementalHistoryLoading)
-                this.MarketSimulator.IncrementalHistoryLoading = true;
-            MarketSimulator.Deposit(Config.Market, Config.StartingBalance.Asset, Config.StartingBalance.Amount);
-
-            var algoClass = Type.GetType(Config.AlgoClass);
-            if (algoClass == null)
-                throw new Exception($"Algorith class {Config.AlgoClass} not found.");
-
-            var ctors = algoClass.GetConstructors();
-            var myctor = ctors.FirstOrDefault(ct =>
-                                                {
-                                                    var pars = ct.GetParameters();
-                                                    return pars.Length == 2 && pars[0].ParameterType == typeof(IMarketApi);
-                                                });
-            if (myctor == null)
-                throw new Exception("Unable to find a constructor with 2 parameters (ImarketApi, config)");
-            var configClass = myctor.GetParameters()[1].ParameterType;
-            algoConfig = null;
-            try
-            {
-                algoConfig = JsonConvert.DeserializeObject(config.AlgoConfig.ToString(), configClass);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Unable to translate from provided algo config to ${configClass.FullName }: ${ex.Message}");
-            }
-
-            this.Algo = myctor.Invoke(new[] { MarketSimulator.GetMarketApi(config.Market), algoConfig }) as TradingAlgo;
-            this.Algo.IsPlottingEnabled = Config.PlottingEnabled;
-            this.Algo.ShowPlotCallback = (pl) => this?.ShowPlotCallback(pl);
-            if (this.Algo == null)
-                throw new Exception("Wrong algo class");
         }
         public BackTester(Configuration config, TradeBarsRepository db)
         {
@@ -135,6 +97,7 @@ namespace SharpTrader
 
             var HistoryDB = db;
             this.MarketSimulator = new MultiMarketSimulator(Config.DataDir, HistoryDB, Config.StartTime, Config.EndTime);
+            this.MarketSimulator.IncrementalHistoryLoading = config.IncrementalHistoryLoading;
             MarketSimulator.Deposit(Config.Market, Config.StartingBalance.Asset, Config.StartingBalance.Amount);
 
             var algoClass = Type.GetType(Config.AlgoClass);
@@ -187,6 +150,7 @@ namespace SharpTrader
 
             var startingBal = -1m;
             double currentBenchmarkVal = (double)Config.StartingBalance.Amount;
+            var oldCursor = Console.CursorTop;
             while (MarketSimulator.NextTick() && MarketSimulator.Time < EndTime)
             {
                 if (startingBal < 0)
@@ -195,7 +159,7 @@ namespace SharpTrader
                 Algo.OnTickAsync().Wait();
                 steps++;
                 //---- update equity and benchmark ---------- 
-                if (steps % 30 == 0)
+                if (steps % 60 == 0)
                 {
                     var balance = MarketSimulator.GetEquity(BaseAsset);
                     BotStats.Update(MarketSimulator.Time, (double)balance);
@@ -226,6 +190,16 @@ namespace SharpTrader
                     }
 
                 }
+
+                if (steps % 240 == 0)
+                {
+                    var prcDone = (MarketSimulator.Time - MarketSimulator.StartTime).Ticks / MarketSimulator.EndTime.Ticks * 100;
+                    if (oldCursor == Console.CursorTop)
+                        Console.CursorTop = oldCursor - 1;
+
+                    Console.WriteLine($"Simulation time: {MarketSimulator.Time} - {prcDone}% completed");
+                    oldCursor = Console.CursorTop;
+                }
             }
 
             var totalBal = MarketSimulator.GetEquity(BaseAsset);
@@ -243,9 +217,10 @@ namespace SharpTrader
 
             sw.Stop();
 
-            Logger.Info($"Test terminated in {sw.ElapsedMilliseconds} ms.");
-            Logger.Info($"Balance: {totalBal} - Trades:{MarketSimulator.Trades.Count()} - Lost in fee:{lostInFee}");
             var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
+
+            Logger.Info($"Test terminated in {sw.ElapsedMilliseconds} ms.");
+            Logger.Info($"Balance: {totalBal} - Operations:{operations.Count} - Lost in fee:{lostInFee}");
             if (operations.Count > 0)
             {
                 Logger.Info($"Algorithm => Profit/MDD: {BotStats.Profit / BotStats.MaxDrowDown} - MaxDrawDown: {BotStats.MaxDrowDown} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
