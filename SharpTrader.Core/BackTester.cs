@@ -40,6 +40,8 @@ namespace SharpTrader
                 Profit = equity - StartingEquity;
                 if (MaxDrowDown != 0)
                     ProfitOverMaxDrowDown = Profit / MaxDrowDown;
+                else
+                    ProfitOverMaxDrowDown = float.PositiveInfinity;
             }
         }
 
@@ -48,7 +50,7 @@ namespace SharpTrader
             public string SessionName = "Backetester";
             public string DataDir { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
             public string HistoryDb { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
-            public string LogDir => $"{DataDir}/logs/{SessionName}";
+            public string LogDir { get; } = $"./logs/";
             public bool PlottingEnabled { get; set; } = false;
             public bool PlotResults { get; set; } = false;
             public string AlgoClass;
@@ -193,11 +195,11 @@ namespace SharpTrader
 
                 if (steps % 240 == 0)
                 {
-                    var prcDone = (MarketSimulator.Time - MarketSimulator.StartTime).Ticks / MarketSimulator.EndTime.Ticks * 100;
+                    var prcDone = (double)(MarketSimulator.Time - StartTime).Ticks / (EndTime - StartTime).Ticks * 100;
                     if (oldCursor == Console.CursorTop)
                         Console.CursorTop = oldCursor - 1;
 
-                    Console.WriteLine($"Simulation time: {MarketSimulator.Time} - {prcDone}% completed");
+                    Console.WriteLine($"Simulation time: {MarketSimulator.Time} - {prcDone:f2}% completed");
                     oldCursor = Console.CursorTop;
                 }
             }
@@ -223,8 +225,8 @@ namespace SharpTrader
             Logger.Info($"Balance: {totalBal} - Operations:{operations.Count} - Lost in fee:{lostInFee}");
             if (operations.Count > 0)
             {
-                Logger.Info($"Algorithm => Profit/MDD: {BotStats.Profit / BotStats.MaxDrowDown} - MaxDrawDown: {BotStats.MaxDrowDown} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
-                Logger.Info($"BenchMark => Profit/MDD: {BenchmarkStats.Profit / BenchmarkStats.MaxDrowDown} - MaxDrawDown: {BenchmarkStats.MaxDrowDown} ");
+                Logger.Info($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
+                Logger.Info($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
             }
 
             foreach (var p in Algo.Plots)
@@ -255,7 +257,7 @@ namespace SharpTrader
                 plot.PlotLine("Benchmark", benchPoints, ARGBColors.MediumPurple);
 
                 Directory.CreateDirectory(Config.LogDir);
-                chart.Serialize(Path.Combine(Config.LogDir, $"Chart_equity.json"));
+                chart.Serialize(Path.Combine(Config.LogDir, $"{Config.SessionName}_Chart_equity.json"));
             }
         }
     }
