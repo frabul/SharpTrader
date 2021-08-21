@@ -13,6 +13,10 @@ namespace SharpTrader.AlgoFramework
         public TradingAlgo Algo { get; private set; }
         public DateTime NextSwapTime { get; private set; }
         public TimeSpan UpdatePeriod { get; set; } = TimeSpan.FromHours(24);
+        /// <summary>
+        /// Returns all symbols that could potentially be selected for trading
+        /// </summary>
+        public abstract ISymbolInfo[] SymbolsPool { get; }
         protected abstract ISymbolInfo[] OnUpdate(TimeSlice slice);
 
         protected abstract Task OnInitialize();
