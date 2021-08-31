@@ -150,7 +150,7 @@ namespace SharpTrader
                 return;
             this.BenchmarkStats = new Statistics();
             this.BotStats = new Statistics();
-            Logger.Info($"Backtesting {Algo.Version} from  {StartTime} - {EndTime} with configuration:\n" + JObject.FromObject(algoConfig).ToString());
+            Logger.Info($"Backtesting {Algo.Version} from  {StartTime + Config.WarmUpTime} to {EndTime} (warmup {Config.WarmUpTime}) with configuration:\n" + JObject.FromObject(algoConfig).ToString());
 
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -169,14 +169,16 @@ namespace SharpTrader
             {
                 if (startingBal < 0)
                     startingBal = MarketSimulator.GetEquity(BaseAsset);
-                if (MarketSimulator.Time < StartTime + Config.WarmUpTime)
+                bool warmUpCompleted = MarketSimulator.Time < StartTime + Config.WarmUpTime;
+                if (!warmUpCompleted)
                     Algo.StopEntries();
                 else
                     Algo.ResumeEntries();
+
                 Algo.OnTickAsync().Wait();
                 steps++;
                 //---- update equity and benchmark ---------- 
-                if (steps % 60 == 0)
+                if (steps % 60 == 0 && warmUpCompleted)
                 {
                     var balance = MarketSimulator.GetEquity(BaseAsset);
                     BotStats.Update(MarketSimulator.Time, (double)balance);
