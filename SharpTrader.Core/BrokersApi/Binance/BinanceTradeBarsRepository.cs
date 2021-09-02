@@ -172,7 +172,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                         await Task.Delay(3000);
                     }
                     if (allCandles.Count > 1)
-                        startTime = new DateTime((allCandles[allCandles.Count - 1].CloseTime - TimeSpan.FromSeconds(1)).Ticks, DateTimeKind.Utc);
+                        startTime = new DateTime((allCandles[allCandles.Count - 1].CloseTime.AddSeconds(1)).Ticks, DateTimeKind.Utc);
                 }
             }
             catch
@@ -213,7 +213,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         {
             return base.GetSymbolHistory(info, startOfData, endOfData);
         }
-         
+
         public async Task AssureFilter(Func<string, bool> filter, DateTime fromTime, DateTime toTime)
         {
             var exchangeInfo = Client.GetExchangeInfo().Result;
@@ -234,7 +234,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             await Task.WhenAll(tasks);
         }
 
- 
+
 
     }
 }
