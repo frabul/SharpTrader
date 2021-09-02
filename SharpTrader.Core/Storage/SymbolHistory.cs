@@ -15,7 +15,7 @@ namespace SharpTrader.Storage
             Market = raw.Id.Market;
             Symbol = raw.Id.Symbol;
             Resolution = raw.Id.Resolution;
-            Ticks = new TimeSerieNavigator<ITradeBar>(raw.GetNavigatorFromTicks(t => t.Time >= startOfData && t.Time <= endOfData));
+            Ticks = new TimeSerieNavigator<ITradeBar>(raw.GetNavigatorFromTicks(t => t.Time > startOfData && t.Time <= endOfData));
         }
 
         internal SymbolHistory(HistoryView raw)
