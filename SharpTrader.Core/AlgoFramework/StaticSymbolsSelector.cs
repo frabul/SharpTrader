@@ -6,14 +6,13 @@ namespace SharpTrader.AlgoFramework
 {
     public class StaticSymbolsSelector : SymbolsSelector
     {
-        public string[] SymbolsKeys { get; }
         public ISymbolInfo[] Symbols { get; private set; }
 
         public override ISymbolInfo[] SymbolsPool => Symbols;
 
-        public StaticSymbolsSelector(IEnumerable<string> symbolsKeys)
+        public StaticSymbolsSelector(IEnumerable<ISymbolInfo> symbolsKeys)
         {
-            SymbolsKeys = symbolsKeys.ToArray();
+            Symbols = symbolsKeys.ToArray();
         }
 
         protected override ISymbolInfo[] OnUpdate(TimeSlice slice)
@@ -22,9 +21,8 @@ namespace SharpTrader.AlgoFramework
         }
 
         protected override Task OnInitialize()
-        {
-            Symbols = Algo.Market.GetSymbols().Where(s => SymbolsKeys.Any(sk => sk == s.Key)).ToArray();
+        { 
             return Task.CompletedTask;
         }
-    } 
+    }
 }
