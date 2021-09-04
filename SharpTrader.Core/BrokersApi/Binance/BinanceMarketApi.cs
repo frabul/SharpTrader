@@ -945,8 +945,6 @@ namespace SharpTrader.BrokersApi.Binance
                             convert = 0;
                     }
                 }
-
-
                 var bb = new AssetBalance { Asset = bal.Asset, Free = bal.Free * convert, Locked = bal.Locked * convert };
                 list.Add(bb);
             }
@@ -955,52 +953,9 @@ namespace SharpTrader.BrokersApi.Binance
         public async Task<IRequest<decimal>> GetEquity(string asset)
         {
             try
-            {
-                List<SymbolPriceResponse> allPrices = await GetAllPrices();
-
-                if (asset == "ETH" || asset == "BNB" || asset == "BTC")
-                {
-                    lock (LockBalances)
-                    {
-                        decimal val = 0;
-                        foreach (var kv in _Balances)
-                        {
-                            if (kv.Key == asset)
-                                val += kv.Value.Total;
-                            else if (kv.Value.Total != 0)
-                            {
-                                var sym1 = (kv.Key + asset);
-                                var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == sym1);
-                                if (price1 != null)
-                                {
-                                    val += ((decimal)price1.Price * kv.Value.Total);
-                                }
-                                else
-                                {
-                                    var sym2 = asset + kv.Key;
-                                    var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == sym2);
-                                    if (price2 != null)
-                                    {
-                                        val += (kv.Value.Total / price2.Price);
-                                    }
-                                }
-                            }
-                        }
-                        return new Request<decimal>(RequestStatus.Completed, val);
-                    }
-                }
-                else
-                {
-                    var btceq = await GetEquity("BTC");
-                    var price1 = allPrices.FirstOrDefault(pri => pri.Symbol == asset + "BTC");
-                    var price2 = allPrices.FirstOrDefault(pri => pri.Symbol == "BTC" + asset);
-                    if (price1 != null && btceq.Status == RequestStatus.Completed)
-                        return new Request<decimal>(RequestStatus.Completed, (decimal)price1.Price / btceq.Result);
-                    else if (price2 != null && btceq.Status == RequestStatus.Completed)
-                        return new Request<decimal>(RequestStatus.Completed, (decimal)price2.Price * btceq.Result);
-                    else
-                        return new Request<decimal>("Unable to get the price of the symbol");
-                }
+            { 
+                var balancesConverted = await GetAllBalancesConvertedAsync(asset);
+                return new Request<decimal>(RequestStatus.Completed, balancesConverted.Sum(b => b.Total));
             }
             catch (Exception ex)
             {
@@ -1214,7 +1169,7 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<object>(GetExceptionErrorInfo(ex));
             }
         }
-        public async Task DustConvert()
+        public async Task<ConvertDustResponse> DustConvert()
         {
             List<AssetBalance> allBalances = await this.GetAllBalancesConvertedAsync("BTC");
 
@@ -1232,8 +1187,9 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 var pars = new ConvertDustRequest(finalAssets);
                 var res = await this.Client.ConvertDustToBNB(pars);
+                return res;
             }
-
+            return new ConvertDustResponse();
         }
         public ISymbolInfo GetSymbolInfo(string key)
         {
