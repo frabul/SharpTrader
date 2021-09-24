@@ -157,7 +157,7 @@ namespace SharpTrader.AlgoFramework
 
             //purge old operations that never got to active state
             Logger.Info("Purging old operations and rebuilding database.");
-            var purgeLimit = this.Time - TimeSpan.FromDays(7);
+            var purgeLimit = this.Time - TimeSpan.FromDays(2);
             List<string> operationsToRemove = new List<string>();
 
             foreach (var oper in this.Db.GetCollection("ClosedOperations").FindAll())
