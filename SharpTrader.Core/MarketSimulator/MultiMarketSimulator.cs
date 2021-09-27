@@ -80,25 +80,18 @@ namespace SharpTrader.MarketSimulator
 
         int NoMoreDataCount = 0;
         public bool IncrementalHistoryLoading { get; set; } = false;
-        private bool firstTick = true;
+
         public bool NextTick()
         {
             //calculate next tick time
-            var nextTick = this.Time + Resolution; 
+            var nextTick = this.Time + Resolution;
             //update market time
             this.Time = nextTick;
-            bool moreData = false; 
+            bool moreData = false;
             //add new data to all symbol feeds that have it    
             foreach (var market in _Markets)
             {
-                
-                var newMonthStarted = (Time.Month != market.Time.Month || Time.Year != market.Time.Year || !market.FistTickPassed);
-                if (IncrementalHistoryLoading && firstTick)
-                {
-                    LoadMoreData(market);
-                    firstTick = false;
-                    newMonthStarted = false;
-                }
+                LoadMoreData(market);
 
                 market.Time = this.Time;
                 foreach (var feed in market.SymbolsFeeds.Values)
@@ -116,10 +109,6 @@ namespace SharpTrader.MarketSimulator
                         moreData |= dataSource.Ticks.Position < dataSource.Ticks.Count - 1;
                     }
                 }
-                //the time of last tick of month is coincident with the start of new month
-                //so we need to provde that befor loading new data
-                if (IncrementalHistoryLoading && newMonthStarted)
-                    LoadMoreData(market);
             }
 
             if (!moreData)
@@ -133,23 +122,29 @@ namespace SharpTrader.MarketSimulator
             //raise orders/trades events
             foreach (var market in _Markets)
                 market.RaisePendingEvents();
-
-            return nextTick <= this.EndTime && NoMoreDataCount < 10;
+            var stillMoreData = NoMoreDataCount < 10 || IncrementalHistoryLoading; // if incremental history is selected we cannot be sure that we don't have more data
+            
+            return nextTick <= this.EndTime && stillMoreData;
         }
 
         private void LoadMoreData(MarketEmulator market)
         {
-            // a new month has started, let's load the data for this month
-            foreach (var feed in market.SymbolsFeeds.Values)
+            if (Time >= market.NextDataLoadTime)
             {
-                var histInfo = new SymbolHistoryId(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
-
-                feed.DataSource = this.HistoryDb.GetSymbolHistory(
-                    histInfo,
-                    this.Time,
-                    new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1));
-                this.HistoryDb.SaveAndClose(histInfo, false);
-                market.FistTickPassed = true;
+                // we load the data from current time to the end of month
+                var chunkEndTime = new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1);
+                foreach (var feed in market.SymbolsFeeds.Values)
+                {
+                    var histInfo = new SymbolHistoryId(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
+                    feed.DataSource?.Ticks?.Clear();    // clear ticks for faster memory garbage collection
+                    feed.DataSource = this.HistoryDb.GetSymbolHistory(
+                        histInfo,
+                        this.Time,
+                        new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1));
+                    this.HistoryDb.SaveAndClose(histInfo, false);
+                    market.FistTickPassed = true;
+                }
+                market.NextDataLoadTime = chunkEndTime.AddMinutes(0.5); //the first candle of new month is output at minute 1
             }
         }
 

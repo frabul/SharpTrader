@@ -208,6 +208,7 @@ namespace SharpTrader.MarketSimulator
         }
 
         public bool FistTickPassed { get; set; } = false;
+        public DateTime NextDataLoadTime { get; internal set; } = DateTime.MinValue;
 
         internal void RaisePendingEvents()
         {
