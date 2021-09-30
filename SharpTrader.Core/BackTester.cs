@@ -210,41 +210,31 @@ namespace SharpTrader
 
                 }
 
-                if (steps % 240 == 0)
+                if (steps % (60 * 24) == 0)
                 {
                     var prcDone = (double)(MarketSimulator.Time - StartTime).Ticks / (EndTime - StartTime).Ticks * 100;
                     if (oldCursor == Console.CursorTop)
-                        Console.CursorTop = oldCursor - 1;
+                    {
+                        Console.CursorTop = oldCursor - 4;
+                        for (int i = 0; i < 4; i++) 
+                        Console.WriteLine("                                                          ");
+                        Console.CursorTop = oldCursor - 4;
+                    }
+                        
 
                     Console.WriteLine($"Simulation time: {MarketSimulator.Time} - {prcDone:f2}% completed");
+                    PrintStats(true);
                     oldCursor = Console.CursorTop;
                 }
             }
 
-            var totalBal = MarketSimulator.GetEquity(BaseAsset);
-            //get the total fee paid calculated on commission asset
-            var feeList = MarketSimulator.Trades.Select(
-                                                tr =>
-                                                {
-                                                    if (tr.Symbol.EndsWith(tr.CommissionAsset))
-                                                        return tr.Commission;
-                                                    else
-                                                        return tr.Commission * tr.Price;
-                                                });
-            var lostInFee = feeList.Sum();
+
             //get profit
 
             sw.Stop();
-
-            var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
-
             Logger.Info($"Test terminated in {sw.ElapsedMilliseconds} ms.");
-            Logger.Info($"Balance: {totalBal} - Operations:{operations.Count} - Lost in fee:{lostInFee}");
-            if (operations.Count > 0)
-            {
-                Logger.Info($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
-                Logger.Info($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
-            }
+
+            PrintStats(false);
 
             foreach (var p in Algo.Plots)
                 ShowPlotCallback?.Invoke(p);
@@ -276,6 +266,38 @@ namespace SharpTrader
                 Directory.CreateDirectory(Config.LogDir);
                 chart.Serialize(Path.Combine(Config.LogDir, $"{Config.SessionName}_Chart_equity.json"));
             }
+        }
+
+        private void PrintStats(bool consoleOnly)
+        {
+            Action<string> printAction = s => Logger.Info(s);
+            if (consoleOnly)
+                printAction = s => Console.WriteLine(s);
+            var totalBal = MarketSimulator.GetEquity(BaseAsset);
+            //get the total fee paid calculated on commission asset
+            var feeList = MarketSimulator.Trades.Select(
+                                                tr =>
+                                                {
+                                                    if (tr.Symbol.EndsWith(tr.CommissionAsset))
+                                                        return tr.Commission;
+                                                    else
+                                                        return tr.Commission * tr.Price;
+                                                });
+            var lostInFee = feeList.Sum();
+            var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
+            printAction($"Balance: {totalBal} - Operations:{operations.Count} - Lost in fee:{lostInFee}");
+            if (operations.Count > 0)
+            {
+                printAction($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
+                printAction($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+            }
+            else
+            {
+
+                printAction($"Algorithm => No data");
+                printAction($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+            }
+
         }
     }
 
