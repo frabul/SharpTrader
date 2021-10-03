@@ -7,18 +7,18 @@ namespace SharpTrader.AlgoFramework
 {
     public class FixedAmountAllocator : FundsAllocator
     {
-        private List<Signal> PendingSignals = new List<Signal>(); 
-        public TimeSpan CoolDown { get; private set; } = TimeSpan.FromMinutes(30);
+        private List<Signal> PendingSignals = new List<Signal>();
+        public TimeSpan CoolDown { get; set; } = TimeSpan.FromMinutes(0);
         public bool ProportionalToProfit { get; set; } = false;
         public decimal TargetProfit { get; set; } = 0.05m;
         public int MaxActiveOperationsPerSymbol { get; set; } = 1;
         public decimal MaxInvested { get; set; } = 0;
         public decimal MaxInvestedPerSymbol { get; set; } = 0;
-        public AssetAmount Amount { get; set; }  
+        public AssetAmount Amount { get; set; }
 
-        public FixedAmountAllocator( )
-        { 
-        } 
+        public FixedAmountAllocator()
+        {
+        }
 
         public override void Update(TimeSlice slice)
         {
@@ -71,9 +71,9 @@ namespace SharpTrader.AlgoFramework
                         {
                             //create operations
                             var operType = signal.Kind == SignalKind.Buy ? OperationType.BuyThenSell : OperationType.SellThenBuy;
-                            var newOper = new Operation( Algo.GetNewOperationId(), signal, new AssetAmount(Amount.Asset, budget), operType);
+                            var newOper = new Operation(Algo.GetNewOperationId(), signal, new AssetAmount(Amount.Asset, budget), operType);
                             newOper.OnNewTrade += (o, t) => { (symData.AllocatorData as MySymbolData).LastInvestmentTime = t.Time; };
-                            slice.Add(newOper); 
+                            slice.Add(newOper);
                         }
                         else
                         {

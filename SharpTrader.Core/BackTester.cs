@@ -210,18 +210,17 @@ namespace SharpTrader
 
                 }
 
+                //print partial results
                 if (steps % (60 * 24) == 0)
                 {
                     var prcDone = (double)(MarketSimulator.Time - StartTime).Ticks / (EndTime - StartTime).Ticks * 100;
                     if (oldCursor == Console.CursorTop)
                     {
-                        Console.CursorTop = oldCursor - 4;
-                        for (int i = 0; i < 4; i++) 
-                        Console.WriteLine("                                                          ");
-                        Console.CursorTop = oldCursor - 4;
+                        if (Console.CursorTop > 3)
+                            Console.CursorTop -= 4;
+                        DeleteConsoleLines(4);
                     }
-                        
-
+                  
                     Console.WriteLine($"Simulation time: {MarketSimulator.Time} - {prcDone:f2}% completed");
                     PrintStats(true);
                     oldCursor = Console.CursorTop;
@@ -268,6 +267,14 @@ namespace SharpTrader
             }
         }
 
+        private static void DeleteConsoleLines(int cnt)
+        {
+            var blankLine = new string(' ', Console.BufferWidth); 
+            for (int i = 0; i < cnt; i++)
+                Console.WriteLine(blankLine);
+            Console.CursorTop -= cnt;
+        }
+
         private void PrintStats(bool consoleOnly)
         {
             Action<string> printAction = s => Logger.Info(s);
@@ -285,7 +292,7 @@ namespace SharpTrader
                                                 });
             var lostInFee = feeList.Sum();
             var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
-            printAction($"Balance: {totalBal} - Operations:{operations.Count} - Lost in fee:{lostInFee}");
+            printAction($"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
             if (operations.Count > 0)
             {
                 printAction($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
