@@ -1,5 +1,5 @@
 
-import { createChart, IChartApi, TimeRange, MouseEventParams, Point, Coordinate, BarPrice, BarData, BarPrices, ISeriesApi } from 'lightweight-charts';
+import { createChart, TimeRange, MouseEventParams, Point, Coordinate, BarPrice, BarData, BarPrices, ISeriesApi, IChartApi } from 'lightweight-charts';
 
 class Figure {
     Chart: IChartApi;
@@ -44,8 +44,8 @@ function AddLineSerie(figure: Figure, seriesData: any) {
     figure.SeriesMap.set(series, seriesData);
 }
 
-function CreateFigure( figureData, box:HTMLDivElement ) { 
-   
+function CreateFigure(figureData, box: HTMLDivElement) {
+
     var chart = createChart(box, { width: box.clientWidth, height: box.clientHeight });
     chart.applyOptions(
         {
@@ -142,18 +142,18 @@ function CreateFigure( figureData, box:HTMLDivElement ) {
     }, 200);
 }
 
-function CreateChart(chartData) { 
-    let figures : Array<any> = chartData.Figures;
-    var container = document.getElementById("chartBox");   
+function CreateChart(chartData) {
+    let figures: Array<any> = chartData.Figures;
+    var container = document.getElementById("chartBox");
     container.innerHTML = "";
     container.style.gridTemplateRows = "";
 
-    figures.forEach( figData => { 
+    figures.forEach(figData => {
         var box = document.createElement('div');
-        box.className = "grid-item";  
+        box.className = "grid-item";
         container.appendChild(box);
-        container.style.gridTemplateRows += " " + figData.HeightRelative + "fr"; 
-        CreateFigure(figData, box); 
+        container.style.gridTemplateRows += " " + figData.HeightRelative + "fr";
+        CreateFigure(figData, box);
     });
 }
 
@@ -166,14 +166,18 @@ function readSingleFile(e: Event) {
     if (!file) {
         return;
     }
+    plotFromFile(file);
+}
+
+function plotFromFile(filePath){
     var reader = new FileReader();
     reader.onload = function (e) {
         var contents = e.target.result;
-        var jsonData = JSON.parse(contents as string); 
+        var jsonData = JSON.parse(contents as string);
         //create the main chart 
         CreateChart(jsonData)
     };
-    reader.readAsText(file)
+    reader.readAsText(filePath)
 }
 
 function displayContents(contents) {
@@ -184,12 +188,10 @@ function displayContents(contents) {
 document.getElementById('buttonOpenFile').addEventListener("click", openFile, false);
 document.getElementById('inputFile').addEventListener("change", readSingleFile, false);
 
-// var searchParams = new URLSearchParams(window.location.search);
-// var chartFile = searchParams.get('chart');
-// var request = new XMLHttpRequest();
-// request.open("GET", chartFile, false);
-// request.send(null);
-//var jsonData = JSON.parse(request.responseText);
+var searchParams = new URLSearchParams(window.location.search);
+var chartFile = searchParams.get('chart');
+ 
+plotFromFile(chartFile);
 
 //create the main chart
 //for each serie that is in main area
