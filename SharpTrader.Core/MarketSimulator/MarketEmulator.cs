@@ -173,11 +173,10 @@ namespace SharpTrader.MarketSimulator
                 bal = _Balances[ass.QuoteAsset];
                 amount = order.Amount * (decimal)order.Price;
             }
-            if (bal.Free < amount)
-                if (!AllowBorrow || !ass.IsMarginTadingAllowed)
-                {
-                    return (false, "Insufficient balance");
-                }
+            bool canBorrow = (AllowBorrow && ass.IsMarginTadingAllowed);
+            if (bal.Free < amount && !canBorrow)
+                return (false, "Insufficient balance");
+
 
             bal.Free -= amount;
             bal.Locked += amount;
@@ -487,7 +486,7 @@ namespace SharpTrader.MarketSimulator
         }
 
         public ISymbolInfo GetSymbolInfo(string symbolKey)
-        { 
+        {
             return SymbolsFeeds[symbolKey].Symbol;
         }
     }
