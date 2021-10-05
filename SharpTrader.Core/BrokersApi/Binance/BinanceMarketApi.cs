@@ -558,8 +558,8 @@ namespace SharpTrader.BrokersApi.Binance
                         AccountUpdateMessageHandler = HandleAccountUpdatedMessage,
                         OrderUpdateMessageHandler = HandleOrderUpdateMsg,
                         TradeUpdateMessageHandler = HandleTradeUpdateMsg,
-                        OutboundAccountPositionHandler = HandleOutboundAccountPosition
-
+                        OutboundAccountPositionHandler = HandleOutboundAccountPosition,
+                        BalanceUpdateMessageHandler = HandleBalanceUpdateMessage
                     });
                 }
             }
@@ -569,6 +569,8 @@ namespace SharpTrader.BrokersApi.Binance
             }
 
         }
+
+
 
         private void CloseUserDataSocket()
         {
@@ -607,6 +609,15 @@ namespace SharpTrader.BrokersApi.Binance
                     this._Balances[bal.Asset].Free = bal.Free;
                     this._Balances[bal.Asset].Locked = bal.Locked;
                 }
+            }
+        }
+        
+        private void HandleBalanceUpdateMessage(BalanceUpdateMessage data)
+        {
+            lock (LockBalances)
+            {
+                if(this._Balances.ContainsKey(data.Asset))
+                    this._Balances[data.Asset].Free += data.Delta;
             }
         }
 
@@ -910,13 +921,13 @@ namespace SharpTrader.BrokersApi.Binance
                             let symInfo = this.GetSymbolInfo(p.Symbol)
                             select
                                 new { symKey = p.Symbol, symbol = symInfo, price = p.Price };
-            var badSymbols = allPrices.Where(p => p.symbol == null).Select(p=>p.symKey);
+            var badSymbols = allPrices.Where(p => p.symbol == null).Select(p => p.symKey);
             allPrices = allPrices.Where(p => p.symbol != null);
 
-            if(badSymbols.Any()) 
+            if (badSymbols.Any())
                 Logger.Warn("It was not possible to find symbol info for {0}.", string.Join(", ", badSymbols));
-            
-             
+
+
 
             //calculate the value of target asset compared to BTC
             decimal btcToFinal = 1;
