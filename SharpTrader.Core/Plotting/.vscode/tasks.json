@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "wpk",
+			"problemMatcher": [],
+			"label": "npm: wpk",
+			"detail": "webpack",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		}
+	]
+}
