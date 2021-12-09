@@ -19,7 +19,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         NLog.Logger Logger = NLog.LogManager.GetLogger("BinanceTradeBarsRepository");
         private BinanceClient Client;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
-        private readonly string MarketName = "Binance";
+ 
         private SemaphoreSlim DownloadCandlesSemaphore;
         public int ConcurrencyCount { get; set; } = 10;
 
