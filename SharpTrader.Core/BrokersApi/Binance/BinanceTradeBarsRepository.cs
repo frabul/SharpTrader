@@ -19,7 +19,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         NLog.Logger Logger = NLog.LogManager.GetLogger("BinanceTradeBarsRepository");
         private BinanceClient Client;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
- 
+
         private SemaphoreSlim DownloadCandlesSemaphore;
         public int ConcurrencyCount { get; set; } = 10;
 
@@ -153,7 +153,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
 
                         allCandles.AddRange(batch);
 
-                        //if we get no data for more than 3 requests then we can assume that there isn't any more data
+                        //if we get no data for at least 2 requests then we can assume that there isn't any more data
                         if (batch.Count < 1)
                             zeroCount++;
                         else
@@ -175,15 +175,10 @@ namespace SharpTrader.Core.BrokersApi.Binance
                         startTime = new DateTime((allCandles[allCandles.Count - 1].CloseTime.AddSeconds(1)).Ticks, DateTimeKind.Utc);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-
+                Logger.Error("Fatal error during download of {0} klines: {1}", symbol, ex.Message);
             }
-            finally
-            {
-            }
-
-
             return allCandles;
         }
 
