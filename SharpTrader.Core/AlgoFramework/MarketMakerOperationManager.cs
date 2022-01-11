@@ -12,10 +12,7 @@ namespace SharpTrader.AlgoFramework
 {
     public class MarketMakerOperationManager : OperationManager
     {
-        //todo - merge operations?
-        //todo after each action we should give 10 seconds delay before perfoming a new order so we get updates 
-        //todo avoid problems due to unsynched info about trades
-        //todo ogni volta che viene cancellato un ordine si deve aspettare del tempo prima di crearne uno nuovo
+        //todo after each action we should give 10 seconds delay before perfoming a new order so we get updates
         NLog.Logger Logger;
         public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(15);
         public TimeSpan DelayAfterCloseFailed = TimeSpan.FromSeconds(60);
@@ -238,7 +235,7 @@ namespace SharpTrader.AlgoFramework
 
         private async Task<bool> CloseOrdersAndLiquidate(DeferredTask self)
         {
-            //todo se questo expire accade in contemporanea con un trade generato da exit order abbiamo un problema di corsa critica...
+            //se questo expire accade in contemporanea con un trade generato da exit order abbiamo un problema di corsa critica...
             //     quindi per prima cosa cancelliamo ordine, poi controlliamo il filled di tutti gli ordini, dopo 1 minuto liquidiamo
             var entryClosed = await CloseEntryOrder(self.Op, self.myOpData);
             var exitClosed = await CloseExitOrder(self.Op, self.myOpData);
