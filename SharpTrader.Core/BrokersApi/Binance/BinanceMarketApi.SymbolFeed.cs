@@ -14,6 +14,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
+using System.Collections.Concurrent;
 
 namespace SharpTrader.BrokersApi.Binance
 {
@@ -33,6 +34,10 @@ namespace SharpTrader.BrokersApi.Binance
         private static Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private SymbolHistoryId HistoryId;
         private Candlestick LastFullCandle = new Candlestick();
+        private ConcurrentQueue<BinanceKlineData> KlinesReceived = new ConcurrentQueue<BinanceKlineData>();
+        private ConcurrentQueue<BinancePartialData> PartialDepthsReceived = new ConcurrentQueue<BinancePartialData>();
+
+
 
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
         public BinanceSymbolInfo Symbol { get; private set; }
@@ -43,6 +48,8 @@ namespace SharpTrader.BrokersApi.Binance
         public double Spread { get; set; }
         public double Volume24H { get; private set; }
         public bool Disposed { get; private set; }
+
+
 
         public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, BinanceTradeBarsRepository hist, string market, BinanceSymbolInfo symbol, DateTime timeNow)
         {
@@ -93,7 +100,7 @@ namespace SharpTrader.BrokersApi.Binance
                         }
                         KlineListen();
                     }
-                    if (DepthWatchdog.Elapsed > TimeSpan.FromSeconds(120))
+                    if (DepthWatchdog.Elapsed > TimeSpan.FromSeconds(240))
                     {
                         DepthWatchdog.Restart();
                         if (DateTime.Now > LastDepthWarn.AddSeconds(90))
@@ -103,13 +110,15 @@ namespace SharpTrader.BrokersApi.Binance
                         }
                         PartialDepthListen();
                     }
-
                 }
                 catch
                 {
 
                 }
-                await Task.Delay(2500);
+
+                DigestPartialDepthMessageQueue();
+                DigestKlineMessageQueue();
+                await Task.Delay(50);
             }
 
         }
@@ -142,74 +151,104 @@ namespace SharpTrader.BrokersApi.Binance
         private void HandlePartialDepthUpdate(BinancePartialData messageData)
         {
             DepthWatchdog.Restart();
-
-            var bid = messageData.Bids.FirstOrDefault(b => b.Quantity > 0);
-            var ask = messageData.Asks.FirstOrDefault(a => a.Quantity > 0);
-
-            if (ask != null)
-                Ask = (double)ask.Price;
-            else
-                Ask = float.MaxValue;
-            if (bid != null)
-                Bid = (double)bid.Price;
-            else
-                Bid = 0;
-            Spread = Ask - Bid;
-
-            this.Time = messageData.EventTime;
+            PartialDepthsReceived.Enqueue(messageData);
         }
 
         private void HandleKlineEvent(BinanceKlineData msg)
         {
             KlineWatchdog.Restart();
-            TimeSpan resolution = TimeSpan.FromMinutes(1);
-            this.Time = msg.EventTime;
-            List<Candlestick> CandlesToAdd = new List<Candlestick>(10);
-            var kline = msg.Kline;
-
-            //check if there could be a gap
-            if (!LastFullCandle.IsDefault() && FormingCandle != null && kline.StartTime > FormingCandle.StartTime)
-            {
-                if (FormingCandle.StartTime > LastFullCandle.OpenTime)
-                {
-                    //there is a gap
-                    var forming = KlineToCandlestick(FormingCandle);
-                    CandlesToAdd.Add(forming);
-                    DateTime time = FormingCandle.StartTime + resolution;
-                    while (time < kline.StartTime)
-                    {
-                        var filler = new Candlestick(forming);
-                        filler.Open = filler.Close;
-                        filler.High = filler.Close;
-                        filler.Low = filler.Close;
-                        CandlesToAdd.Add(filler);
-                        time = time + resolution;
-                    }
-                    Logger.Warn("{0:HH.mm.ss} - {1} symbol feed - found gap in kline events, {2} missing\n arrived now {3:HH.mm.ss} - forming {4:HH.mm.ss}",
-                        time,
-                        Symbol.Key,
-                        CandlesToAdd.Count,
-                        kline.StartTime, forming.OpenTime);
-                }
-            }
-
-            if (msg.Kline.IsBarFinal)
-            {
-                LastFullCandle = KlineToCandlestick(msg.Kline);
-                this.OnData?.Invoke(this, LastFullCandle);
-                CandlesToAdd.Add(LastFullCandle);
-            }
-            if (CandlesToAdd.Count > 0)
-                HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
-            foreach (var c in CandlesToAdd)
-            {
-                LastFullCandle = c;
-                this.OnData?.Invoke(this, c);
-            }
-
-
-            FormingCandle = msg.Kline;
+            KlinesReceived.Enqueue(msg);
         }
+
+        private void DigestPartialDepthMessageQueue()
+        {
+            while (PartialDepthsReceived.TryDequeue(out BinancePartialData messageData))
+            {
+                var bid = messageData.Bids.FirstOrDefault(b => b.Quantity > 0);
+                var ask = messageData.Asks.FirstOrDefault(a => a.Quantity > 0);
+
+                if (ask != null)
+                    Ask = (double)ask.Price;
+                else
+                    Ask = float.MaxValue;
+                if (bid != null)
+                    Bid = (double)bid.Price;
+                else
+                    Bid = 0;
+                Spread = Ask - Bid;
+
+                this.Time = messageData.EventTime;
+            }
+        }
+
+        private void DigestKlineMessageQueue()
+        {
+            while (KlinesReceived.TryDequeue(out BinanceKlineData msg))
+            {
+                TimeSpan resolution = TimeSpan.FromMinutes(1);
+                this.Time = msg.EventTime;
+                List<Candlestick> CandlesToAdd = new List<Candlestick>(10);
+                var kline = msg.Kline;
+                //trace final bar 
+                if (msg.Kline.Symbol == "ALPHABTC")
+                {
+                    Logger.Trace("Kline update ({0} - {2}) arrived at {1:HH.mm.ss} ",
+                        msg.Symbol,
+                        DateTime.UtcNow,
+                        msg.Kline.EndTime);
+                }
+                if (msg.Kline.IsBarFinal)
+                    Logger.Trace("Final bar ({0} - {2}) arrived at {1:HH.mm.ss} ",
+                        msg.Symbol,
+                        DateTime.UtcNow,
+                        msg.Kline.EndTime);
+
+                //check if there could be a gap
+                if (!LastFullCandle.IsDefault() && FormingCandle != null && kline.StartTime > FormingCandle.StartTime)
+                {
+                    //if the forming candle was not completed ( and added )
+                    if (FormingCandle.StartTime > LastFullCandle.OpenTime)
+                    {
+                        //there is a gap 
+                        Logger.Warn("{0:HH.mm.ss} - {1} - found gap in kline events", DateTime.UtcNow, Symbol.Key);
+
+                        var filler = KlineToCandlestick(FormingCandle);
+                        CandlesToAdd.Add(filler);
+                        Logger.Trace("SymbolFeed - {0} - adding filler candle {1}", Symbol.Key, filler.CloseTime);
+                        while (filler.CloseTime < kline.StartTime)
+                        {
+                            filler = new Candlestick(
+                                filler.CloseTime,
+                                filler.CloseTime + resolution,
+                                filler.Close,
+                                filler.Close,
+                                filler.Close,
+                                filler.Close,
+                                0
+                            );
+                            CandlesToAdd.Add(filler);
+                            Logger.Trace("SymbolFeed - {0} - adding filler candle {1}", Symbol.Key, filler.CloseTime);
+                        }
+                    }
+                }
+
+                if (msg.Kline.IsBarFinal)
+                {
+                    LastFullCandle = KlineToCandlestick(msg.Kline);
+                    CandlesToAdd.Add(LastFullCandle);
+                }
+                if (CandlesToAdd.Count > 0)
+                    HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
+                foreach (var c in CandlesToAdd)
+                {
+                    LastFullCandle = c;
+                    this.OnData?.Invoke(this, c);
+                }
+
+                FormingCandle = msg.Kline;
+            }
+        }
+
         private static Candlestick KlineToCandlestick(BinanceKline kline)
         {
             return new Candlestick()
