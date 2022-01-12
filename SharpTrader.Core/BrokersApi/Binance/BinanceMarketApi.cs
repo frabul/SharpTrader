@@ -611,12 +611,12 @@ namespace SharpTrader.BrokersApi.Binance
                 }
             }
         }
-        
+
         private void HandleBalanceUpdateMessage(BalanceUpdateMessage data)
         {
             lock (LockBalances)
             {
-                if(this._Balances.ContainsKey(data.Asset))
+                if (this._Balances.ContainsKey(data.Asset))
                     this._Balances[data.Asset].Free += data.Delta;
             }
         }
@@ -1022,19 +1022,27 @@ namespace SharpTrader.BrokersApi.Binance
                 }
 
             }
+            feed.Users++;
             return feed;
         }
 
         public void DisposeFeed(ISymbolFeed f)
         {
-            lock (LockBalances)
+            // we cannot dispose the feed because we share one feed with many users so we need to 
+            //     to implement a counter that checks how many users remain
+            if (f is SymbolFeed feed)
             {
-                if (f is SymbolFeed feed && Feeds.Contains(feed))
+                feed.Users--;
+                if (feed.Users <= 0)
                 {
-                    Feeds.Remove(feed);
-                    feed.Dispose();
-                }
-            }
+                    lock (LockBalances)
+                    {
+                        if (Feeds.Contains(feed))
+                            Feeds.Remove(feed); 
+                        feed.Dispose();
+                    }
+                } 
+            } 
         }
 
         public async Task<IRequest<IOrder>> PostNewOrder(OrderInfo orderInfo)
