@@ -36,6 +36,7 @@ namespace SharpTrader.AlgoFramework
         private HashSet<Operation> _ActiveOperations = new HashSet<Operation>();
         private HashSet<Operation> _ClosedOperations = new HashSet<Operation>();
         private NLog.Logger Logger = NLog.LogManager.GetLogger("TradingAlgo");
+        private NLog.Logger SymbolsFilterLogger = NLog.LogManager.GetLogger("TradingAlgo.SymbolsFilter");
         private Configuration Config;
         private object WorkingSliceLock = new object();
         private bool EntriesStopppedByStrategy = false;
@@ -120,6 +121,14 @@ namespace SharpTrader.AlgoFramework
             var changes = await SymbolsFilter.UpdateAsync(slice);
             if (changes != SelectedSymbolsChanges.None)
             {
+                var added_str = string.Join(", ", changes.AddedSymbols.Select(s => s.Key));
+                var removed_str = string.Join(", ", changes.RemovedSymbols.Select(s => s.Key));
+                var all_selected = string.Join(", ", SymbolsFilter.SymbolsSelected.Select(s => s.Key));
+                SymbolsFilterLogger.Trace("Changes in symbols selected\n" +
+                    "   added: {0}\n" +
+                    "   removed: {1}\n" +
+                    "   selected: {2}\n", added_str, removed_str, all_selected);
+
                 var selectedForOperationsActive = this.ActiveOperations.Select(ao => ao.Symbol).GroupBy(ao => ao.Key).Select(g => g.First()).ToList();
                 //release feeds of unused symbols 
                 foreach (var sym in changes.RemovedSymbols)
