@@ -1,5 +1,4 @@
-﻿using IBApi;
-using System;
+﻿using System;
 using System.Linq;
 
 namespace SharpTrader.Storage
