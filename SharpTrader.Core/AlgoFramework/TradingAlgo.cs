@@ -223,7 +223,7 @@ namespace SharpTrader.AlgoFramework
 
             // get signals 
             if (Sentry != null)
-                Sentry.UpdateAsync(slice);
+                await Sentry.UpdateAsync(slice);
 
             //create operations
             if (Allocator != null)
