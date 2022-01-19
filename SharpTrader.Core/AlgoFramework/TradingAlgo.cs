@@ -103,14 +103,20 @@ namespace SharpTrader.AlgoFramework
 
         public override async Task OnStartAsync()
         {
+            Logger.Info($"{this.Name}: initializing.");
             await this.Initialize();
+            Logger.Info($"{this.Name}: initializing SymbolsFilter.");
             await SymbolsFilter.Initialize(this);
+            Logger.Info($"{this.Name}: initializing sentry.");
             if (Sentry != null)
                 await Sentry.Initialize(this);
+            Logger.Info($"{this.Name}: initializing allocator.");
             if (Allocator != null)
                 await Allocator.Initialize(this);
+            Logger.Info($"{this.Name}: initializing Executor.");
             if (Executor != null)
                 await Executor.Initialize(this);
+            Logger.Info($"{this.Name}: initializing RiskManager.");
             if (RiskManager != null)
                 await RiskManager.Initialize(this);
         }
