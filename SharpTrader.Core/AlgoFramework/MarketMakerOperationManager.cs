@@ -76,7 +76,7 @@ namespace SharpTrader.AlgoFramework
         }
         public decimal EntryDistantThreshold { get; private set; }
         public decimal EntryNearThreshold { get; private set; }
-
+        private Random rand = new Random();
         public MarketMakerOperationManager(decimal entryDistantThreshold, decimal entryNearThreshold)
         {
             Logger = NLog.LogManager.GetLogger(nameof(MarketMakerOperationManager));
@@ -96,7 +96,7 @@ namespace SharpTrader.AlgoFramework
 
         public override async Task Update(TimeSlice slice)
         {
-            Random rand = new Random();
+
             var symbols = Algo.SymbolsData.Values.OrderBy(el => rand.NextDouble()).ToArray();
             //randomize the order of completion
             foreach (var symSlice in symbols)
@@ -111,8 +111,13 @@ namespace SharpTrader.AlgoFramework
                     Logger.Error("Exception during MarketMakerOperationManager.Update: {0}, symbol {1}", ex.Message, symSlice.Symbol.Key);
                 }
             }
+        }
 
-
+        protected override Task OnInitialize()
+        {
+            if (Algo.BackTesting)
+                this.rand = new Random(123);
+            return Task.CompletedTask;
         }
 
         public override decimal GetInvestedOrLockedAmount(ISymbolInfo symbol, string asset)

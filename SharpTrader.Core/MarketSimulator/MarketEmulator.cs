@@ -57,7 +57,7 @@ namespace SharpTrader.MarketSimulator
                 var text = System.IO.File.ReadAllText(Path.Combine(dataDir, name + "SymbolsTable.json"));
                 SymbolsTable = JsonConvert.DeserializeObject<SymbolsTable>(text);
                 //set all symbols trading
-                foreach(var sym in SymbolsTable.Values)
+                foreach (var sym in SymbolsTable.Values)
                     sym.IsTradingEnabled = true;
             }
             catch (Exception ex)
@@ -182,13 +182,15 @@ namespace SharpTrader.MarketSimulator
 
         public decimal GetFreeBalance(string asset)
         {
-            _Balances.TryGetValue(asset, out var res);
-            return res.Free;
+            if (_Balances.TryGetValue(asset, out var res))
+                return res.Free;
+            return 0;
         }
         public decimal GetTotalBalance(string asset)
         {
-            _Balances.TryGetValue(asset, out var res);
-            return res.Total;
+            if (_Balances.TryGetValue(asset, out var res))
+                return res.Total;
+            return 0;
         }
 
         public (string Symbol, AssetBalance bal)[] Balances => _Balances.Select(kv => (kv.Key, kv.Value)).ToArray();
