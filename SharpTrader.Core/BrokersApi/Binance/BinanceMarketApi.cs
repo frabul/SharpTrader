@@ -113,7 +113,7 @@ namespace SharpTrader.BrokersApi.Binance
         {
             var exchangeInfo = await Client.GetExchangeInfo();
             //---- initialize symbols dictionary ---
-            foreach (var binanceSymbol in exchangeInfo.Symbols)
+            foreach (var binanceSymbol in exchangeInfo.Symbols.OrderBy(s => s.symbol))
             {
                 BinanceSymbolInfo symInfo = new BinanceSymbolInfo(binanceSymbol);
 
@@ -1038,11 +1038,11 @@ namespace SharpTrader.BrokersApi.Binance
                     lock (LockBalances)
                     {
                         if (Feeds.Contains(feed))
-                            Feeds.Remove(feed); 
+                            Feeds.Remove(feed);
                         feed.Dispose();
                     }
-                } 
-            } 
+                }
+            }
         }
 
         public async Task<IRequest<IOrder>> PostNewOrder(OrderInfo orderInfo)
