@@ -334,10 +334,25 @@ namespace SharpTrader.AlgoFramework
         {
             if (_Entries.Count > 0 && _Exits.Count > 0)
             {
-                var amout = from e in _Entries.Concat(_Exits)
-                            let dir = e.Direction == TradeDirection.Buy ? -1 : 1 //if we buy then amount is spent, if we sell it's gained
-                            select dir * e.Amount * e.Price - (e.Amount * e.Price) * fee_ratio;
-                var total = amout.Sum();
+                //this is an estimation
+                // we use only amount invested because the liquidated amount is affected by fees paid but we are already
+                // considering fees estimated in our calculation
+                decimal spent, recovered, fee;
+                if (Type == OperationType.BuyThenSell)
+                {
+                    spent = AmountInvested * AverageEntryPrice;
+                    recovered = AmountInvested * AverageExitPrice;
+
+                }
+                else
+                {
+                    recovered = AmountInvested * AverageEntryPrice;
+                    spent = AmountInvested * AverageExitPrice;
+
+                }
+
+                fee = (spent + recovered) * fee_ratio;
+                var total = recovered - spent - fee;
                 return total;
             }
             return 0;
