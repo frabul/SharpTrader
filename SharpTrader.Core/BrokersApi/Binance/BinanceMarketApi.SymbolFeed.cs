@@ -30,14 +30,15 @@ namespace SharpTrader.BrokersApi.Binance
         private Stopwatch DepthWatchdog = new Stopwatch();
         private DateTime LastKlineWarn = DateTime.Now;
         private DateTime LastDepthWarn = DateTime.Now;
-        private BinanceKline FormingCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
+
         private static Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private SymbolHistoryId HistoryId;
-        private Candlestick LastFullCandle = new Candlestick();
+
         private ConcurrentQueue<BinanceKlineData> KlinesReceived = new ConcurrentQueue<BinanceKlineData>();
         private ConcurrentQueue<BinancePartialData> PartialDepthsReceived = new ConcurrentQueue<BinancePartialData>();
 
-
+        private Candlestick FormingCandle = new Candlestick();
+        private Candlestick LastEmittedCandled = new Candlestick();
 
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
         public BinanceSymbolInfo Symbol { get; private set; }
@@ -182,69 +183,80 @@ namespace SharpTrader.BrokersApi.Binance
 
         private void DigestKlineMessageQueue()
         {
+            bool is_different(decimal a, double b) => (a - (decimal)b) / a > 0.0001m;
+            decimal diff(decimal a, double b) => (a - (decimal)b) / a;
+            TimeSpan resolution = TimeSpan.FromMinutes(1);
+            List<Candlestick> CandlesToAdd = new List<Candlestick>(10);
             while (KlinesReceived.TryDequeue(out BinanceKlineData msg))
             {
-                TimeSpan resolution = TimeSpan.FromMinutes(1);
-                this.Time = msg.EventTime;
-                List<Candlestick> CandlesToAdd = new List<Candlestick>(10);
-                var kline = msg.Kline;
-                //trace final bar 
-                if (msg.Kline.Symbol == "ALPHABTC")
+                //we need to check that the received candle is not preceding the last emitted
+                if (msg.Kline.StartTime <= LastEmittedCandled.OpenTime)
                 {
-                    Logger.Trace("Kline update ({0} - {2}) arrived at {1:HH.mm.ss} ",
-                        msg.Symbol,
-                        DateTime.UtcNow,
-                        msg.Kline.EndTime);
+                    if (is_different(msg.Kline.Close, LastEmittedCandled.Close))
+                        Logger.Warn("{0} SymbolFeed: received candle {1} (open) precending last one {2} - diff {3} ",
+                            Symbol.Key,
+                            msg.Kline.StartTime,
+                            LastEmittedCandled.OpenTime,
+                            diff(msg.Kline.Close, LastEmittedCandled.Close)
+                            );
+                    continue;
                 }
+
+                this.Time = msg.EventTime;
+                var candleReceived = KlineToCandlestick(msg.Kline);
+
+                //trace final bar  
                 if (msg.Kline.IsBarFinal)
                     Logger.Trace("Final bar ({0} - {2}) arrived at {1:HH.mm.ss} ",
                         msg.Symbol,
                         DateTime.UtcNow,
                         msg.Kline.EndTime);
 
-                //check if there could be a gap
-                if (!LastFullCandle.IsDefault() && FormingCandle != null && kline.StartTime > FormingCandle.StartTime)
-                {
-                    //if the forming candle was not completed ( and added )
-                    if (FormingCandle.StartTime > LastFullCandle.OpenTime)
-                    {
-                        //there is a gap 
-                        Logger.Warn("{0:HH.mm.ss} - {1} - found gap in kline events", DateTime.UtcNow, Symbol.Key);
 
-                        var filler = KlineToCandlestick(FormingCandle);
-                        CandlesToAdd.Add(filler);
-                        Logger.Trace("SymbolFeed - {0} - adding filler candle {1}", Symbol.Key, filler.CloseTime);
-                        while (filler.CloseTime < kline.StartTime)
-                        {
-                            filler = new Candlestick(
-                                filler.CloseTime,
-                                filler.CloseTime + resolution,
-                                filler.Close,
-                                filler.Close,
-                                filler.Close,
-                                filler.Close,
-                                0
-                            );
-                            CandlesToAdd.Add(filler);
-                            Logger.Trace("SymbolFeed - {0} - adding filler candle {1}", Symbol.Key, filler.CloseTime);
-                        }
-                    }
-                }
+                FormingCandle = candleReceived;
 
+                //emit candle if it is final
                 if (msg.Kline.IsBarFinal)
                 {
-                    LastFullCandle = KlineToCandlestick(msg.Kline);
-                    CandlesToAdd.Add(LastFullCandle);
-                }
-                if (CandlesToAdd.Count > 0)
-                    HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
-                foreach (var c in CandlesToAdd)
-                {
-                    LastFullCandle = c;
-                    this.OnData?.Invoke(this, c);
+
+                    LastEmittedCandled = candleReceived;
+                    CandlesToAdd.Add(LastEmittedCandled);
+                    //the new forming candle is a filler
+                    FormingCandle = new Candlestick(
+                                LastEmittedCandled.CloseTime,
+                                LastEmittedCandled.CloseTime + resolution,
+                                LastEmittedCandled.Close,
+                                LastEmittedCandled.Close,
+                                LastEmittedCandled.Close,
+                                LastEmittedCandled.Close,
+                                0
+                            );
                 }
 
-                FormingCandle = msg.Kline;
+            }
+            //instad of waiting for the candle we just emit forming candle  
+            if (!LastEmittedCandled.IsDefault())
+                if (DateTime.UtcNow > LastEmittedCandled.Time.AddSeconds(3.5) + resolution)
+                {
+                    Logger.Debug("{0} SymbolFeed: emitting forming candle ", Symbol.Key);
+                    this.Time = DateTime.UtcNow;
+                    LastEmittedCandled = FormingCandle;
+                    CandlesToAdd.Add(LastEmittedCandled);
+                    FormingCandle = new Candlestick(
+                                    LastEmittedCandled.CloseTime,
+                                    LastEmittedCandled.CloseTime + resolution,
+                                    LastEmittedCandled.Close,
+                                    LastEmittedCandled.Close,
+                                    LastEmittedCandled.Close,
+                                    LastEmittedCandled.Close,
+                                    0
+                                );
+                }
+            if (CandlesToAdd.Count > 0)
+                HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
+            foreach (var c in CandlesToAdd)
+            {
+                this.OnData?.Invoke(this, c);
             }
         }
 
