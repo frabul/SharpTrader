@@ -35,8 +35,8 @@ namespace SharpTrader.AlgoFramework
         private TimeSlice OldSlice = new TimeSlice();
         private HashSet<Operation> _ActiveOperations = new HashSet<Operation>();
         private HashSet<Operation> _ClosedOperations = new HashSet<Operation>();
-        private NLog.Logger Logger = NLog.LogManager.GetLogger("TradingAlgo");
-        private NLog.Logger SymbolsFilterLogger = NLog.LogManager.GetLogger("TradingAlgo.SymbolsFilter");
+        private Serilog.ILogger Logger  ;
+        private Serilog.ILogger SymbolsFilterLogger = Serilog.Log.ForContext("SourceContext","TradingAlgo.SymbolsFilter");
         private Configuration Config;
         private object WorkingSliceLock = new object();
         private bool EntriesStopppedByStrategy = false;
@@ -62,10 +62,16 @@ namespace SharpTrader.AlgoFramework
 
         public TradingAlgo(IMarketApi marketApi, Configuration config)
         {
+           
+
             Config = config;
             Market = marketApi;
             Market.OnNewTrade += Market_OnNewTrade;
             this.DoMarginTrading = config.MarginTrading;
+            Logger = Serilog.Log
+               .ForContext("SourceContext", "TradingAlgo")
+               .ForContext("AlgoName", this.Name)
+               ;
         }
 
         public async Task Initialize()
@@ -86,11 +92,11 @@ namespace SharpTrader.AlgoFramework
                         if (SymbolsData.ContainsKey(trade.Symbol))
                             this.WorkingSlice.Add(SymbolsData[trade.Symbol].Symbol, trade);
                         else
-                            Logger.Error($"{Name} - Symbol data not found for trade {trade} during initialize.");
+                            Logger.Error("Symbol data not found for trade during initialize. {Trade}", trade);
                 }
                 else
                 {
-                    Logger.Error("{0} - GetLastTrades failed during initialize", Name);
+                    Logger.Error("GetLastTrades failed during initialize.");
                 }
             }
             //call on initialize
@@ -103,20 +109,20 @@ namespace SharpTrader.AlgoFramework
 
         public override async Task OnStartAsync()
         {
-            Logger.Info($"{this.Name}: initializing.");
+            Logger.Debug($"{this.Name}: initializing.");
             await this.Initialize();
-            Logger.Info($"{this.Name}: initializing SymbolsFilter.");
+            Logger.Debug($"{this.Name}: initializing SymbolsFilter.");
             await SymbolsFilter.Initialize(this);
-            Logger.Info($"{this.Name}: initializing sentry.");
+            Logger.Debug($"{this.Name}: initializing sentry.");
             if (Sentry != null)
                 await Sentry.Initialize(this);
-            Logger.Info($"{this.Name}: initializing allocator.");
+            Logger.Debug($"{this.Name}: initializing allocator.");
             if (Allocator != null)
                 await Allocator.Initialize(this);
-            Logger.Info($"{this.Name}: initializing Executor.");
+            Logger.Debug($"{this.Name}: initializing Executor.");
             if (Executor != null)
                 await Executor.Initialize(this);
-            Logger.Info($"{this.Name}: initializing RiskManager.");
+            Logger.Debug($"{this.Name}: initializing RiskManager.");
             if (RiskManager != null)
                 await RiskManager.Initialize(this);
         }

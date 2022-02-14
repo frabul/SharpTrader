@@ -26,7 +26,7 @@ namespace SharpTrader
         private string SpaceFile => $"OptimizationSapce_{SessionName}.json";
 
         private OptimizerSession Session;
-        private NLog.Logger Logger;
+        private Serilog.ILogger Logger;
         private OptimizationSpace BaseSpace;
 
         public Configuration Config { get; }
@@ -51,7 +51,7 @@ namespace SharpTrader
 
         public void Start()
         {
-            Logger = NLog.LogManager.GetLogger($"Optimizer_{SessionName}");
+            Logger = Serilog.Log.ForContext("SourceContext",$"Optimizer_{SessionName}");
             Logger.Info($"Starting optimization session: {SessionName}");
             HistoryDB = new TradeBarsRepository(Config.BacktesterConfig.HistoryDb);
             for (int i = Session.Lastexecuted + 1; i < BaseSpace.Configurations.Count; i++)

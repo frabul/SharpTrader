@@ -47,7 +47,7 @@ namespace SharpTrader.BrokersApi.Binance
         private BinanceWebSocketClient WSClient;
         private CombinedWebSocketClient CombinedWebSocketClient;
 
-        private NLog.Logger Logger;
+        private Serilog.ILogger Logger;
         private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
         private System.Timers.Timer TimerListenUserData;
         private LiteDatabase TradesAndOrdersArch;

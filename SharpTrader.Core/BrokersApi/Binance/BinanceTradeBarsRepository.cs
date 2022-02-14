@@ -16,14 +16,14 @@ namespace SharpTrader.Core.BrokersApi.Binance
 {
     public class BinanceTradeBarsRepository : TradeBarsRepository
     {
-        NLog.Logger Logger = NLog.LogManager.GetLogger("BinanceTradeBarsRepository");
+        Serilog.ILogger Logger = Serilog.Log.ForContext("SourceContext", "BinanceTradeBarsRepository");
         private BinanceClient Client;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
 
         private SemaphoreSlim DownloadCandlesSemaphore;
         public int ConcurrencyCount { get; set; } = 10;
 
-        public BinanceTradeBarsRepository(string dataDir, BinanceClient cli, ChunkFileVersion cv = ChunkFileVersion.V3, ChunkSpan chunkSpan = ChunkSpan.OneDay) : base(dataDir,cv, chunkSpan)
+        public BinanceTradeBarsRepository(string dataDir, BinanceClient cli, ChunkFileVersion cv = ChunkFileVersion.V3, ChunkSpan chunkSpan = ChunkSpan.OneDay) : base(dataDir, cv, chunkSpan)
         {
             Client = cli;
             DownloadCandlesSemaphore = new SemaphoreSlim(ConcurrencyCount, ConcurrencyCount);
@@ -80,11 +80,11 @@ namespace SharpTrader.Core.BrokersApi.Binance
                 DateTime checkTime = fromTime;
                 while (checkTime < toTime)
                 {
-                    void ReportAssure()
+                    void ReportAssure(DateTime holeEndTime)
                     {
                         if (!reported)
-                            Logger.Info($"Assuring data for {histInfo.Symbol} from {fromTime:yyyyMMdd HH:mm} to {toTime:yyyyMMdd HH:mm}");
-                        Logger.Debug($"Hole found in {histInfo.Symbol} history from {checkTime} to {oldTicks.Time}.");
+                            Logger.Information("Assuring data for {Symbol} from {FromTime:yyyyMMdd HH:mm} to {ToTime:yyyyMMdd HH:mm}.", histInfo.Symbol, fromTime, toTime);
+                        Logger.Debug("{Symbol} - Hole found in history from {FromTime} to {ToTime}.", histInfo.Symbol, checkTime, holeEndTime);
                         reported = true;
                     }
 
@@ -92,9 +92,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                     {
                         if (oldTicks.Time - checkTime > histInfo.Resolution)
                         {
-                            ReportAssure();
-
-
+                            ReportAssure(oldTicks.Current.CloseTime);
                             var candles = await DownloadCandles(histInfo.Symbol, checkTime, oldTicks.Current.CloseTime);
                             this.AddCandlesticks(histInfo, candles);
                         }
@@ -104,7 +102,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                     {
                         if (oldTicks.Count < 1 || oldTicks.Current.CloseTime < checkTime)
                         {
-                            ReportAssure();
+                            ReportAssure(toTime);
                             //there isn't any other tick, all remaining data needs to be downloaded 
                             var candles = await DownloadCandles(histInfo.Symbol, checkTime, toTime);
                             this.AddCandlesticks(histInfo, candles);
@@ -117,7 +115,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Fatal Exception while download history for symbol {0}: {1}", histInfo.Symbol, ex.Message);
+                Logger.Error(ex, "{Symbol} - Fatal Exception while download history", histInfo.Symbol);
             }
             finally
             {
@@ -129,7 +127,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
 
         private async Task<List<Candlestick>> DownloadCandles(string symbol, DateTime startTime, DateTime endTime)
         {
-            Logger.Debug($"Downloading candles for {symbol} from {startTime} to {endTime}");
+            Logger.Debug("{Symbol} - Downloading candles for  from {FromTime} to {ToTime}", symbol, startTime, endTime);
             List<Candlestick> allCandles = new List<SharpTrader.Candlestick>();
             try
             {
@@ -177,7 +175,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Fatal error during download of {0} klines: {1}", symbol, ex.Message);
+                Logger.Error(ex, "{Symbol} - Fatal error during download of klines ", symbol);
             }
             return allCandles;
         }
