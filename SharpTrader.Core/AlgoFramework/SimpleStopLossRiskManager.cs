@@ -27,12 +27,12 @@ namespace SharpTrader.AlgoFramework
         private Serilog.ILogger Logger;
         public SimpleStopLossRiskManager(decimal stopLoss)
         {
-            Logger = Serilog.Log.ForContext("SourceContext", "SimpleStopLossRiskManager");
             StopLoss = stopLoss;
         }
 
         protected override Task OnInitialize()
         {
+            Logger = Algo.Logger.ForContext<SimpleStopLossRiskManager>();
             return Task.CompletedTask;
         }
 
@@ -111,7 +111,7 @@ namespace SharpTrader.AlgoFramework
                             }
                             if (myData.LiquidationTries > 50)
                             {
-                                logger.Information($"Scheduling operation for close as it reached maximum number of liquidation tries.");
+                                logger.Information("Scheduling operation for close as it reached maximum number of liquidation tries.");
                                 op.ScheduleClose(Algo.Time.AddMinutes(1));
                             }
                         }

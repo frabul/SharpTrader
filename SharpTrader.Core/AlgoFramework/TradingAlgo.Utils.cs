@@ -16,16 +16,16 @@ namespace SharpTrader.AlgoFramework
                 var feed = await Market.GetSymbolFeedAsync(symbolKey);
                 if (feed == null)
                 {
-                    Logger.Error($"Error while selling {symbolKey}: symbol not found.");
+                    Logger.Error("{Symbol} - symbol feed not found while selling", symbolKey);
                     return;
                 }
                 var amount = Market.GetFreeBalance(feed.Symbol.Asset);
                 var adj = feed.GetOrderAmountAndPriceRoundedDown(amount, (decimal)feed.Bid);
-                Logger.Info($"Try selling {adj.amount} {symbolKey } @ {adj.price} because {reason}.");
+
                 if (adj.amount > 0)
                 {
-                    //immediatly liquidate everything with a market order 
-
+                    Logger.Information("Try selling {Amount} {Symbol} @ {Price} because {Reason}.", adj.amount, symbolKey, adj.price, reason);
+                    //immediatly liquidate everything with a market order  
                     var orderInfo = new OrderInfo()
                     {
                         Symbol = symbolKey,
@@ -38,17 +38,17 @@ namespace SharpTrader.AlgoFramework
                     var request = await Market.PostNewOrder(orderInfo);
                     if (!request.IsSuccessful)
                     {
-                        Logger.Info($"Error while selling {adj.amount} {symbolKey } @ {adj.price}.");
+                        Logger.Error("Error while selling {Amount} {Symbol} @ {Price}: {ErrInfo}.", adj.amount, symbolKey, adj.price, request.ErrorInfo);
                     }
                 }
                 else
                 {
-                    Logger.Error($"Unable to sell {symbolKey } because amount ( {amount} ) is too low");
+                    Logger.Error("Unable to sell {Symbol} because amount ( {Amount} ) is too low", symbolKey, amount);
                 }
             }
             catch (Exception ex)
             {
-                Logger.Error($"Error during try sell {symbolKey}: {ex.Message}");
+                Logger.Error(ex, "Error during try sell {Symbol}: {Message}", symbolKey, ex.Message);
             }
 
         }
@@ -58,13 +58,12 @@ namespace SharpTrader.AlgoFramework
             var logger = Logger.ForContext("Operation", op, true);
             (IOrder order, bool amountRemainingLow, bool OrderError) result = default;
             await Executor.CancelAllOrders(op);
-            logger.Information("Liquidating operation {@Operation}, because {Reason}", reason);
+            logger.Information("Liquidating operation {@Operation}, because {Reason}", op, reason);
             if (op.AmountRemaining < 0)
             {
                 logger.Warning("Liquidation requested but AmountRemaining < 0");
                 return result;
             }
-
 
             var symData = this.GetSymbolData(op.Symbol);
             var adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, (decimal)symData.Feed.Bid);
@@ -72,14 +71,14 @@ namespace SharpTrader.AlgoFramework
             if (adj.amount <= 0)
             {
                 result.amountRemainingLow = true;
-                logger.Warning($"Unable to liquidate operation because amount remaining is too low");
+                logger.Warning("Unable to liquidate operation because amount remaining is too low");
                 return result;
             }
 
             adj = ClampOrderAmount(symData, op.ExitTradeDirection, adj);
             if (adj.amount <= 0)
             {
-                logger.Warning($"Unable to liquidate operation because not enough free balance");
+                logger.Warning("Unable to liquidate operation because not enough free balance");
                 return result;
             }
 
@@ -102,7 +101,7 @@ namespace SharpTrader.AlgoFramework
             {
                 result.OrderError = true;
                 logger.Error("Error executing market order, {@OrderInfo}, because {Reason} ", orderInfo, request.ErrorInfo);
-            } 
+            }
             return result;
         }
 

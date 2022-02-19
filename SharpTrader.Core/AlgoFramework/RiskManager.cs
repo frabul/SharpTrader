@@ -7,6 +7,10 @@ namespace SharpTrader.AlgoFramework
 {
     public abstract class RiskManager : IObjectSerializationProvider
     {
+        public RiskManager()
+        {
+
+        }
         public TradingAlgo Algo { get; private set; }
         protected abstract Task OnInitialize();
         public virtual void OnSymbolsChanged(SelectedSymbolsChanges changes) { }

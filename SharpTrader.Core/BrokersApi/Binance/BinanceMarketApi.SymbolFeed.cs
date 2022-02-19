@@ -4,7 +4,6 @@ using BinanceExchange.API.Enums;
 using BinanceExchange.API.Models.WebSocket;
 using BinanceExchange.API.Websockets;
 using LiteDB;
-using NLog;
 using SharpTrader.Core.BrokersApi.Binance;
 using SharpTrader.Storage;
 using System;
@@ -59,7 +58,9 @@ namespace SharpTrader.BrokersApi.Binance
             this.Symbol = symbol;
             this.Market = market;
             this.Time = timeNow;
-            Logger = LogManager.GetLogger("Bin" + Symbol + "Feed");
+            Logger = Serilog.Log
+                .ForContext<SymbolFeed>()
+                .ForContext("Symbol", symbol.ToString());
 
             HistoryId = new SymbolHistoryId(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
 
@@ -95,7 +96,7 @@ namespace SharpTrader.BrokersApi.Binance
                         KlineWatchdog.Restart();
                         if (DateTime.Now > LastKlineWarn.AddSeconds(900))
                         {
-                            Logger.Warn("{0} Kline websock looked like frozen", Symbol);
+                            Logger.Warning("{Symbol} Kline websock looked like frozen", Symbol);
                             LastKlineWarn = DateTime.Now;
                         }
                         KlineListen();
@@ -105,7 +106,7 @@ namespace SharpTrader.BrokersApi.Binance
                         DepthWatchdog.Restart();
                         if (DateTime.Now > LastDepthWarn.AddSeconds(90))
                         {
-                            Logger.Warn("{0}Depth websock looked like frozen", Symbol);
+                            Logger.Warning("{Symbol} Depth websock looked like frozen", Symbol);
                             LastDepthWarn = DateTime.Now;
                         }
                         PartialDepthListen();
@@ -131,7 +132,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Exception during KlineListen: " + BinanceMarketApi.GetExceptionErrorInfo(ex));
+                Logger.Error(ex, "Exception during KlineListen: {Message}", BinanceMarketApi.GetExceptionErrorInfo(ex));
             }
         }
 
@@ -143,7 +144,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Exception during PartialDepthListen: " + BinanceMarketApi.GetExceptionErrorInfo(ex));
+                Logger.Error(ex, "Exception during PartialDepthListen: {Message}", BinanceMarketApi.GetExceptionErrorInfo(ex));
             }
 
         }
@@ -193,7 +194,7 @@ namespace SharpTrader.BrokersApi.Binance
                 if (msg.Kline.StartTime <= LastEmittedCandled.OpenTime)
                 {
                     if (is_different(msg.Kline.Close, LastEmittedCandled.Close))
-                        Logger.Warn("{0} SymbolFeed: received candle {1} (open) precending last one {2} - diff {3} ",
+                        Logger.Warning("{Symbol} SymbolFeed: received candle {@NewCandle} precending last one {@PreviousCandle} - diff {Diff} ",
                             Symbol.Key,
                             msg.Kline.StartTime,
                             LastEmittedCandled.OpenTime,
@@ -207,10 +208,10 @@ namespace SharpTrader.BrokersApi.Binance
 
                 //trace final bar  
                 if (msg.Kline.IsBarFinal)
-                    Logger.Trace("Final bar ({0} - {2}) arrived at {1:HH.mm.ss} ",
+                    Logger.Verbose("{Symbol} - Final bar {@Candle} arrived at local system time {Time:HH.mm.ss} ",
                         msg.Symbol,
-                        DateTime.UtcNow,
-                        msg.Kline.EndTime);
+                        msg.Kline,
+                        DateTime.UtcNow);
 
 
                 FormingCandle = candleReceived;
@@ -238,7 +239,7 @@ namespace SharpTrader.BrokersApi.Binance
             if (!LastEmittedCandled.IsDefault())
                 if (DateTime.UtcNow > LastEmittedCandled.Time.AddSeconds(3.5) + resolution)
                 {
-                    Logger.Debug("{0} SymbolFeed: emitting forming candle ", Symbol.Key);
+                    Logger.Verbose("{Symbol} SymbolFeed: emitting forming candle ", Symbol.Key);
                     this.Time = DateTime.UtcNow;
                     LastEmittedCandled = FormingCandle;
                     CandlesToAdd.Add(LastEmittedCandled);
@@ -302,13 +303,13 @@ namespace SharpTrader.BrokersApi.Binance
                     try { history.AddRecord(symbolHistory.Ticks.Current, true); }
                     catch
                     {
-                        Logger.Warn("Bad candle {0} in history {1}", symbolHistory.Ticks.Current.Time, symbolHistory.Symbol);
+                        Logger.Warning("Bad candle {@Candle} in history {@HistoryId}", symbolHistory.Ticks.Current, HistoryId);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Logger.Error("Exception during SymbolFeed.GetHistoryNavigator: {0}", ex.Message);
+                Logger.Error(ex, "Exception during SymbolFeed.GetHistoryNavigator: {Message}", ex.Message);
             }
             finally
             {
@@ -328,7 +329,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Exeption during SymbolFeed.Dispose: " + ex.Message);
+                Logger.Error(ex, "Exeption during SymbolFeed.Dispose: {Message}", ex.Message);
             }
         }
 

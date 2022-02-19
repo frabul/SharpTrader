@@ -51,20 +51,20 @@ namespace SharpTrader
 
         public void Start()
         {
-            Logger = Serilog.Log.ForContext("SourceContext",$"Optimizer_{SessionName}");
-            Logger.Info($"Starting optimization session: {SessionName}");
+            Logger = Serilog.Log
+                .ForContext<Optimizer>()
+                .ForContext("OptimizerSesssion", SessionName);
+            
+            Logger.Information("Starting optimization session {OptimizerSesssion}.", SessionName); 
+            
             HistoryDB = new TradeBarsRepository(Config.BacktesterConfig.HistoryDb);
             for (int i = Session.Lastexecuted + 1; i < BaseSpace.Configurations.Count; i++)
             {
-                Logger.Info($"-------------------------- {i} of {BaseSpace.Configurations.Count} --------------------------");
-               
-                 
+                Logger.Information("--- Backtesting permutation {Index} of {PermutationsCount} ---", i, BaseSpace.Configurations.Count); 
                 RunOne(BaseSpace.Configurations[i], i);
                 Session.Lastexecuted = i;
                 File.WriteAllText(SessionFile, JsonConvert.SerializeObject(Session));
-            }
-
-            //Parallel.ForEach(paramSets, new ParallelOptions { MaxDegreeOfParallelism = 2 }, act);
+            } 
         }
 
         void RunOne(object algoConfig, int index)

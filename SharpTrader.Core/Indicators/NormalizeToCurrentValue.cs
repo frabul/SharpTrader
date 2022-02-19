@@ -3,13 +3,13 @@
     public class NormalizeToCurrentValue : Indicator<IBaseData, IBaseData>
     {
         private Indicator<IBaseData, IBaseData> BaseIndicator;
-        private IBaseData LastInput;
+        public IBaseData LastInput { get; private set; }
         public override bool IsReady => BaseIndicator.IsReady;
         public NormalizeToCurrentValue(string name, Indicator<IBaseData, IBaseData> toNormalize) : base(name)
         {
-            BaseIndicator = toNormalize; 
+            BaseIndicator = toNormalize;
         }
-         
+
         protected override IBaseData Calculate(IBaseData input)
         {
             LastInput = input;
@@ -19,7 +19,7 @@
 
         protected override double CalculatePeek(double sample)
         {
-            return BaseIndicator.Peek(sample) / sample; 
+            return BaseIndicator.Peek(sample) / sample;
         }
 
         public override void Reset()

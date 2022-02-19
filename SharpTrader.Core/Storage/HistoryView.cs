@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using NLog;
 
 namespace SharpTrader.Storage
 {
     class HistoryView
     {
-        Logger Logger = LogManager.GetLogger("HistoryView");
+        Serilog.ILogger Logger = Serilog.Log.ForContext<HistoryView>();
         private SymbolHistoryMetaDataInternal SymbolHistory;
         private List<Candlestick> _Ticks = new List<Candlestick>();
         public SymbolHistoryId Id { get; set; }
@@ -86,7 +85,7 @@ namespace SharpTrader.Storage
                 Candlestick lastCandle = this.Ticks.Count > 0 ? this.Ticks[this.Ticks.Count - 1] : new Candlestick();
                 if (c.Timeframe != this.Id.Resolution)
                 {
-                    Logger.Error("Bad timeframe for candle");
+                    Logger.Error("{Symbol} - Bad timeframe for {@Candle}", this.Id.Symbol, c);
                     throw new InvalidOperationException("Bad timeframe for candle");
                 }
                 else

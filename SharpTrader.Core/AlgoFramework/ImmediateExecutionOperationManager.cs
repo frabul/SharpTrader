@@ -1,5 +1,4 @@
 ﻿using LiteDB;
-using NLog;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -13,7 +12,8 @@ namespace SharpTrader.AlgoFramework
     /// </summary>
     public class ImmediateExecutionOperationManager : OperationManager
     {
-        Logger Logger = LogManager.GetCurrentClassLogger();
+
+        private Serilog.ILogger Logger;
         public override Task CancelAllOrders(Operation op)
         {
             return Task.CompletedTask;
@@ -33,6 +33,7 @@ namespace SharpTrader.AlgoFramework
         }
         protected override Task OnInitialize()
         {
+            Logger = Algo.Logger.ForContext<ImmediateExecutionOperationManager>();
             return Task.CompletedTask;
         }
 
@@ -120,7 +121,7 @@ namespace SharpTrader.AlgoFramework
                                 }
                                 else
                                 {
-                                    Logger.Error($"Error while trying to post entry order for symbol {symData.Symbol.Key}: {ticket.ErrorInfo} ");
+                                    Logger.Error("{Symbol} - Error while trying to post entry order for symbol : {ErrorInfo}", symData.Symbol.Key, ticket.ErrorInfo);
                                 }
                             }
                         }

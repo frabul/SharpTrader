@@ -16,7 +16,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
 {
     public class BinanceTradeBarsRepository : TradeBarsRepository
     {
-        Serilog.ILogger Logger = Serilog.Log.ForContext("SourceContext", "BinanceTradeBarsRepository");
+        Serilog.ILogger Logger = Serilog.Log.ForContext<BinanceTradeBarsRepository>();
         private BinanceClient Client;
         private Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
 

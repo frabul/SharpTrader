@@ -35,8 +35,7 @@ namespace SharpTrader.AlgoFramework
         private TimeSlice OldSlice = new TimeSlice();
         private HashSet<Operation> _ActiveOperations = new HashSet<Operation>();
         private HashSet<Operation> _ClosedOperations = new HashSet<Operation>();
-        private Serilog.ILogger Logger  ;
-        private Serilog.ILogger SymbolsFilterLogger = Serilog.Log.ForContext("SourceContext","TradingAlgo.SymbolsFilter");
+        private Serilog.ILogger SymbolsFilterLogger;
         private Configuration Config;
         private object WorkingSliceLock = new object();
         private bool EntriesStopppedByStrategy = false;
@@ -59,19 +58,19 @@ namespace SharpTrader.AlgoFramework
         public bool DoMarginTrading { get; private set; }
         public bool EntriesSuspended => State.EntriesSuspendedByUser || EntriesStopppedByStrategy || Config.LiquidationOnly;
         public bool IsPlottingEnabled { get; set; } = false;
+        public Serilog.ILogger Logger { get; private set; }
 
-        public TradingAlgo(IMarketApi marketApi, Configuration config)
+        public TradingAlgo(IMarketApi marketApi, Serilog.ILogger logger, Configuration config)
         {
-           
-
             Config = config;
             Market = marketApi;
             Market.OnNewTrade += Market_OnNewTrade;
             this.DoMarginTrading = config.MarginTrading;
-            Logger = Serilog.Log
+            Logger = logger
+               .ForContext(new MarketTimeEnricher(marketApi))
                .ForContext("SourceContext", "TradingAlgo")
-               .ForContext("AlgoName", this.Name)
-               ;
+               .ForContext("AlgoName", this.Name);
+            SymbolsFilterLogger = Logger.ForContext("SourceContext", "TradingAlgo.SymbolsFilter");
         }
 
         public async Task Initialize()
@@ -92,7 +91,7 @@ namespace SharpTrader.AlgoFramework
                         if (SymbolsData.ContainsKey(trade.Symbol))
                             this.WorkingSlice.Add(SymbolsData[trade.Symbol].Symbol, trade);
                         else
-                            Logger.Error("Symbol data not found for trade during initialize. {Trade}", trade);
+                            Logger.Error("Symbol data not found for trade during initialize. {@Trade}", trade);
                 }
                 else
                 {
@@ -109,20 +108,20 @@ namespace SharpTrader.AlgoFramework
 
         public override async Task OnStartAsync()
         {
-            Logger.Debug($"{this.Name}: initializing.");
+            Logger.Information("Initializing.");
             await this.Initialize();
-            Logger.Debug($"{this.Name}: initializing SymbolsFilter.");
+            Logger.Information("Initializing SymbolsFilter.");
             await SymbolsFilter.Initialize(this);
-            Logger.Debug($"{this.Name}: initializing sentry.");
+            Logger.Information("Initializing sentry.");
             if (Sentry != null)
                 await Sentry.Initialize(this);
-            Logger.Debug($"{this.Name}: initializing allocator.");
+            Logger.Information("Initializing allocator.");
             if (Allocator != null)
                 await Allocator.Initialize(this);
-            Logger.Debug($"{this.Name}: initializing Executor.");
+            Logger.Information("Initializing Executor.");
             if (Executor != null)
                 await Executor.Initialize(this);
-            Logger.Debug($"{this.Name}: initializing RiskManager.");
+            Logger.Information("Initializing RiskManager.");
             if (RiskManager != null)
                 await RiskManager.Initialize(this);
         }
@@ -136,10 +135,12 @@ namespace SharpTrader.AlgoFramework
                 var added_str = string.Join(", ", changes.AddedSymbols.Select(s => s.Key));
                 var removed_str = string.Join(", ", changes.RemovedSymbols.Select(s => s.Key));
                 var all_selected = string.Join(", ", SymbolsFilter.SymbolsSelected.Select(s => s.Key));
-                SymbolsFilterLogger.Trace("Changes in symbols selected\n" +
-                    "   added: {0}\n" +
-                    "   removed: {1}\n" +
-                    "   selected: {2}\n", added_str, removed_str, all_selected);
+
+                SymbolsFilterLogger
+                    .ForContext("Selected", SymbolsFilter.SymbolsSelected, true)
+                    .ForContext("Added", changes.AddedSymbols, true)
+                    .ForContext("Removed", changes.RemovedSymbols, true)
+                    .Information("Changes in symbols selected.");
 
                 var selectedForOperationsActive = this.ActiveOperations.Select(ao => ao.Symbol).GroupBy(ao => ao.Key).Select(g => g.First()).ToList();
                 //release feeds of unused symbols 
@@ -201,10 +202,13 @@ namespace SharpTrader.AlgoFramework
                     var symData = _SymbolsData[trade.Symbol];
                     activeOp = symData.ActiveOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
                 }
+
                 if (activeOp != null)
                 {
                     if (activeOp.AddTrade(trade))
-                        Logger.Info($"{Time} - New trade for operation {activeOp.ToString()}: {trade.ToString()}");
+                        Logger.ForContext("Operation", activeOp, true)
+                              .ForContext("Trade", trade, true)
+                              .Information("New trade for operation.");
                 }
                 else
                 {
@@ -214,19 +218,24 @@ namespace SharpTrader.AlgoFramework
                     if (oldOp != null)
                     {
                         if (oldOp.AddTrade(trade))
-                            Logger.Info($"{Time} - New trade for 'old' operation {activeOp}: {trade.ToString()}");
+                        {
+                            Logger.ForContext("Operation", oldOp, true)
+                                  .ForContext("Trade", trade, true)
+                                  .Warning("New trade for 'old' operation.");
+                            DbClosedOperations.Upsert(oldOp);
+                        }
                         //check if it got resumed by this new trade
                         if (!oldOp.IsClosed)
                         {
-
+                            Logger.Information("Resuming 'old' operation {OperationId}.", oldOp.Id);
                             this.ResumeOperation(oldOp);
-                            Logger.Info($"Resuming 'old' operation {activeOp}.");
                         }
                         else
                             oldOp.Dispose(); //otherwise we must dispose it
                     }
                     else
-                        Logger.Debug($"{Time} - New trade {trade.ToString()} without any associated operation");
+                        Logger.ForContext("Trade", trade, true)
+                            .Warning("Trade without any associated operation.");
                 }
             }
 
@@ -248,11 +257,18 @@ namespace SharpTrader.AlgoFramework
                 List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
                 foreach (var op in operationsToClose)
                 {
-                    if (op.AmountInvested > 0)
-                        Logger.Info("{0} - Closing operation {1}.", Time, op.ToString("c"));
+                    var logger = Logger.ForContext("Operation", new { op.Id, Gain = op.CalculateGainAsQuteAsset() }, true);
+                    if (op.AmountInvested != 0)
+                    {
+                        var gain = op.CalculateGainAsQuteAsset(0.001m);
+                        var gainPrc = gain * 100 / op.QuoteAmountInvested;
+                        logger.Information("Closing operation {OperationId} - Gain: {gain:f6}, Gain%: {gainPrc:f2} ", op.Id, gain, gainPrc);
+                    }
                     else
-                        Logger.Debug("{0} - Closing operation {1}.", Time, op.ToString("c"));
+                        logger.Debug("Closing operation.");
+
                     op.Close();
+
                     _ActiveOperations.Remove(op);
                     if (this.Config.SaveData || op.AmountInvested > 0)
                         this._ClosedOperations.Add(op);
@@ -291,7 +307,7 @@ namespace SharpTrader.AlgoFramework
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"Error while running command: {ex.Message}.");
+                    Logger.Error("Error while running command: {Message}.", ex.Message);
                 }
             }
 
@@ -314,7 +330,7 @@ namespace SharpTrader.AlgoFramework
 
         private void ResumeOperation(Operation op)
         {
-            Logger.Info($"Resuming operation {op}.");
+            Logger.ForContext("Operation", op, true).Information("Resuming operation.");
             op.Resume();
             AddActiveOperation(op);
             var removed = this._ClosedOperations.Remove(op);
@@ -375,12 +391,11 @@ namespace SharpTrader.AlgoFramework
         {
             if (Time >= NextUpdateTime)
             {
-                if (!BackTesting)
-                {
-                    //ClearClosedOperations(TimeSpan.FromHours(1));
-                    if (Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
-                        Logger.Warn($"{Name} - OnTick duration longer than expected. Expected {Resolution} - real {Time - NextUpdateTime + Resolution }");
-                }
+
+                //ClearClosedOperations(TimeSpan.FromHours(1));
+                if (!BackTesting && Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
+                    Logger.Warning("OnTick duration longer than expected. " +
+                        "Expected {Expected} - elapsed {Elapsed}", Resolution, Time - NextUpdateTime + Resolution);
 
                 TimeSlice curSlice;
                 lock (WorkingSliceLock)
@@ -424,7 +439,7 @@ namespace SharpTrader.AlgoFramework
                 .ToArray();
             if (operationsToFlush.Length > 0)
             {
-                Logger.Debug("Flushing {0} operations.", operationsToFlush.Length);
+                Logger.Debug("Flushing {Cnt} operations.", operationsToFlush.Length);
                 foreach (var op in operationsToFlush)
                 {
                     _ClosedOperations.Remove(op);
@@ -434,4 +449,5 @@ namespace SharpTrader.AlgoFramework
             }
         }
     }
+
 }
