@@ -59,7 +59,8 @@ namespace SharpTrader.AlgoFramework
                         symData.AllocatorData = new MySymbolData();
 
                     DateTime lastInvestment = (symData.AllocatorData as MySymbolData).LastInvestmentTime;
-
+                    //todo MaxActiveOperationsPerSymbol is a problem if we gat a new signal because we ignore it if there is another operation 
+                    //     with bad signal
                     if (Algo.Time >= lastInvestment + CoolDown && symData.ActiveOperations.Count < this.MaxActiveOperationsPerSymbol)
                     {
                         //if cooldown has elapsed we can open a new operation

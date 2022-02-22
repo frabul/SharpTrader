@@ -54,17 +54,17 @@ namespace SharpTrader
             Logger = Serilog.Log
                 .ForContext<Optimizer>()
                 .ForContext("OptimizerSesssion", SessionName);
-            
-            Logger.Information("Starting optimization session {OptimizerSesssion}.", SessionName); 
-            
+
+            Logger.Information("Starting optimization session {OptimizerSesssion}.", SessionName);
+
             HistoryDB = new TradeBarsRepository(Config.BacktesterConfig.HistoryDb);
             for (int i = Session.Lastexecuted + 1; i < BaseSpace.Configurations.Count; i++)
             {
-                Logger.Information("--- Backtesting permutation {Index} of {PermutationsCount} ---", i, BaseSpace.Configurations.Count); 
+                Logger.Information("--- Backtesting permutation {Index} of {PermutationsCount} ---", i, BaseSpace.Configurations.Count);
                 RunOne(BaseSpace.Configurations[i], i);
                 Session.Lastexecuted = i;
                 File.WriteAllText(SessionFile, JsonConvert.SerializeObject(Session));
-            } 
+            }
         }
 
         void RunOne(object algoConfig, int index)
@@ -72,11 +72,7 @@ namespace SharpTrader
             var backtesterConfig = JsonConvert.DeserializeObject<BackTester.Configuration>(JsonConvert.SerializeObject(Config.BacktesterConfig));
             backtesterConfig.AlgoConfig = JObject.FromObject(algoConfig);
             backtesterConfig.SessionName = $"{this.Config.SessionName}_{index}";
-            var backTester = new BackTester(backtesterConfig, HistoryDB)
-            {
-                ShowPlotCallback = ShowPlotCallback,
-                Logger = this.Logger
-            };
+            var backTester = new BackTester(backtesterConfig, HistoryDB, this.Logger);
             backTester.Start();
         }
     }

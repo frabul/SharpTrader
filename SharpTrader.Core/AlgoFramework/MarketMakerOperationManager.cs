@@ -177,7 +177,6 @@ namespace SharpTrader.AlgoFramework
             myOpData.Initialized = true;
 
             var symData = Algo.SymbolsData[op.Symbol.Key];
-            var logger = Logger.ForContext("Operation", op, true);
             if (myOpData.OperationManager == null)
                 myOpData.OperationManager =
                     new DeferredTask()
@@ -186,7 +185,7 @@ namespace SharpTrader.AlgoFramework
                         Op = op,
                         SymbolData = symData,
                         Next = MonitorOperation,
-                        Logger = logger
+                        Logger = Logger
                     };
 
             if (myOpData.EntryManager == null)
@@ -197,7 +196,7 @@ namespace SharpTrader.AlgoFramework
                         Op = op,
                         SymbolData = symData,
                         Next = OpenEntryOrder,
-                        Logger = logger
+                        Logger = Logger
                     };
             if (myOpData.ExitManager == null)
                 myOpData.ExitManager =
@@ -207,7 +206,7 @@ namespace SharpTrader.AlgoFramework
                         Op = op,
                         SymbolData = symData,
                         Next = OpenExitOrder,
-                        Logger = logger
+                        Logger = Logger
                     };
         }
 
@@ -229,6 +228,7 @@ namespace SharpTrader.AlgoFramework
                         myOpData.EntryManager = null;
                     if (myOpData.ExitManager != null && await myOpData.ExitManager.Next(myOpData.ExitManager))
                         myOpData.ExitManager = null;
+
                     //for (int i = 0; i < myOpData.ScheduledTasks.Count; i++)
                     //{
                     //    var task = myOpData.ScheduledTasks[i];
@@ -281,7 +281,7 @@ namespace SharpTrader.AlgoFramework
                 }
                 else if (liquidationResult.amountRemainingLow)
                 {
-                    self.Logger.Information("Queue operation for close because liquidation retunrned amountRemainingLow");
+                    self.Logger.Information("{OperationId} - Queue operation for close because liquidation retunrned amountRemainingLow", self.Op.Id);
                     await this.CloseQueueAsync(op, CloseQueueTime);
                     terminate = true;
                 }
@@ -304,7 +304,7 @@ namespace SharpTrader.AlgoFramework
             if (op.IsClosing || op.IsClosed)
             {
                 if (op.AmountRemaining > 0)
-                    self.Logger.Warning("Closing operation but amountremaining is > 0", op);
+                    self.Logger.Warning("{OperationId} - Closing operation but amountremaining is > 0", op);
                 return true;
             }
 
@@ -336,11 +336,11 @@ namespace SharpTrader.AlgoFramework
                     var conditions = new { isEntryExpired, noActiveExit, remainingAmountSmall };
                     //put in close queue
                     if (op.AmountInvested == 0)
-                        self.Logger.Verbose("Schedulin op {OperationId} for close.", op.Id);
-                    if (op.AmountRemaining == 0)
-                        self.Logger.Information("Scheduling {OperationId} for close.", op.Id);
+                        self.Logger.Verbose("{OperationId} - scheduling for close.", op.Id);
+                    else if (op.AmountRemaining == 0)
+                        self.Logger.Information("{OperationId} - scheduling for close.", op.Id);
                     else
-                        self.Logger.Warning("Schedule op for close but amount remaining > 0, {RemainingAmountSmall}", remainingAmountSmall);
+                        self.Logger.Warning("{OperationId} - scheduling op for close but amount remaining > 0, {RemainingAmountSmall}", op.Id, remainingAmountSmall);
                     await CloseQueueAsync(self.Op, CloseQueueTime);
                 }
                 else
@@ -379,7 +379,7 @@ namespace SharpTrader.AlgoFramework
             if (op.IsClosing || op.IsClosed)
             {
                 if (op.AmountRemaining > 0)
-                    self.Logger.Warning("Operation was closed but amountremaining is > 0");
+                    self.Logger.Warning("{OperationId} - Operation was closed but amountremaining is > 0", op.Id);
                 return true;
             }
 
@@ -415,8 +415,8 @@ namespace SharpTrader.AlgoFramework
                                     ClientOrderId = op.GetNewOrderId(),
                                     Direction = op.ExitTradeDirection
                                 };
-                                self.Logger.Information("Setting exit order {OpertionId}: {OrderDirection} {OrderAmount}@{OrderPrice}",
-                                              op.Id, orderInfo.Direction, orderInfo.Amount, orderInfo.Price);
+                                self.Logger.Information("{OperationId} - Setting exit order: {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
+                                              op.Id, orderInfo.Direction, op.Symbol, orderInfo.Amount, orderInfo.Price);
                                 var request = await Algo.Market.PostNewOrder(orderInfo);
 
                                 if (request.IsSuccessful)
@@ -427,7 +427,7 @@ namespace SharpTrader.AlgoFramework
                                 else
                                 {
                                     //order failed, retry in 10 seconds
-                                    self.Logger.Error("Failed setting exit order, reason: {Reason}" + request.ErrorInfo);
+                                    self.Logger.Error("{OperationId} - Failed setting exit order, reason: {Reason}", op.Id, request.ErrorInfo);
                                     self.Time = Algo.Time.AddSeconds(10);
                                 }
                             }
@@ -466,7 +466,7 @@ namespace SharpTrader.AlgoFramework
                 var opExpired = Algo.Time > op.Signal.ExpireDate;
                 if (wrongPrice || wrongAmout || opExpired)
                 {
-                    self.Logger.Debug("Cancelling exit order, reason: {Reason}", new { wrongPrice, wrongAmout, opExpired });
+                    self.Logger.Debug("{OperationId} - cancelling exit order, reason: {Reason}", op.Id, new { wrongPrice, wrongAmout, opExpired });
                     var requestResult = await this.CloseExitOrder(op, myOpData);
                     if (requestResult)
                     {
@@ -512,7 +512,7 @@ namespace SharpTrader.AlgoFramework
             if (op.IsClosing || op.IsClosed)
             {
                 if (op.AmountRemaining > 0)
-                    self.Logger.Warning("Operation is closing but amountremaining is > 0");
+                    self.Logger.Warning("{OperationId} - Operation is closing but amountremaining is > 0", op.Id);
                 return true;
             }
 
@@ -550,10 +550,10 @@ namespace SharpTrader.AlgoFramework
                                 ClientOrderId = op.GetNewOrderId(),
                                 Direction = op.EntryTradeDirection
                             };
-                            self.Logger
-                                .ForContext("Operation", new { op.Id, op.Signal })
-                                .Information("Setting Entry for {OpertionId}: {OrderDirection} {OrderAmount}@{OrderPrice}",
-                                              op.Id, orderInfo.Direction, orderInfo.Amount, orderInfo.Price);
+
+                            self.Logger.Information(
+                                "{OperationId} - Setting Entry: {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
+                                op.Id, orderInfo.Direction, orderInfo.Symbol, orderInfo.Amount, orderInfo.Price);
 
                             var req = await Algo.Market.PostNewOrder(orderInfo);
 
@@ -566,7 +566,7 @@ namespace SharpTrader.AlgoFramework
                             else
                             {
                                 //log error and repeat operation in 30 seconds
-                                self.Logger.Error("Failed opening Entry order, reason: {Reason}", req.ErrorInfo);
+                                self.Logger.Error("{OperationId} - failed opening Entry order, reason: {Reason}", op.Id, req.ErrorInfo);
                                 self.Time = Algo.Time.AddSeconds(30);
                             }
                         }
@@ -629,17 +629,14 @@ namespace SharpTrader.AlgoFramework
         }
 
         private async Task<bool> CloseOrder(IOrder order, Operation op)
-        {
-            var logger = Logger
-                .ForContext("Order", order, destructureObjects: true)
-                .ForContext("Operation", op, destructureObjects: true);
+        { 
             bool ok = true;
             if (!order.IsClosed)
             {
                 var req = await Algo.Market.OrderCancelAsync(order.Id);
                 if (!req.IsSuccessful)
                 {
-                    logger.Error("Unable to close order {OrderId}, reason: {Reason}. Trying to synch...", order.ClientId, req.ErrorInfo);
+                    Logger.Error("{OperationId} - unable to close order {OrderId}, reason: {Reason}. Trying to synch...", op.Id, order.ClientId, req.ErrorInfo);
                     //check if order was closed already
                     var req2 = await Algo.Market.OrderSynchAsync(order.Id);
                     if (req2.IsSuccessful)
@@ -647,13 +644,13 @@ namespace SharpTrader.AlgoFramework
                     else
                     {
                         ok = false;
-                        logger.Error("Unable to synch order {OrderId}, reason: {Reason}", order.ClientId, req.ErrorInfo);
+                        Logger.Error("{OperationId} - unable to synch order {OrderId}, reason: {Reason}", op.Id, order.ClientId, req.ErrorInfo);
                     }
 
                     if (!order.IsClosed)
                     {
                         ok = false;
-                        logger.Error("Order {OrderId} still open after sync.", order.ClientId);
+                        Logger.Error("{OperationId} - order {OrderId} still open after sync.", op.Id, order.ClientId);
                     }
                 }
 

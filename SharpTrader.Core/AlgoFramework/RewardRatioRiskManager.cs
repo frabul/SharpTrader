@@ -55,7 +55,7 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-        private Serilog.ILogger Logger ;
+        private Serilog.ILogger Logger;
         public double RiskRewardRatio { get; set; } = 1;
         public TimeSpan BaseLevelTimespan { get; set; } = TimeSpan.Zero;
         public bool TrailingStopLoss { get; set; } = false;
@@ -108,7 +108,7 @@ namespace SharpTrader.AlgoFramework
         {
             foreach (var op in Algo.ActiveOperations.Where(o => o.IsStarted() && !o.IsClosed && !o.IsClosing))
             {
-                var logger = Logger.ForContext("Operation", op, true);
+
                 if (op.AmountRemaining <= 0)
                     op.ScheduleClose(Algo.Time + TimeSpan.FromMinutes(2));
 
@@ -143,15 +143,14 @@ namespace SharpTrader.AlgoFramework
                         var lr = await Algo.TryLiquidateOperation(op, $"stopLoss reached");
                         if (lr.amountRemainingLow)
                         {
-
-                            logger.Information("Schedule operation for close as amount remaining is low.");
+                            Logger.Information("{OperationId} - schedule operation for close as amount remaining is low.", op.Id);
                             op.ScheduleClose(Algo.Time.AddMinutes(3));
 
                         }
                     }
                     else
                     {
-                        logger.Information("Schedule operation for close");
+                        Logger.Information("{OperationId} - schedule operation for close", op.Id);
                         op.ScheduleClose(Algo.Time.AddMinutes(1));
                     }
                 }

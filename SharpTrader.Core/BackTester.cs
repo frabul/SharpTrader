@@ -20,19 +20,19 @@ namespace SharpTrader
         public class Statistics
         {
             public List<IndicatorDataPoint> EquityHistory { get; set; } = new List<IndicatorDataPoint>();
-            public double BalancePeak { get; private set; }
-            public double MaxDrowDown { get; private set; }
-            public double StartingEquity { get; private set; }
-            public double Profit { get; private set; }
-            public double ProfitOverMaxDrowDown { get; private set; }
+            public decimal BalancePeak { get; private set; }
+            public decimal MaxDrowDown { get; private set; }
+            public decimal StartingEquity { get; private set; }
+            public decimal Profit { get; private set; }
+            public decimal ProfitOverMaxDrowDown { get; private set; }
             private bool IsFirstRecord = true;
-            internal void Update(DateTime time, double equity)
+            internal void Update(DateTime time, decimal equity)
             {
                 if (IsFirstRecord)
                     StartingEquity = equity;
 
                 IsFirstRecord = false;
-                EquityHistory.Add(new IndicatorDataPoint(time, equity));
+                EquityHistory.Add(new IndicatorDataPoint(time, (double)equity));
                 BalancePeak = equity > BalancePeak ? equity : BalancePeak;
                 if (BalancePeak - equity > MaxDrowDown)
                     MaxDrowDown = BalancePeak - equity;
@@ -41,13 +41,13 @@ namespace SharpTrader
                 if (MaxDrowDown != 0)
                     ProfitOverMaxDrowDown = Profit / MaxDrowDown;
                 else
-                    ProfitOverMaxDrowDown = float.PositiveInfinity;
+                    ProfitOverMaxDrowDown = decimal.MaxValue;
             }
         }
 
         public class Configuration
         {
-            public string SessionName = "Backetester";
+            public string SessionName { get; set; } = "Backetester";
             public string DataDir { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
             public string HistoryDb { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
             public string LogDir { get; } = $"./logs/";
@@ -62,9 +62,9 @@ namespace SharpTrader
             public DateTime EndTime { get; set; }
             public bool IncrementalHistoryLoading { get; set; } = false;
             public AssetAmount StartingBalance { get; set; } = new AssetAmount("BTC", 100);
-            public string Market = "Binance";
+            public string Market { get; set; } = "Binance";
 
-            public JObject AlgoConfig = new JObject();
+            public JObject AlgoConfig { get; set; } = new JObject();
 
             public Configuration Clone()
             {
@@ -95,12 +95,18 @@ namespace SharpTrader
         /// How much history should be loaded back from the simulation start time
         /// </summary>
         public TimeSpan HistoryLookBack { get; private set; } = TimeSpan.Zero;
-        public Serilog.ILogger Logger { get; set; }
+        public Serilog.ILogger Logger { get; private set; }
         public Action<PlotHelper> ShowPlotCallback { get; set; }
 
         public BackTester(Configuration config) : this(config, new TradeBarsRepository(config.HistoryDb))
         {
 
+        }
+        public BackTester(Configuration config, TradeBarsRepository db, Serilog.ILogger logger) : this(config, db)
+        {
+            Logger = logger
+                        .ForContext<BackTester>()
+                        .ForContext("BacktestSession", config.SessionName);
         }
         public BackTester(Configuration config, TradeBarsRepository db)
         {
@@ -165,7 +171,7 @@ namespace SharpTrader
 
             this.Algo.Start(true).Wait();
             this.Algo.RequestResumeEntries();
-            int steps = 1;
+            int steps = 0;
 
 
             var startingBal = -1m;
@@ -182,12 +188,12 @@ namespace SharpTrader
                     Algo.RequestResumeEntries();
 
                 Algo.OnTickAsync().Wait();
-                steps++;
+
                 //---- update equity and benchmark ---------- 
                 if (steps % 60 == 0 && warmUpCompleted)
                 {
                     var balance = MarketSimulator.GetEquity(BaseAsset);
-                    BotStats.Update(MarketSimulator.Time, (double)balance);
+                    BotStats.Update(MarketSimulator.Time, balance);
                     //--- calculate benchmark change
                     double changeSum = 0;
                     int changeCount = 0;
@@ -215,10 +221,9 @@ namespace SharpTrader
                     }
                     if (changeCount > 0)
                     {
-                        currentBenchmarkVal += changeSum * (double)currentBenchmarkVal / changeCount;
-                        BenchmarkStats.Update(MarketSimulator.Time, currentBenchmarkVal);
-                    }
-
+                        currentBenchmarkVal += changeSum * currentBenchmarkVal / changeCount;
+                        BenchmarkStats.Update(MarketSimulator.Time, (decimal)currentBenchmarkVal);
+                    } 
                 }
 
                 //print partial results
@@ -236,13 +241,15 @@ namespace SharpTrader
                     PrintStats(true);
                     oldCursor = Console.CursorTop;
                 }
+
+                steps++;
             }
 
 
             //get profit 
             sw.Stop();
             Logger.Information("Test terminated in {Duration} ms.", sw.ElapsedMilliseconds);
-
+            Console.WriteLine("Test terminated in {0} ms.", sw.ElapsedMilliseconds);
             PrintStats(false);
 
             foreach (var p in Algo.Plots)
@@ -300,27 +307,33 @@ namespace SharpTrader
                                                 });
             var lostInFee = feeList.Sum();
             var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
-            
-         
-                Console.WriteLine(
-                    $"Time: {MarketSimulator.Time:yyyy/MM/dd hh:mm}\n" +
-                    $"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
-                if (operations.Count > 0)
-                {
-                    Console.WriteLine($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
-                    Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
-                }
-                else
-                {
 
-                    Console.WriteLine($"Algorithm => No data");
-                    Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
-                }
-  
+
+            Console.WriteLine(
+                $"Time: {MarketSimulator.Time:yyyy/MM/dd hh:mm}\n" +
+                $"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
+            if (operations.Count > 0)
+            {
+                Console.WriteLine($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
+                Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+            }
+            else
+            {
+
+                Console.WriteLine($"Algorithm => No data");
+                Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+            }
+
             if (!consoleOnly)
             {
-                Logger.Information("Backtest results {@Results} \n",
-                    new { MarketSimulator.Time, Balance = totalBal, OperationsCount = operations.Count, BotStats, BenchmarkStats });
+                Logger.Information("Backtest results:\n" +
+                    "Balance: {totalBal:F4} - Operations:{OperationsCount} - Lost in fee:{lostInFee:F4}\n" +
+                    "Algorithm => {@AlgoStats} \n" +
+                    "BenchMark => {@BenchmarkStats}",
+                    totalBal, operations.Count, lostInFee,
+                    new { BotStats.StartingEquity, BotStats.Profit, BotStats.ProfitOverMaxDrowDown, ProfitPerOper = BotStats.Profit / operations.Count, BotStats.MaxDrowDown, BotStats.BalancePeak },
+                    new { BenchmarkStats.StartingEquity, BenchmarkStats.Profit, BenchmarkStats.ProfitOverMaxDrowDown, BenchmarkStats.MaxDrowDown, BenchmarkStats.BalancePeak }
+                    );
             }
         }
     }
