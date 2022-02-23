@@ -76,7 +76,7 @@ namespace SharpTrader.Storage
                     return false;
                 }
             }
-            catch (Exception )
+            catch (Exception)
             {
                 return false;
                 //Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
@@ -117,7 +117,7 @@ namespace SharpTrader.Storage
             throw new NotImplementedException();
         }
 
-        public static async Task<HistoryChunk_BinancePublic> LoadFromAsync(string filePath)
+        public static Task<HistoryChunk_BinancePublic> LoadFromAsync(string filePath)
         {
             var fiName = Path.GetFileName(filePath);
             if (ChunkId_BinancePublic.TryParse(fiName, out var id))
@@ -129,14 +129,15 @@ namespace SharpTrader.Storage
                     using var stream = entry.Open();
                     return ParseFile(stream);
                 });
-                return new HistoryChunk_BinancePublic()
-                {
-                    ChunkId = id,
-                    Ticks = allCandles.ToList()
-                };
+                return Task.FromResult(  
+                    new HistoryChunk_BinancePublic()
+                    {
+                        ChunkId = id,
+                        Ticks = allCandles.ToList()
+                    });
             }
             throw new InvalidOperationException("Invalid file");
-
+       
         }
 
         private static List<Candlestick> ParseFile(Stream s)

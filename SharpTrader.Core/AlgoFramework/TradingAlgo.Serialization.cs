@@ -207,16 +207,13 @@ namespace SharpTrader.AlgoFramework
         {
             if (!Config.SaveData)
             {
-                foreach (var op in ActiveOperations.Where(op => op.IsChanged))
+                foreach (var op in ActiveOperations.Concat(ClosedOperations).Where(op => op.IsChanged))
                 {
-                    Logger.ForContext("Operation", op, true).Information("{OperationId} - Operation changed"); 
+                    Logger.ForContext("Operation", op, true)
+                          .ForContext("Symbol", op.Symbol)
+                          .Debug("{OperationId} - Operation changed", op.Id);
                     op.AcceptChanges();
                 } 
-                foreach (var op in ClosedOperations.Where(op => op.IsChanged))
-                {
-                    Logger.ForContext("Operation", op, true).Information("{OperationId} - Operation changed"); 
-                    op.AcceptChanges();
-                }
                 return;
             }
             lock (DbLock)
@@ -243,14 +240,16 @@ namespace SharpTrader.AlgoFramework
                 Db.BeginTrans();
                 foreach (var op in ActiveOperations.Where(op => op.IsChanged))
                 {
-                    Logger.ForContext("Operation", op, true).Information("{OperationId} - Operation changed");
+                    Logger.ForContext("Operation", op, true)
+                          .Debug("{OperationId} - Operation changed", op.Id);
                     DbActiveOperations.Upsert(op);
                     op.AcceptChanges();
                 }
 
                 foreach (var op in ClosedOperations.Where(op => op.IsChanged))
                 {
-                    Logger.ForContext("Operation", op, true).Information("{OperationId} - Operation changed");
+                    Logger.ForContext("Operation", op, true)
+                          .Debug("{OperationId} - Operation changed", op.Id);
                     DbClosedOperations.Upsert(op);
                     op.AcceptChanges();
                 }

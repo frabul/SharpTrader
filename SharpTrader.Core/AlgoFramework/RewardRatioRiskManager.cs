@@ -137,20 +137,21 @@ namespace SharpTrader.AlgoFramework
 
                 if (op.RiskManaged && !(op.IsClosed || op.IsClosing))
                 {
+                    var logger = Logger.ForContext("Symbol", op.Symbol);
                     if (op.AmountRemaining > 0)
                     {
                         //--- liquidate operation funds --- 
                         var lr = await Algo.TryLiquidateOperation(op, $"stopLoss reached");
                         if (lr.amountRemainingLow)
                         {
-                            Logger.Information("{OperationId} - schedule operation for close as amount remaining is low.", op.Id);
+                            logger.Information("{OperationId} - schedule operation for close as amount remaining is low.", op.Id);
                             op.ScheduleClose(Algo.Time.AddMinutes(3));
 
                         }
                     }
                     else
                     {
-                        Logger.Information("{OperationId} - schedule operation for close", op.Id);
+                        logger.Information("{OperationId} - schedule operation for close", op.Id);
                         op.ScheduleClose(Algo.Time.AddMinutes(1));
                     }
                 }

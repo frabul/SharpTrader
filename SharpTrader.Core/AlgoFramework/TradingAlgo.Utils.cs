@@ -55,13 +55,13 @@ namespace SharpTrader.AlgoFramework
 
         public async Task<(IOrder order, bool amountRemainingLow, bool OrderError)> TryLiquidateOperation(Operation op, string reason)
         {
-
+            var logger = Logger.ForContext("Symbol", op.Symbol);
             (IOrder order, bool amountRemainingLow, bool OrderError) result = default;
             await Executor.CancelAllOrders(op);
-            Logger.Information("{OperationId} - liquidation because {Reason}", op.Id, reason);
+            logger.Information("{OperationId} - liquidation because {Reason}", op.Id, reason);
             if (op.AmountRemaining < 0)
             {
-                Logger.Warning("{OperationId} - liquidation requested but AmountRemaining < 0", op.Id);
+                logger.Warning("{OperationId} - liquidation requested but AmountRemaining < 0", op.Id);
                 return result;
             }
 
@@ -71,14 +71,14 @@ namespace SharpTrader.AlgoFramework
             if (adj.amount <= 0)
             {
                 result.amountRemainingLow = true;
-                Logger.Warning("{OperationId} - unable to liquidate because amount remaining is too low", op.Id);
+                logger.Warning("{OperationId} - unable to liquidate because amount remaining is too low", op.Id);
                 return result;
             }
 
             adj = ClampOrderAmount(symData, op.ExitTradeDirection, adj);
             if (adj.amount <= 0)
             {
-                Logger.Warning("{OperationId} - unable to liquidate because not enough free balance", op.Id); ;
+                logger.Warning("{OperationId} - unable to liquidate because not enough free balance", op.Id); ;
                 return result;
             }
 
@@ -93,14 +93,14 @@ namespace SharpTrader.AlgoFramework
                 Direction = op.ExitTradeDirection
             };
 
-            Logger.Debug("{OperationId} - try market exit {OrderDirection} {Symbol} {Amount}@{Price}.", op.Id, orderInfo.Direction, orderInfo.Symbol, orderInfo.Amount, symData.Feed.Bid);
+            logger.Debug("{OperationId} - try market exit {OrderDirection} {Symbol} {Amount}@{Price}.", op.Id, orderInfo.Direction, orderInfo.Symbol, orderInfo.Amount, symData.Feed.Bid);
             var request = await Market.PostNewOrder(orderInfo);
             if (request.IsSuccessful)
                 result.order = request.Result;
             else
             {
                 result.OrderError = true;
-                Logger.Error("{OperationId} - error executing market order because {Reason}.", op.Id, request.ErrorInfo);
+                logger.Error("{OperationId} - error executing market order because {Reason}.", op.Id, request.ErrorInfo);
             }
             return result;
         }

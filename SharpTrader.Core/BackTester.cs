@@ -98,24 +98,23 @@ namespace SharpTrader
         public Serilog.ILogger Logger { get; private set; }
         public Action<PlotHelper> ShowPlotCallback { get; set; }
 
-        public BackTester(Configuration config) : this(config, new TradeBarsRepository(config.HistoryDb))
+        public BackTester(Configuration config) : this(config, new TradeBarsRepository(config.HistoryDb), null, null)
         {
 
         }
-        public BackTester(Configuration config, TradeBarsRepository db, Serilog.ILogger logger) : this(config, db)
-        {
-            Logger = logger
-                        .ForContext<BackTester>()
-                        .ForContext("BacktestSession", config.SessionName);
-        }
-        public BackTester(Configuration config, TradeBarsRepository db)
+     
+        public BackTester(Configuration config, TradeBarsRepository db, Serilog.ILogger logger, Serilog.ILogger algoLogger)
         {
             Config = config;
+            Logger = logger;
             if (Logger == null)
                 Logger = Serilog.Log
                     .ForContext<BackTester>()
                     .ForContext("BacktestSession", config.SessionName);
-
+            if (algoLogger == null)
+                algoLogger = Logger;
+            else
+                algoLogger = algoLogger.ForContext("BacktestSession", config.SessionName);
 
             var HistoryDB = db;
             this.MarketSimulator = new MultiMarketSimulator(Config.DataDir, HistoryDB, Config.StartTime, Config.EndTime);
@@ -145,7 +144,8 @@ namespace SharpTrader
                 throw new Exception($"Unable to translate from provided algo config to ${configClass.FullName }: ${ex.Message}");
             }
 
-            this.Algo = myctor.Invoke(new[] { MarketSimulator.GetMarketApi(config.Market), Logger, algoConfig }) as TradingAlgo;
+   
+            this.Algo = myctor.Invoke(new[] { MarketSimulator.GetMarketApi(config.Market), algoLogger, algoConfig }) as TradingAlgo;
             this.Algo.IsPlottingEnabled = Config.PlottingEnabled;
             this.Algo.ShowPlotCallback = (pl) => this?.ShowPlotCallback(pl);
             if (this.Algo == null)
@@ -223,7 +223,7 @@ namespace SharpTrader
                     {
                         currentBenchmarkVal += changeSum * currentBenchmarkVal / changeCount;
                         BenchmarkStats.Update(MarketSimulator.Time, (decimal)currentBenchmarkVal);
-                    } 
+                    }
                 }
 
                 //print partial results
