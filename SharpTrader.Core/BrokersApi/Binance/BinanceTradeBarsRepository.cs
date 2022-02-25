@@ -58,8 +58,8 @@ namespace SharpTrader.Core.BrokersApi.Binance
         {
 
 
-            if (toTime > DateTime.Now.AddYears(10))
-                toTime = DateTime.Now.AddYears(10);
+            if (toTime > DateTime.UtcNow.AddYears(10))
+                toTime = DateTime.UtcNow.AddYears(10);
             toTime = new DateTime(toTime.Year, toTime.Month, toTime.Day, toTime.Hour, toTime.Minute, 0, DateTimeKind.Utc);
             bool reported = false;
             var epoch = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);

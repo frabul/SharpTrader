@@ -32,10 +32,7 @@ namespace SharpTrader.BrokersApi.Binance
         public event Action<IMarketApi, ITrade> OnNewTrade;
         private readonly object LockOrdersTrades = new object();
         private readonly object LockBalances = new object();
-        private readonly Stopwatch StopwatchSocketClose = new Stopwatch();
-        private readonly Stopwatch UserDataPingStopwatch = new Stopwatch();
         private HashSet<Order> OpenOrders = new HashSet<Order>();
-
         private ILiteCollection<SymbolData> SymbolsData;
         private ILiteCollection<Order> DbOpenOrders;
         private ILiteCollection<Order> Orders;
@@ -45,26 +42,24 @@ namespace SharpTrader.BrokersApi.Binance
         public BinanceTradeBarsRepository HistoryDb { get; set; }
         private BinanceWebSocketClient WSClient;
         private CombinedWebSocketClient CombinedWebSocketClient;
-
         private Serilog.ILogger Logger;
         private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
-        private System.Timers.Timer TimerListenUserData;
         private LiteDatabase TradesAndOrdersArch;
         private LiteDatabase TradesAndOrdersDb;
         private List<SymbolFeed> Feeds = new List<SymbolFeed>();
-        private Guid UserDataSocket;
         private Regex IdRegex = new Regex("([0-9A-Z]+[A-Z])([0-9]+)", RegexOptions.Compiled);
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
         private string OperationsDbPath;
         private string OperationsArchivePath;
         private DateTime TimeToArchive;
         private MemoryCache Cache = new MemoryCache();
-        private Task FastUpdatesTask;
         private Task OrdersAndTradesSynchTask;
 
         private Dictionary<string, BinanceSymbolInfo> Symbols = new Dictionary<string, BinanceSymbolInfo>();
         private Dictionary<string, List<BinanceSymbolInfo>> SymbolsByAsset = new Dictionary<string, List<BinanceSymbolInfo>>();
         private Dictionary<string, List<BinanceSymbolInfo>> SymbolsByQuoteAsset = new Dictionary<string, List<BinanceSymbolInfo>>();
+        private Task UserDataStreamManager;
+        private bool ExchangeInfoInitialized;
 
         public DateTime StartOperationDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         public BinanceClient Client { get; private set; }
@@ -79,6 +74,8 @@ namespace SharpTrader.BrokersApi.Binance
 
         IEnumerable<IOrder> IMarketApi.OpenOrders { get { lock (LockOrdersTrades) return OpenOrders.ToArray(); } }
 
+        public bool IsServiceAvailable { get; set; }
+
         public (string Symbol, decimal balance)[] FreeBalances
         {
             get
@@ -87,10 +84,15 @@ namespace SharpTrader.BrokersApi.Binance
                     return _Balances.Select(kv => (kv.Key, kv.Value.Free)).ToArray();
             }
         }
-
-
-        public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1)
+        /// <summary>
+        /// If true then this instance support only public access
+        /// </summary>
+        public bool PublicAccessOnly { get; }
+        public bool IsDisposed { get; private set; }
+        public bool IsDisposing { get; private set; }
+        public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1, bool publicOnly = false)
         {
+            PublicAccessOnly = publicOnly;
             Logger = Serilog.Log.Logger.ForContext<BinanceMarketApi>();
             Logger.Information("BinanceMarketApi Starting initialization...");
             OperationsDbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
@@ -105,105 +107,90 @@ namespace SharpTrader.BrokersApi.Binance
             this.HistoryDb = new BinanceTradeBarsRepository(dataDir, Client);
         }
 
-
-
-
-        public async Task Initialize(bool resynchTradesAndOrders = false, bool publicOnly = false)
+        public async Task Initialize(bool resynchTradesAndOrders = false)
         {
-            var exchangeInfo = await Client.GetExchangeInfo();
-            //---- initialize symbols dictionary ---
-            foreach (var binanceSymbol in exchangeInfo.Symbols.OrderBy(s => s.symbol))
-            {
-                BinanceSymbolInfo symInfo = new BinanceSymbolInfo(binanceSymbol);
+            // Start basic services
+            _ = Task.Run(ServiceSynchServerTime);
+            // wait for service IsServiceAvailable and ExchangeInfoInitialized
+            while (!this.IsServiceAvailable)
+                await Task.Delay(100);
 
-                if (!SymbolsByAsset.ContainsKey(symInfo.Asset))
-                    SymbolsByAsset.Add(symInfo.Asset, new List<BinanceSymbolInfo>());
 
-                if (!SymbolsByQuoteAsset.ContainsKey(symInfo.QuoteAsset))
-                    SymbolsByQuoteAsset.Add(symInfo.QuoteAsset, new List<BinanceSymbolInfo>());
-
-                Symbols.Add(symInfo.Key, symInfo);
-                SymbolsByAsset[symInfo.Asset].Add(symInfo);
-                SymbolsByQuoteAsset[symInfo.QuoteAsset].Add(symInfo);
-            }
-            //initialize websocket
+         
+            _ = Task.Run(ServiceUpdateExchageInfo); 
+            // wait for service IsServiceAvailable and ExchangeInfoInitialized
+            while (!this.IsServiceAvailable || !ExchangeInfoInitialized)
+                await Task.Delay(100);
+             
+            //initialize websockets
             WSClient = new BinanceWebSocketClient(Client);
-            CombinedWebSocketClient = new CombinedWebSocketClient();
-            await this.ServerTimeSynch();
+            CombinedWebSocketClient = new CombinedWebSocketClient(Client);
 
-            //initialize db
-            Logger.Information("Archiving old oders...");
-            ArchiveOldOperations();
-
-            if (resynchTradesAndOrders)
-                await DownloadAllOrdersAndTrades();
-            else
+            //initialize non public services
+            if (!PublicAccessOnly)
             {
-                Logger.Information("Synching oders and trades....");
-                if (!publicOnly)
-                {
-                    await SynchOpenOrders();
-                    await SynchLastTrades();
-                }
+
+                _ = Task.Run(ServiceSynchBalance);
+                if (resynchTradesAndOrders)
+                    await DownloadAllOrdersAndTrades(); 
+                UserDataStreamManager = Task.Run(ServiceUserDataStream);
+                OrdersAndTradesSynchTask = Task.Run(ServiceSynchOrdersAndTrades);
             }
 
-            if (!publicOnly)
-            {
-                await ListenUserData();
-                await SynchBalance();
 
-                TimerListenUserData = new System.Timers.Timer(30000)
-                {
-                    AutoReset = false,
-                    Enabled = true,
-                };
-                TimerListenUserData.Elapsed += (s, ea) => ListenUserData().ContinueWith(t => TimerListenUserData.Start());
-
-                //----------
-
-                async Task SynchOrdersAndTrades()
-                {
-                    while (true)
-                    {
-                        await Task.Delay(TradesAndOrdersSynchPeriod);
-                        try
-                        {
-                            //we first synch open orders 
-                            await SynchOpenOrders();
-                            //synch last trades 
-                            await SynchLastTrades();
-                            //then finally we restart the timer and archive operations  
-                            ArchiveOldOperations();
-                        }
-                        catch { }
-                    }
-                };
-                OrdersAndTradesSynchTask = Task.Run(SynchOrdersAndTrades);
-            }
-            async Task SynchTimeAndBalance()
-            {
-                while (true)
-                {
-                    try
-                    {
-                        //first synch server time then balance then restart timer
-                        if (!publicOnly)
-                            await SynchBalance();
-                        await ServerTimeSynch();
-                    }
-                    catch { }
-                    await Task.Delay(BalanceAndTimeSynchPeriod);
-                }
-            };
-            FastUpdatesTask = Task.Run(SynchTimeAndBalance);
-            Logger.Information("BinanceMarketApi initialization complete");
+            Logger.Information("BinanceMarketApi initialization completed");
         }
 
+        private async Task ServiceUpdateExchageInfo()
+        {
+            while (!(IsDisposing || IsDisposed))
+            {
+                try
+                {
+                    var exchangeInfo = await Client.GetExchangeInfo();
+                    if (!ExchangeInfoInitialized)
+                    {
+                        foreach (var binanceSymbol in exchangeInfo.Symbols.OrderBy(s => s.symbol))
+                        {
+                            BinanceSymbolInfo symInfo = new BinanceSymbolInfo(binanceSymbol);
+
+                            if (!SymbolsByAsset.ContainsKey(symInfo.Asset))
+                                SymbolsByAsset.Add(symInfo.Asset, new List<BinanceSymbolInfo>());
+
+                            if (!SymbolsByQuoteAsset.ContainsKey(symInfo.QuoteAsset))
+                                SymbolsByQuoteAsset.Add(symInfo.QuoteAsset, new List<BinanceSymbolInfo>());
+
+                            if (!Symbols.ContainsKey(symInfo.Key))
+                            {
+                                Symbols.Add(symInfo.Key, symInfo);
+                                SymbolsByAsset[symInfo.Asset].Add(symInfo);
+                                SymbolsByQuoteAsset[symInfo.QuoteAsset].Add(symInfo);
+                            }
+                            //update symbol
+                            Symbols[symInfo.Key].Update(binanceSymbol);
+                        }
+                        ExchangeInfoInitialized = true;
+                    }
+
+                    //refresh every 1 minute
+                    await Task.Delay(TimeSpan.FromMinutes(1));
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Exception in ServiceUpdateExchageInfo.");
+                    await Task.Delay(TimeSpan.FromMinutes(1));
+                }
+
+
+
+            }
+
+        }
 
         private void ArchiveOldOperations()
         {
 
-            if (LastOperationsArchivingTime + TimeSpan.FromHours(24) < DateTime.Now)
+            if (LastOperationsArchivingTime + TimeSpan.FromHours(24) < DateTime.UtcNow)
                 lock (LockOrdersTrades)
                 {
                     TimeToArchive = Time - OperationsKeepAliveTime;
@@ -233,7 +220,7 @@ namespace SharpTrader.BrokersApi.Binance
                     OrdersArchive.Insert(ordersToMove);
 
                     TradesAndOrdersDb.Rebuild();
-                    LastOperationsArchivingTime = DateTime.Now;
+                    LastOperationsArchivingTime = DateTime.UtcNow;
                     TradesAndOrdersDb.Dispose();
                     TradesAndOrdersArch.Dispose();
                     InitializeOperationsDb();
@@ -360,45 +347,74 @@ namespace SharpTrader.BrokersApi.Binance
                 Trades.InsertBulk(trades);
         }
 
-        private async Task ServerTimeSynch()
+        private async Task ServiceSynchServerTime()
         {
-            try
+            int errorCount = 0;
+            while (!IsDisposing && !IsDisposed)
             {
-                var time = await Client.GetServerTime();
-                Client.TimestampOffset = time.ServerTime - DateTime.UtcNow;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Error during server time synch: {Message}", GetExceptionErrorInfo(ex));
-            }
-
-        }
-
-        private async Task SynchBalance()
-        {
-            try
-            {
-                var accountInfo = await Client.GetAccountInformation();
-                lock (LockBalances)
+                try
                 {
-                    foreach (var bal in accountInfo.Balances)
+                    var time = await Client.GetServerTime();
+                    errorCount = 0;
+                    this.IsServiceAvailable = true;
+                    Client.TimestampOffset = time.ServerTime - DateTime.UtcNow;
+                    if (!IsServiceAvailable)
+                        Logger.Information("BinanceApi is reachable, delay {Delay}", Client.TimestampOffset);
+                    else
+                        Logger.Verbose("BinanceApi is reachable, delay {Delay}", Client.TimestampOffset);
+
+                    await Task.Delay(BalanceAndTimeSynchPeriod);
+                }
+                catch (Exception ex)
+                {
+                    errorCount++;
+                    if (errorCount > 2)
                     {
-                        if (!_Balances.ContainsKey(bal.Asset))
-                            this._Balances[bal.Asset] = new AssetBalance();
-
-                        this._Balances[bal.Asset].Asset = bal.Asset;
-                        this._Balances[bal.Asset].Free = bal.Free;
-                        this._Balances[bal.Asset].Locked = bal.Locked;
-
+                        if (IsServiceAvailable)
+                            Logger.Warning("BinanceApi seems to be unreachable...{Message}", GetExceptionErrorInfo(ex));
+                        IsServiceAvailable = false;
                     }
+                    else
+                    {
+                        Logger.Error(ex, "Error during server time synch: {Message}", GetExceptionErrorInfo(ex));
+                    }
+                    await Task.Delay(1000);
                 }
             }
-            catch (Exception ex)
+        }
+
+        private async Task ServiceSynchBalance()
+        {
+            while (!IsDisposing && !IsDisposed)
             {
-                Logger.Error(ex, "Error while trying to update account info: {Message} ", GetExceptionErrorInfo(ex));
+                try
+                {
+                    if (IsServiceAvailable)
+                    {
+                        var accountInfo = await Client.GetAccountInformation();
+                        lock (LockBalances)
+                        {
+                            foreach (var bal in accountInfo.Balances)
+                            {
+                                if (!_Balances.ContainsKey(bal.Asset))
+                                    this._Balances[bal.Asset] = new AssetBalance();
+
+                                this._Balances[bal.Asset].Asset = bal.Asset;
+                                this._Balances[bal.Asset].Free = bal.Free;
+                                this._Balances[bal.Asset].Locked = bal.Locked;
+                            }
+                        }
+                        await Task.Delay(BalanceAndTimeSynchPeriod);
+                    }
+                    else
+                        await Task.Delay(1000);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Error while trying to update account info: {Message} ", GetExceptionErrorInfo(ex));
+                }
+
             }
-
-
         }
 
         private void RemoveOpenOrder(Order order)
@@ -455,6 +471,7 @@ namespace SharpTrader.BrokersApi.Binance
             foreach (var sym in Symbols.Keys)
                 await SynchLastTrades(sym);
         }
+
         public async Task SynchLastTrades(string sym, bool force = false, int tradesCountLimit = 100)
         {
             var symData = SymbolsData.FindById(sym);
@@ -524,75 +541,139 @@ namespace SharpTrader.BrokersApi.Binance
                 Logger.Warning(ex, "Error during {Symbol} trades synch", sym);
             }
         }
-        private async Task ListenUserData()
+        private async Task ServiceUserDataStream()
         {
-            try
+            Guid UserDataSocket = Guid.Empty;
+            DateTime nextPing = DateTime.MinValue;
+            DateTime nextHandOverTime = DateTime.MaxValue;
+            DateTime nextKeepAliveTime = DateTime.MaxValue;
+            Guid oldSocket = Guid.Empty;
+            while (this.IsDisposed && !IsDisposing)
             {
-                if (UserDataSocket != default && (!UserDataPingStopwatch.IsRunning || UserDataPingStopwatch.Elapsed > TimeSpan.FromMinutes(1)))
+                if (!IsServiceAvailable)
                 {
-                    UserDataPingStopwatch.Restart();
+                    await Task.Delay(1000);
+                    continue;
+                }
+                //check if socket is connected alive
+                if (UserDataSocket != Guid.Empty && DateTime.UtcNow >= nextPing)
+                {
+                    nextPing = DateTime.UtcNow.AddSeconds(5);
                     try
                     {
-                        if (!WSClient.PingWebSocketInstance(UserDataSocket))
+                        if (!WSClient.IsAlive(UserDataSocket))
                         {
-                            CloseUserDataSocket();
+                            CloseSocket(UserDataSocket);
                             Logger.Information("Closing user data socket because ping returned false.");
                         }
                     }
-                    catch { UserDataSocket = default; }
-                }
-
-                //every 120 minutes close the socket
-                if (!StopwatchSocketClose.IsRunning || StopwatchSocketClose.Elapsed > TimeSpan.FromMinutes(120))
-                {
-                    StopwatchSocketClose.Restart();
-                    CloseUserDataSocket();
-                }
-
-
-                if (UserDataSocket == default)
-                {
-                    UserDataSocket = await WSClient.ConnectToUserDataWebSocket(new UserDataWebSocketMessages()
+                    catch (Exception ex)
                     {
-                        AccountUpdateMessageHandler = HandleAccountUpdatedMessage,
-                        OrderUpdateMessageHandler = HandleOrderUpdateMsg,
-                        TradeUpdateMessageHandler = HandleTradeUpdateMsg,
-                        OutboundAccountPositionHandler = HandleOutboundAccountPosition,
-                        BalanceUpdateMessageHandler = HandleBalanceUpdateMessage
-                    });
+                        Logger.Error(ex, "Unexpected exception while ping user data socket.");
+                        UserDataSocket = default;
+                    }
+                }
+
+                //keep alive listen key
+                if (UserDataSocket != Guid.Empty && DateTime.UtcNow >= nextKeepAliveTime)
+                {
+                    try
+                    {
+                        await WSClient.KeepAliveListenKey(UserDataSocket);
+                        nextKeepAliveTime = DateTime.UtcNow.AddMinutes(15);
+                    }
+                    catch (Exception ex)
+                    {
+                        nextKeepAliveTime = DateTime.UtcNow.AddMinutes(3);
+                        Logger.Error(ex, "Exception while keep alive listen key.");
+                    }
+                }
+
+
+                // reconnect data socket if it is not connected
+                if (UserDataSocket == Guid.Empty)
+                    nextHandOverTime = DateTime.UtcNow;
+                if (DateTime.UtcNow >= nextHandOverTime)
+                {
+                    if (IsServiceAvailable)
+                    {
+                        //keep old socket open
+                        if (UserDataSocket != Guid.Empty)
+                            oldSocket = UserDataSocket;
+                        try
+                        {
+                            UserDataSocket = await WSClient.ConnectToUserDataWebSocket(new UserDataWebSocketMessages()
+                            {
+                                AccountUpdateMessageHandler = HandleAccountUpdatedMessage,
+                                OrderUpdateMessageHandler = HandleOrderUpdateMsg,
+                                TradeUpdateMessageHandler = HandleTradeUpdateMsg,
+                                OutboundAccountPositionHandler = HandleOutboundAccountPosition,
+                                BalanceUpdateMessageHandler = HandleBalanceUpdateMessage
+                            });
+                            nextHandOverTime = DateTime.UtcNow.AddMinutes(120);
+                            nextKeepAliveTime = DateTime.UtcNow.AddMinutes(15);
+                            //close old socket
+                            if (oldSocket != Guid.Empty)
+                                CloseSocket(oldSocket);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex, "Failed to listen for user data stream because: {Message}", GetExceptionErrorInfo(ex));
+                        }
+                    }
+                }
+                // delay
+                await Task.Delay(100);
+            }
+        }
+        private async Task ServiceSynchOrdersAndTrades()
+        {
+            while (!IsDisposing && !IsDisposed)
+            {
+                try
+                {
+                    if (IsServiceAvailable)
+                    {
+                        Logger.Verbose("Synching oders and trades....");
+                        //we first synch open orders 
+                        await SynchOpenOrders();
+                        //synch last trades 
+                        await SynchLastTrades();
+                    }
+
+                    //then finally we archive operations  
+                    ArchiveOldOperations();
+                    await Task.Delay(TradesAndOrdersSynchPeriod);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Error in SynchOrdersAndTrades");
                 }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to listen for user data stream because: {Message}", GetExceptionErrorInfo(ex));
-            }
-
         }
-
-
-
-        private void CloseUserDataSocket()
+        private void CloseSocket(Guid sockId)
         {
             try
             {
-                if (UserDataSocket != default)
+                if (sockId != Guid.Empty)
                 {
-                    WSClient.CloseWebSocketInstance(UserDataSocket);
+                    WSClient.CloseWebSocketInstance(sockId);
                 }
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Failed closing user data stream because: {Message} ", GetExceptionErrorInfo(ex));
+                Logger.Error(ex, "Failed closing socket because: {Message} ", GetExceptionErrorInfo(ex));
             }
-            UserDataSocket = default;
+            sockId = Guid.Empty;
         }
-
         private void HandleAccountUpdatedMessage(BinanceAccountUpdateData msg)
         {
             lock (LockBalances)
             {
                 foreach (var bal in msg.Balances)
                 {
+                    if (!_Balances.ContainsKey(bal.Asset))
+                        this._Balances[bal.Asset] = new AssetBalance();
                     this._Balances[bal.Asset].Free = bal.Free;
                     this._Balances[bal.Asset].Locked = bal.Locked;
                 }
@@ -605,6 +686,9 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 foreach (var bal in msg.Balances)
                 {
+                    if (!_Balances.ContainsKey(bal.Asset))
+                        this._Balances[bal.Asset] = new AssetBalance();
+
                     this._Balances[bal.Asset].Free = bal.Free;
                     this._Balances[bal.Asset].Locked = bal.Locked;
                 }
@@ -615,8 +699,10 @@ namespace SharpTrader.BrokersApi.Binance
         {
             lock (LockBalances)
             {
-                if (this._Balances.ContainsKey(data.Asset))
-                    this._Balances[data.Asset].Free += data.Delta;
+                if (!_Balances.ContainsKey(data.Asset))
+                    this._Balances[data.Asset] = new AssetBalance();
+            
+                this._Balances[data.Asset].Free += data.Delta;
             }
         }
 
@@ -1017,7 +1103,7 @@ namespace SharpTrader.BrokersApi.Binance
             else
             {
                 allPrices = await Client.GetSymbolsPriceTicker();
-                Cache.Set("allPrices", allPrices, DateTime.Now.AddSeconds(30));
+                Cache.Set("allPrices", allPrices, DateTime.UtcNow.AddSeconds(30));
             }
 
             return allPrices;
@@ -1257,10 +1343,12 @@ namespace SharpTrader.BrokersApi.Binance
 
         public void Dispose()
         {
+            IsDisposing = true;
             Trades = null;
             Orders = null;
             TradesAndOrdersDb.Dispose();
             TradesAndOrdersArch.Dispose();
+            IsDisposed = true;
         }
 
         public ITrade GetTradeById(string tradeId)
