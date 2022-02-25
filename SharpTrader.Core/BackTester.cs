@@ -312,9 +312,12 @@ namespace SharpTrader
             Console.WriteLine(
                 $"Time: {MarketSimulator.Time:yyyy/MM/dd hh:mm}\n" +
                 $"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
+
+            var profitPerOper = operations.Count > 0 ? BotStats.Profit / operations.Count : 0;
+
             if (operations.Count > 0)
             {
-                Console.WriteLine($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
+                Console.WriteLine($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {profitPerOper:F8} ");
                 Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
             }
             else
@@ -326,12 +329,13 @@ namespace SharpTrader
 
             if (!consoleOnly)
             {
+             
                 Logger.Information("Backtest results:\n" +
                     "Balance: {totalBal:F4} - Operations:{OperationsCount} - Lost in fee:{lostInFee:F4}\n" +
                     "Algorithm => {@AlgoStats} \n" +
                     "BenchMark => {@BenchmarkStats}",
                     totalBal, operations.Count, lostInFee,
-                    new { BotStats.StartingEquity, BotStats.Profit, BotStats.ProfitOverMaxDrowDown, ProfitPerOper = BotStats.Profit / operations.Count, BotStats.MaxDrowDown, BotStats.BalancePeak },
+                    new { BotStats.StartingEquity, BotStats.Profit, BotStats.ProfitOverMaxDrowDown, ProfitPerOper = profitPerOper, BotStats.MaxDrowDown, BotStats.BalancePeak },
                     new { BenchmarkStats.StartingEquity, BenchmarkStats.Profit, BenchmarkStats.ProfitOverMaxDrowDown, BenchmarkStats.MaxDrowDown, BenchmarkStats.BalancePeak }
                     );
             }
