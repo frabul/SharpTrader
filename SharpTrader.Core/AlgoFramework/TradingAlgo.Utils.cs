@@ -135,5 +135,70 @@ namespace SharpTrader.AlgoFramework
             return adj;
         }
 
+        public class AlgoResultsSlice
+        {
+            public string AlgoName { get; set; }
+            public DateTime PeriodStart { get; set; }
+            public DateTime PeriodEnd { get; set; }
+            public decimal Volume { get; set; }
+            public decimal Equity { get; set; }
+            public decimal GainsRealized { get; set; }
+            public decimal GainsPartial { get; set; }
+            public int OperationsCount { get; set; }
+            public string BaseAsset { get; set; }
+        }
+
+        public AlgoResultsSlice GetTradingResults(DateTime startTime, DateTime endTime, string baseAsset)
+        {
+            var allOperations = QueryOperations(op =>  op["CreationTime"].AsDateTime >= startTime && op["CreationTime"].AsDateTime < endTime && op["AmountInvested"].AsDecimal > 0)
+                                        .Select(op => this.OperationFromBson(op)).ToList();
+            var periodResults = new AlgoResultsSlice()
+            {
+                AlgoName = this.Name,
+                PeriodStart = startTime,
+                PeriodEnd = endTime,
+                BaseAsset = baseAsset
+            };
+            foreach (var op in allOperations)
+            {
+                //check that the operation is not anomalous
+                var gain = op.CalculateGainAsQuteAsset(0.00075m);
+                var roi = gain / op.QuoteAmountInvested;
+                if (roi > 0.1m || op.AmountRemaining < 0)
+                {
+                    Logger.Warning("Found operation {OperationId} with anomalous gain {gain} or amount remaining {OperationAmountRemaining} ", op.Id, gain, op.AmountRemaining);
+                    continue;
+                }
+                //-------
+                periodResults.OperationsCount += 1;
+                if ((op.IsClosed || op.IsClosing) && op.AmountRemaining / op.AmountInvested <= 0.05m)
+                {
+                    var spent = op.Entries.Sum(e => e.Price * e.Amount);
+                    var recovered = op.Exits.Sum(e => e.Price * e.Amount);
+                    periodResults.Volume += spent + recovered;
+                    periodResults.Equity += roi;
+                    periodResults.GainsRealized += gain;
+                    periodResults.GainsPartial += gain;
+                }
+                else if ((op.AmountRemaining / op.AmountInvested) > 0.02m)
+                {
+                    //get the current price for the symbol
+                    if (this.SymbolsData.TryGetValue(op.Symbol.Key, out SymbolData symData))
+                    {
+                        if (symData.Feed != null)
+                        {
+                            var curPrice = symData.Feed.Bid;
+                            var spent = op.AmountInvested * op.AverageEntryPrice;
+                            var recovered = op.AmountLiquidated * op.AverageExitPrice;
+                            var couldRecover = op.AmountRemaining * (decimal)curPrice;
+                            periodResults.Volume += spent + recovered;
+                            periodResults.Equity += (recovered + couldRecover - spent) / op.QuoteAmountInvested;
+                            periodResults.GainsPartial += (recovered + couldRecover - spent) * (1 - 0.00075m * 2);
+                        }
+                    }
+                }
+            }
+            return periodResults;
+        }
     }
 }
