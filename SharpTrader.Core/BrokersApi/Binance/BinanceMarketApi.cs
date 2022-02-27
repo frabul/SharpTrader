@@ -564,13 +564,14 @@ namespace SharpTrader.BrokersApi.Binance
                         if (!WSClient.IsAlive(UserDataSocket))
                         {
                             CloseSocket(UserDataSocket);
+                            UserDataSocket = Guid.Empty;
                             Logger.Information("Closing UserDataSocket because ping returned false.");
                         }
                     }
                     catch (Exception ex)
                     {
                         Logger.Error(ex, "Unexpected exception while ping UserDataSocket.");
-                        UserDataSocket = default;
+                        UserDataSocket = Guid.Empty;
                     }
                 }
 
@@ -1293,6 +1294,7 @@ namespace SharpTrader.BrokersApi.Binance
                     {
                         Symbol = order.Symbol,
                         OrderId = order.OrderId,
+                        NewClientOrderId = order.ClientId + "c"
                     });
                     lock (LockBalances)
                     {

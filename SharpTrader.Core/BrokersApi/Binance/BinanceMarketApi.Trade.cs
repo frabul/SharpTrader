@@ -37,14 +37,15 @@ namespace SharpTrader.BrokersApi.Binance
             Direction = tr.Side == OrderSide.Buy ? TradeDirection.Buy : TradeDirection.Sell;
             Price = tr.PriceOfLastFilledTrade;
             Amount = tr.QuantityOfLastFilledTrade;
-            Commission = Commission;
-            CommissionAsset = CommissionAsset;
+            Commission = tr.Commission;
+            CommissionAsset = tr.AssetCommissionTakenFrom;
             Time = tr.TimeStamp;
             OrderId = tr.OrderId;
-            ClientOrderId = tr.NewClientOrderId;
+            ClientOrderId = tr.OriginalClientOrderId;
             TradeId = tr.TradeId;
             Id = Symbol + TradeId;
         }
+
         [BsonId]
         public string Id { get; set; }
         public long TradeId { get; set; }
