@@ -545,10 +545,10 @@ namespace SharpTrader.BrokersApi.Binance
         {
             Guid UserDataSocket = Guid.Empty;
             DateTime nextPing = DateTime.MinValue;
-            DateTime nextHandOverTime = DateTime.MaxValue;
-            DateTime nextKeepAliveTime = DateTime.MaxValue;
+            DateTime nextHandOverTime = DateTime.UtcNow.AddMinutes(120);
+            DateTime nextKeepAliveTime = DateTime.UtcNow.AddMinutes(15);
             Guid oldSocket = Guid.Empty;
-            while (this.IsDisposed && !IsDisposing)
+            while (!(this.IsDisposed || IsDisposing))
             {
                 if (!IsServiceAvailable)
                 {
@@ -564,12 +564,12 @@ namespace SharpTrader.BrokersApi.Binance
                         if (!WSClient.IsAlive(UserDataSocket))
                         {
                             CloseSocket(UserDataSocket);
-                            Logger.Information("Closing user data socket because ping returned false.");
+                            Logger.Information("Closing UserDataSocket because ping returned false.");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error(ex, "Unexpected exception while ping user data socket.");
+                        Logger.Error(ex, "Unexpected exception while ping UserDataSocket.");
                         UserDataSocket = default;
                     }
                 }
@@ -586,6 +586,12 @@ namespace SharpTrader.BrokersApi.Binance
                     {
                         nextKeepAliveTime = DateTime.UtcNow.AddMinutes(3);
                         Logger.Error(ex, "Exception while keep alive listen key.");
+                        if (ex is BinanceException binex && binex.ErrorDetails.Code == -1125)
+                        {
+                            Logger.Warning(ex, "Invalidating UserDataSocket because of exception.");
+                            UserDataSocket = Guid.Empty;
+
+                        }
                     }
                 }
 
@@ -602,6 +608,7 @@ namespace SharpTrader.BrokersApi.Binance
                             oldSocket = UserDataSocket;
                         try
                         {
+                            Logger.Information("Reconnecting to UserDataSocket.");
                             UserDataSocket = await WSClient.ConnectToUserDataWebSocket(new UserDataWebSocketMessages()
                             {
                                 AccountUpdateMessageHandler = HandleAccountUpdatedMessage,
@@ -618,7 +625,7 @@ namespace SharpTrader.BrokersApi.Binance
                         }
                         catch (Exception ex)
                         {
-                            Logger.Error(ex, "Failed to listen for user data stream because: {Message}", GetExceptionErrorInfo(ex));
+                            Logger.Error(ex, "Failed to listen for UserDataSocket because: {Message}", GetExceptionErrorInfo(ex));
                         }
                     }
                 }
