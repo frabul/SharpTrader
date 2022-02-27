@@ -94,7 +94,7 @@ namespace SharpTrader.BrokersApi.Binance
                 { 
                     if (DateTime.UtcNow > LastKlineWarn.AddSeconds(900))
                     {
-                        Logger.Warning("{Symbol} - Kline websock looked like frozen", Symbol);
+                        Logger.Warning("{Symbol} - Kline websocket looked like frozen", Symbol);
                         LastKlineWarn = DateTime.UtcNow;
                     } 
                 }
@@ -103,7 +103,7 @@ namespace SharpTrader.BrokersApi.Binance
                     DepthWatchdog.Restart();
                     if (DateTime.UtcNow > LastDepthWarn.AddSeconds(90))
                     {
-                        Logger.Warning("{Symbol} - Depth websock looked like frozen", Symbol);
+                        Logger.Warning("{Symbol} - Depth websocket looked like frozen", Symbol);
                         LastDepthWarn = DateTime.UtcNow;
                     } 
                 } 

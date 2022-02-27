@@ -116,12 +116,12 @@ namespace SharpTrader.BrokersApi.Binance
                 await Task.Delay(100);
 
 
-         
-            _ = Task.Run(ServiceUpdateExchageInfo); 
+
+            _ = Task.Run(ServiceUpdateExchageInfo);
             // wait for service IsServiceAvailable and ExchangeInfoInitialized
             while (!this.IsServiceAvailable || !ExchangeInfoInitialized)
                 await Task.Delay(100);
-             
+
             //initialize websockets
             WSClient = new BinanceWebSocketClient(Client);
             CombinedWebSocketClient = new CombinedWebSocketClient(Client);
@@ -132,7 +132,7 @@ namespace SharpTrader.BrokersApi.Binance
 
                 _ = Task.Run(ServiceSynchBalance);
                 if (resynchTradesAndOrders)
-                    await DownloadAllOrdersAndTrades(); 
+                    await DownloadAllOrdersAndTrades();
                 UserDataStreamManager = Task.Run(ServiceUserDataStream);
                 OrdersAndTradesSynchTask = Task.Run(ServiceSynchOrdersAndTrades);
             }
@@ -708,7 +708,7 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 if (!_Balances.ContainsKey(data.Asset))
                     this._Balances[data.Asset] = new AssetBalance();
-            
+
                 this._Balances[data.Asset].Free += data.Delta;
             }
         }
@@ -719,6 +719,7 @@ namespace SharpTrader.BrokersApi.Binance
             //update or add in database 
             OrdersUpdateOrInsert(newOrder);
             OrdersActiveInsertOrUpdate(newOrder);
+            Logger.Debug("UserDataSocket notified order updated, clientId {OrderId}, raw id {RawId} ", newOrder.ClientId, newOrder.Id);
         }
 
         private void HandleTradeUpdateMsg(BinanceTradeOrderData msg)
@@ -728,8 +729,12 @@ namespace SharpTrader.BrokersApi.Binance
             //get the unique instance of the order
             newOrder = OrdersActiveInsertOrUpdate(newOrder);
             //add trade to order
+
             if (!newOrder.ResultingTrades.Contains(tradeUpdate.TradeId))
                 newOrder.ResultingTrades.Add(tradeUpdate.TradeId);
+
+            Logger.Debug("UserDataSocket notified trade {TradeId} from order {OrderId}", tradeUpdate.Id, tradeUpdate.ClientOrderId);
+
             //reinsert the order
             OrdersUpdateOrInsert(newOrder);
             OrdersActiveInsertOrUpdate(newOrder);
@@ -800,7 +805,7 @@ namespace SharpTrader.BrokersApi.Binance
                 else
                 {
                     Trades.Insert(newTrade);
-                    Logger.Information("New trade {@Trade}", newTrade);
+                    Logger.Information("Inserting new trade {@Trade}", newTrade);
                     OnNewTrade?.Invoke(this, newTrade);
                 }
             }
