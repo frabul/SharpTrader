@@ -20,7 +20,7 @@ namespace SharpTrader.MarketSimulator
         public double Ask { get; private set; }
         public DateTime Time { get; internal set; }
         public double Bid { get; private set; }
-        public string Market { get; private set; }
+        public string MarketName { get; private set; }
         public double Spread { get; set; }
         public ISymbolHistory DataSource { get; set; }
         public IBaseData LastTick { get; private set; }
@@ -28,7 +28,7 @@ namespace SharpTrader.MarketSimulator
         public SymbolFeed(string market, BinanceSymbolInfo symbol)
         {
             this.Symbol = symbol;
-            this.Market = market;
+            this.MarketName = market;
         }
 
         public virtual Task<TimeSerie<ITradeBar>> GetHistoryNavigator(DateTime historyStartTime)
