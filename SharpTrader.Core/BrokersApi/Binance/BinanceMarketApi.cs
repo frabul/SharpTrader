@@ -737,7 +737,7 @@ namespace SharpTrader.BrokersApi.Binance
             if (!newOrder.ResultingTrades.Contains(tradeUpdate.TradeId))
                 newOrder.ResultingTrades.Add(tradeUpdate.TradeId);
 
-            Logger.Debug("UserDataSocket notified trade {TradeId} from order {OrderId}", tradeUpdate.Id, tradeUpdate.ClientOrderId);
+            Logger.Debug("UserDataSocket notified trade {TradeId} from order {OrderId} / {RawOrderId}", tradeUpdate.Id, tradeUpdate.ClientOrderId, tradeUpdate.OrderId);
 
             //reinsert the order
             OrdersUpdateOrInsert(newOrder);
