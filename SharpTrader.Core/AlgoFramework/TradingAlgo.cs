@@ -252,7 +252,7 @@ namespace SharpTrader.AlgoFramework
                             oldOp.Dispose(); //otherwise we must dispose it
                     }
                     else
-                        logger.Warning("The trade {TradeId} from {ClientOrderId} was not associated to any operation.", trade.Id, trade.ClientOrderId);
+                        logger.Verbose("The trade {TradeId} from {ClientOrderId} was not associated to any operation.", trade.Id, trade.ClientOrderId);
                 }
             }
 
