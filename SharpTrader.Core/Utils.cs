@@ -9,6 +9,12 @@ namespace SharpTrader
     public static class Extensions
     {
         public static readonly DateTime BaseUnixTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        public static DateTime StartOfDay(this DateTime date)
+        {
+            return new DateTime(date.Year, date.Month, date.Day, 0, 0, 0, DateTimeKind.Utc);
+        }
+
         public static long ToEpoch(this DateTime date)
         {
             return (long)Math.Round((date - Extensions.BaseUnixTime).TotalSeconds);
@@ -40,13 +46,13 @@ namespace SharpTrader
             return x.Time.CompareTo(y.Time);
         }
     }
-   
+
     public class CandlestickTimeComparer : IComparer<ITradeBar>, IComparer<Candlestick>, IComparer<IBaseData>
     {
         public static CandlestickTimeComparer Instance { get; } = new CandlestickTimeComparer();
         public int Compare(ITradeBar x, ITradeBar y)
         {
-           
+
             return x.OpenTime.CompareTo(y.OpenTime);
             //return (int)(x.OpenTime.Ticks - y.OpenTime.Ticks);
             //var val = x.OpenTime.Ticks - y.OpenTime.Ticks;

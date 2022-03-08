@@ -52,7 +52,9 @@ namespace SharpTrader
         [ProtoIgnore]
         [IgnoreMember]
         public MarketDataKind Kind => MarketDataKind.TradeBar;
-
+        [ProtoIgnore]
+        [IgnoreMember]
+        public static Candlestick Default { get; } = new Candlestick();
         public bool IsDefault()
         {
             return CloseTime == default(DateTime);
@@ -70,17 +72,18 @@ namespace SharpTrader
             openTime = ot;
             closeTime = ct;
         }
-        public Candlestick(DateTime openTime, ITradeBar toCopy, TimeSpan duration)
+
+        public void SetData(DateTime openTime, TimeSpan duration, ITradeBar toCopy)
         {
-            Open = toCopy.Open;
-            Close = toCopy.Close;
-            High = toCopy.High;
-            Low = toCopy.Low;
-            QuoteAssetVolume = toCopy.QuoteAssetVolume;
-            this.openTime = toCopy.OpenTime;
-            closeTime = toCopy.CloseTime;
-            OpenTime = toCopy.OpenTime;
-            CloseTime = toCopy.OpenTime + duration;
+            this.OpenTime = openTime;
+            this.CloseTime = openTime + duration;
+
+            this.Open = toCopy.Open;
+            this.Close = toCopy.Close;
+            this.High = toCopy.High;
+            this.Low = toCopy.Low;
+            this.QuoteAssetVolume = toCopy.QuoteAssetVolume;
+
         }
 
         public Candlestick(ITradeBar toCopy)
@@ -143,6 +146,19 @@ namespace SharpTrader
         public override string ToString()
         {
             return $"{{ {Time} Open:{Open:f7} Hi:{High:f7} Low:{Low:f7} Close:{Close:f7}  }}";
+        }
+
+        public static Candlestick GetFiller(Candlestick precedingCandle)
+        {
+            return new Candlestick(
+               precedingCandle.CloseTime,
+               precedingCandle.CloseTime + precedingCandle.Timeframe,
+               precedingCandle.Close,
+               precedingCandle.Close,
+               precedingCandle.Close,
+               precedingCandle.Close,
+               0
+           );
         }
     }
 }
