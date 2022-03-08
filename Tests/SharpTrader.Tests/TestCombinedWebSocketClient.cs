@@ -20,7 +20,7 @@ namespace SharpTrader.Tests
             BinanceMarketApi api = new BinanceMarketApi(null, null, ".\\Data2");
 
 
-            CombinedWebSocketClient cli = new CombinedWebSocketClient();
+            CombinedWebSocketClient cli = new CombinedWebSocketClient(api.Client);
             var symbols = api.GetSymbols().ToArray();
             Stopwatch sw = new Stopwatch();
 

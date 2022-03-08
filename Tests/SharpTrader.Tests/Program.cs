@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace TestConsole
 {
-    class Program
+    public class Program
     {
         interface IFoo
         {
@@ -34,8 +34,9 @@ namespace TestConsole
             public int B { get; set; } = 3;
         }
 
-        static async Task Main(string[] args)
+        public static async Task Main(string[] args)
         {
+            new TestTradeBarConsolidator().SimpleTest();
             LiteDB.LiteDatabase db = new LiteDB.LiteDatabase("test.db");
 
             var dummyMapper = new LiteDB.BsonMapper();
@@ -52,10 +53,6 @@ namespace TestConsole
                 }
             );
 
-        
-           
-           
-
             var bars = db.GetCollection<Bar>("FooCollection");
             bars.DeleteAll();
             bars.Upsert(new Bar());
@@ -70,10 +67,10 @@ namespace TestConsole
                    var tofoo2 = dummyMapper.Deserialize<Foo2>(bson);
                    return new Foo() { A = bson["A"].AsInt32 };
                }
-           );
+            );
 
 
-            var ret1 = db.GetCollection("FooCollection").FindOne( e => true) ;
+            var ret1 = db.GetCollection("FooCollection").FindOne(e => true);
             //var obj = mapper2.Deserialize<Bar>(ret1);
             var ret = bars.FindAll().ToList();
 
