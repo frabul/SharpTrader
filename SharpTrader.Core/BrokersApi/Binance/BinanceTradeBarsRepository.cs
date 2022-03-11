@@ -54,7 +54,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             System.IO.File.WriteAllText(System.IO.Path.Combine(DataDir, "BinanceSymbolsTable.json"), json);
         }
 
-        public async Task AssureData(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime)
+        public async Task AssureData(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime, bool fillGaps = true)
         {
 
 
@@ -112,6 +112,9 @@ namespace SharpTrader.Core.BrokersApi.Binance
                             checkTime = checkTime + histInfo.Resolution;
                     }
                 }
+                //now fill gaps  
+                if (fillGaps)
+                    this.FillGaps(histInfo);
             }
             catch (Exception ex)
             {

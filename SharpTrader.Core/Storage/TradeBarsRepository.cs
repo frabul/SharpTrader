@@ -20,7 +20,7 @@ namespace SharpTrader.Storage
     public enum ChunkSpan { OneMonth, OneDay }
     //TODO make thread safe
     public class TradeBarsRepository
-    { 
+    {
         private Serilog.ILogger Logger = Serilog.Log.ForContext<TradeBarsRepository>();
         private static readonly CandlestickTimeComparer<Candlestick> CandlestickTimeComparer = new CandlestickTimeComparer<Candlestick>();
         private string DataDir;
@@ -209,9 +209,9 @@ namespace SharpTrader.Storage
             var filesGrouped = chunks.GroupBy(c => c.Value.HistoryId.Key).ToList();
 
             var data = new List<SymbolHistoryMetaDataInternal>();
-            Logger.Information("Rebuilding history db, found {GroupCnt} chunks grouped by id, {ChunkFileVersion} {ChunkSpan}", 
-                filesGrouped.Count, 
-                ChunkFileVersion, 
+            Logger.Information("Rebuilding history db, found {GroupCnt} chunks grouped by id, {ChunkFileVersion} {ChunkSpan}",
+                filesGrouped.Count,
+                ChunkFileVersion,
                 ChunkSpan);
             int cnt = 0;
             foreach (var group in filesGrouped)
@@ -314,6 +314,38 @@ namespace SharpTrader.Storage
             }
         }
 
+        public void FillGaps(SymbolHistoryId finfo)
+        {
+            lock (SymbolsMetaData)
+            {
+                var myData = GetMetaDataInternal(finfo);
+                if (myData.View != null)
+                {
+                    //consolidator fills gaps by default
+                    var consolidator = new TradeBarConsolidator(finfo.Resolution);
+                    var ticks = myData.View.TicksUnsafe;
+
+
+                    lock (ticks)
+                    {
+                        consolidator.OnConsolidated += it =>
+                        {
+                            if (it is Candlestick c)
+                                ticks.Add(c);
+                            else
+                                ticks.Add(new Candlestick(it));
+                        };
+
+                        var oldTicks = new List<Candlestick>(ticks);
+                        ticks.Clear();
+
+                        foreach (var tick in oldTicks)
+                            consolidator.Update(tick);
+                    }
+
+                }
+            }
+        }
         public void Dispose()
         {
             this.Db.Dispose();

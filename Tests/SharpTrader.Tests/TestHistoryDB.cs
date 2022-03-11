@@ -91,6 +91,56 @@ namespace SharpTrader.Tests
             }
         }
 
+        public static async Task TestFillGaps(string symbol)
+        {
+            Console.WriteLine($"Testing FillGaps on {symbol}");
+            var startTime = new DateTime(2021, 06, 01, 0, 0, 0, DateTimeKind.Utc);
+            var endTime = new DateTime(2022, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+            var db = new BinanceTradeBarsRepository(@"C:\projects\temp\DbTest", ChunkFileVersion.V3, ChunkSpan.OneMonth);
+            var histId = new SymbolHistoryId("Binance", symbol, TimeSpan.FromSeconds(60));
+
+            var sw1 = Stopwatch.StartNew();
+            await db.AssureData(histId, startTime, endTime, fillGaps: false);
+            sw1.Stop();
+            Console.WriteLine($"Data assured in {sw1.ElapsedMilliseconds}");
+
+            db.SaveAndClose(histId);
+
+            var dataold = db.GetSymbolHistory(histId, startTime).Ticks;
+
+            var sw2 = Stopwatch.StartNew();
+            db.FillGaps(histId);
+            sw2.Stop();
+            var datanew = db.GetSymbolHistory(histId, startTime).Ticks;
+
+            Console.WriteLine($"Gaps filled in {sw2.ElapsedMilliseconds}");
+            Console.WriteLine($"Diff count {datanew.Count - dataold.Count}");
+
+            var timeIter = startTime.AddMinutes(1);
+            while (timeIter <= dataold.Last.Time)
+            {
+                dataold.SeekNearestBefore(timeIter);
+                datanew.SeekNearestBefore(timeIter);
+
+                if (dataold.Time == timeIter) // dataOld has candle and dataNew should be equal
+                {
+                    if (!dataold.Current.Equals(datanew.Current))
+                    {
+                        Console.WriteLine($"Mismatch at {timeIter}!");
+                    }
+                }
+                else
+                {
+                    //there is a gap
+                    if (datanew.Time != timeIter)
+                        Console.WriteLine($"Gap not filled at {timeIter}");
+                    else
+                        Console.WriteLine($"Gap filled at {timeIter}");
+                }
+                timeIter += histId.Resolution;
+            }
+            db.SaveAndClose(histId);
+        }
 
         public async Task TestDbV3Async()
         {
