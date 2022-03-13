@@ -57,6 +57,16 @@ namespace SharpTrader
             //check if we need to emit last forming candle ( or some fillers )
             Scan(newCandle.Time);
 
+            //optimize the case when the candle does not need any consolidation
+            if (newCandle.Timeframe == Resolution && FormingCandle.IsDefault())
+            {
+                //emit this candle
+                OnConsolidated?.Invoke(newCandle);
+                var candle = newCandle as Candlestick;
+                LastEmittedCandle = candle ?? new Candlestick(newCandle);
+                return;
+            }
+
             // emit the forming candle immediatly if the new one does not belong to it
             if (!FormingCandle.IsDefault() && newCandle.OpenTime >= FormingCandle.CloseTime)
                 EmitCandle();
