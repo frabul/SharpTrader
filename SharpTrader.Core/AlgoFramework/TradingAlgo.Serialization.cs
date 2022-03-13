@@ -207,13 +207,17 @@ namespace SharpTrader.AlgoFramework
         {
             if (!Config.SaveData)
             {
-                foreach (var op in ActiveOperations.Concat(ClosedOperations).Where(op => op.IsChanged))
+                if (Logger.IsEnabled(Serilog.Events.LogEventLevel.Debug))
                 {
-                    Logger.ForContext("Operation", op, true)
-                          .ForContext("Symbol", op.Symbol)
-                          .Debug("{OperationId} - Operation changed", op.Id);
-                    op.AcceptChanges();
-                } 
+                    //this loop is very expensive in backtests - do it only if required
+                    foreach (var op in ActiveOperations.Where(op => op.IsChanged))
+                    {
+                        Logger.ForContext("Operation", op, true)
+                              .ForContext("Symbol", op.Symbol)
+                              .Debug("{OperationId} - Operation changed", op.Id);
+                        op.AcceptChanges();
+                    }
+                }
                 return;
             }
             lock (DbLock)

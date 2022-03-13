@@ -63,8 +63,9 @@ namespace SharpTrader.AlgoFramework
             Market = marketApi;
             Market.OnNewTrade += Market_OnNewTrade;
             this.DoMarginTrading = config.MarginTrading;
+            var minLevel = Enum.GetValues(typeof(Serilog.Events.LogEventLevel)).Cast<Serilog.Events.LogEventLevel>().Where(logger.IsEnabled).Min();
             Logger = new Serilog.LoggerConfiguration()
-                .MinimumLevel.Verbose()
+                .MinimumLevel.Is(minLevel)
                 .Destructure.ByTransforming<Signal>(s => new { s.Id, Symbol = s.Symbol.Key, s.Kind, s.EntryExpiry, s.ExpireDate, s.PriceEntry, s.PriceTarget, s.ModifyTime, OpId = s.Operation?.Id })
                 .Destructure.ByTransforming<Operation>(op =>
                             new
@@ -410,13 +411,13 @@ namespace SharpTrader.AlgoFramework
 
         public override Task OnTickAsync()
         {
-           
+
             if (!BackTesting && OnTickRunning && Time >= NextUpdateTime)
             {
                 if (Time > LastWarningTime + TimeSpan.FromSeconds(30))
                 {
                     Logger.Warning("TradingAlgo.OnTickAsync is taking longer than expected: {Elapsed} vs {Expected}."
-                                    ,Time - (NextUpdateTime - Resolution), Resolution);
+                                    , Time - (NextUpdateTime - Resolution), Resolution);
                     LastWarningTime = Time;
                 }
             }
@@ -429,7 +430,7 @@ namespace SharpTrader.AlgoFramework
                     NextUpdateTime = Time + Resolution;
                     TimeSlice curSlice;
                     lock (WorkingSliceLock)
-                    { 
+                    {
                         curSlice = WorkingSlice;
                         WorkingSlice = OldSlice;
                         WorkingSlice.Clear(Market.Time);
