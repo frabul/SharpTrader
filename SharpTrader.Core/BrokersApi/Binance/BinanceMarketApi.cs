@@ -46,7 +46,7 @@ namespace SharpTrader.BrokersApi.Binance
         private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
         private LiteDatabase TradesAndOrdersArch;
         private LiteDatabase TradesAndOrdersDb;
-        private List<SymbolFeed> Feeds = new List<SymbolFeed>();
+        private Dictionary<string, SymbolFeed> Feeds = new Dictionary<string, SymbolFeed>();
         private Regex IdRegex = new Regex("([0-9A-Z]+[A-Z])([0-9]+)", RegexOptions.Compiled);
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
         private string OperationsDbPath;
@@ -117,7 +117,7 @@ namespace SharpTrader.BrokersApi.Binance
                 await Task.Delay(100);
 
 
-
+            _ = Task.Run(ServiceUpdateOrderBooks);
             _ = Task.Run(ServiceUpdateExchageInfo);
             // wait for service IsServiceAvailable and ExchangeInfoInitialized
             while (!this.IsServiceAvailable || !ExchangeInfoInitialized)
@@ -384,6 +384,25 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
+        private async Task ServiceUpdateOrderBooks()
+        {
+            Stopwatch sw = new Stopwatch();
+            while (!IsDisposing && !IsDisposed)
+            {
+                sw.Restart();
+                var req = await Client.GetSymbolsOrderBookTicker();
+                foreach (var book in req)
+                {
+                    if (Feeds.TryGetValue(book.Symbol, out var feed))
+                    {
+                        feed.BookUpdate(book);
+                    }
+                }
+
+                while (sw.Elapsed < TimeSpan.FromSeconds(2.5))
+                    await Task.Delay(200);
+            }
+        }
         private async Task ServiceSynchBalance()
         {
             while (!IsDisposing && !IsDisposed)
@@ -1135,10 +1154,8 @@ namespace SharpTrader.BrokersApi.Binance
         public async Task<ISymbolFeed> GetSymbolFeedAsync(string symbol)
         {
             SymbolFeed feed;
-            lock (LockBalances)
-                feed = Feeds.Where(sf => sf.Symbol.Key == symbol).FirstOrDefault();
 
-            if (feed == null)
+            if (!Feeds.TryGetValue(symbol, out feed))
             {
                 if (Symbols.ContainsKey(symbol))
                 {
@@ -1147,7 +1164,7 @@ namespace SharpTrader.BrokersApi.Binance
                     await feed.Initialize();
                     lock (LockBalances)
                     {
-                        Feeds.Add(feed);
+                        Feeds.Add(symbol, feed);
                     }
                 }
                 else
@@ -1171,8 +1188,8 @@ namespace SharpTrader.BrokersApi.Binance
                 {
                     lock (LockBalances)
                     {
-                        if (Feeds.Contains(feed))
-                            Feeds.Remove(feed);
+                        if (Feeds.ContainsKey(f.Symbol.Key))
+                            Feeds.Remove(f.Symbol.Key);
                         feed.Dispose();
                     }
                 }
