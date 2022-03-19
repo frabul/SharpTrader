@@ -150,7 +150,7 @@ namespace SharpTrader.AlgoFramework
 
         public AlgoResultsSlice GetTradingResults(DateTime startTime, DateTime endTime, string baseAsset)
         {
-            var allOperations = QueryOperations(op =>  op["CreationTime"].AsDateTime >= startTime && op["CreationTime"].AsDateTime < endTime && op["AmountInvested"].AsDecimal > 0)
+            var allOperations = QueryOperations(op => op["CreationTime"].AsDateTime >= startTime && op["CreationTime"].AsDateTime < endTime && op["AmountInvested"].AsDecimal > 0)
                                         .Select(op => this.OperationFromBson(op)).ToList();
             var periodResults = new AlgoResultsSlice()
             {
@@ -171,7 +171,7 @@ namespace SharpTrader.AlgoFramework
                 }
                 //-------
                 periodResults.OperationsCount += 1;
-                if ((op.IsClosed || op.IsClosing) && op.AmountRemaining / op.AmountInvested <= 0.05m)
+                if ((op.IsClosed || op.IsClosing) && op.AmountRemaining / op.AmountInvested <= 0.2m)
                 {
                     var spent = op.Entries.Sum(e => e.Price * e.Amount);
                     var recovered = op.Exits.Sum(e => e.Price * e.Amount);
@@ -180,7 +180,7 @@ namespace SharpTrader.AlgoFramework
                     periodResults.GainsRealized += gain;
                     periodResults.GainsPartial += gain;
                 }
-                else if ((op.AmountRemaining / op.AmountInvested) > 0.02m)
+                else if ((op.AmountRemaining / op.AmountInvested) > 0.05m && !(op.IsClosed || op.IsClosing))
                 {
                     //get the current price for the symbol
                     if (this.SymbolsData.TryGetValue(op.Symbol.Key, out SymbolData symData))
