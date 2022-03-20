@@ -146,12 +146,14 @@ namespace SharpTrader.AlgoFramework
             public decimal GainsPartial { get; set; }
             public int OperationsCount { get; set; }
             public string BaseAsset { get; set; }
+            public int IgnoredOperationsCount { get; set; }
+            public decimal IgnoredInvested { get; set; }
         }
 
         public AlgoResultsSlice GetTradingResults(DateTime startTime, DateTime endTime, string baseAsset)
         {
             var allOperations = QueryOperations(op => op["CreationTime"].AsDateTime >= startTime && op["CreationTime"].AsDateTime < endTime && op["AmountInvested"].AsDecimal > 0)
-                                        .Select(op => this.OperationFromBson(op)).ToList();
+                                        .Select(op => this.OperationFromBson(op)).ToArray();
             var periodResults = new AlgoResultsSlice()
             {
                 AlgoName = this.Name,
@@ -196,6 +198,11 @@ namespace SharpTrader.AlgoFramework
                             periodResults.GainsPartial += (recovered + couldRecover - spent) * (1 - 0.00075m * 2);
                         }
                     }
+                }
+                else
+                {
+                    periodResults.IgnoredOperationsCount++;
+                    periodResults.IgnoredInvested += op.QuoteAmountInvested;
                 }
             }
             return periodResults;
