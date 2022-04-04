@@ -8,7 +8,7 @@ using System.Reflection;
 namespace SharpTrader.BrokersApi.Binance
 {
     [Obfuscation(Exclude = true)]
-    class Trade : ITrade
+    public class Trade : ITrade
     {
         public Trade()
         {
