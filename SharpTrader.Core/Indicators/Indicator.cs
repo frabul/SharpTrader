@@ -71,7 +71,7 @@ namespace SharpTrader.Indicators
             if (_previousInput != null && input.Time <= _previousInput.Time)
             {
                 // if we receive a time in the past, log and return
-                Log.Error($"This is a forward only indicator: {Name} Input: {input.Time:u} Previous: {_previousInput.Time:u}. It will not be updated with this input.");
+                Log.Error("This is a forward only indicator: {Name} Input: {CurrentTime:yyyy-MM-dd HH:mm:ss} Previous: {PreviousTime:yyyy-MM-dd HH:mm:ss}. It will not be updated with this input.", Name,input.Time, _previousInput.Time);
                 return;
             }
             if (!ReferenceEquals(input, _previousInput))
