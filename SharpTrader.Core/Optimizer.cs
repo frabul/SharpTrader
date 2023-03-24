@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Serilog;
 using SharpTrader.Storage;
 using System;
 using System.IO;
@@ -15,6 +16,8 @@ namespace SharpTrader
 
     public class Optimizer
     {
+        public ILogger AlgoLogger { get; private set; }
+
         TradeBarsRepository HistoryDB;
         public class Configuration
         {
@@ -49,14 +52,14 @@ namespace SharpTrader
             BaseSpace = OptimizationSpace.FromJson(spaceJson);
         }
 
-        public void Start()
+        public void Start(Serilog.ILogger backtesterLogger, Serilog.ILogger  algoLogger)
         {
-            Logger = Serilog.Log
+            Logger = backtesterLogger
                 .ForContext<Optimizer>()
                 .ForContext("OptimizerSesssion", SessionName);
-
+            
             Logger.Information("Starting optimization session {OptimizerSesssion}.", SessionName);
-
+            this.AlgoLogger = algoLogger;
             HistoryDB = new TradeBarsRepository(Config.BacktesterConfig.HistoryDb);
             for (int i = Session.Lastexecuted + 1; i < BaseSpace.Configurations.Count; i++)
             {
@@ -72,7 +75,7 @@ namespace SharpTrader
             var backtesterConfig = JsonConvert.DeserializeObject<BackTester.Configuration>(JsonConvert.SerializeObject(Config.BacktesterConfig));
             backtesterConfig.AlgoConfig = JObject.FromObject(algoConfig);
             backtesterConfig.SessionName = $"{this.Config.SessionName}_{index}";
-            var backTester = new BackTester(backtesterConfig, HistoryDB, this.Logger, this.Logger);
+            var backTester = new BackTester(backtesterConfig, HistoryDB, this.Logger, this.AlgoLogger);
             backTester.Start();
         }
     }
