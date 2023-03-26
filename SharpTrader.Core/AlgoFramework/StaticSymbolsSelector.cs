@@ -20,9 +20,12 @@ namespace SharpTrader.AlgoFramework
             return Symbols;
         }
 
-        protected override Task OnInitialize()
-        { 
-            return Task.CompletedTask;
+        protected override async Task OnInitialize()
+        {
+            foreach (var symbol in Symbols)
+            { 
+                _ = await Algo.Market.GetSymbolFeedAsync(symbol.Key); 
+            }
         }
     }
 }
