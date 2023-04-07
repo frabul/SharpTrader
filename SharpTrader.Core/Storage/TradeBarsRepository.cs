@@ -271,13 +271,11 @@ namespace SharpTrader.Storage
                 meta.ClearView();
 
         }
-
-        public void Delete(string market, string symbol, TimeSpan time)
+        public void Delete(SymbolHistoryId id)
         {
-            var histInfo = new SymbolHistoryId(market, symbol, time);
             lock (SymbolsMetaData)
             {
-                var meta = GetMetaDataInternal(histInfo);
+                var meta = GetMetaDataInternal(id);
                 if (meta == null)
                     throw new Exception("symbol history not found");
 
@@ -289,6 +287,11 @@ namespace SharpTrader.Storage
                     meta.Chunks.Remove(fileInfo);
                 }
             }
+        }
+        public void Delete(string market, string symbol, TimeSpan time)
+        {
+            var histId = new SymbolHistoryId(market, symbol, time);
+            Delete(histId);
         }
 
         public void ValidateData(SymbolHistoryId finfo)
