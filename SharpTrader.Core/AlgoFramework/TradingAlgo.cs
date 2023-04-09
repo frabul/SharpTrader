@@ -266,7 +266,7 @@ namespace SharpTrader.AlgoFramework
 
             //create operations
             if (Allocator != null)
-                Allocator.Update(slice);
+                await Allocator.Update(slice);
 
             //close operations that have been in close queue for enough time
             lock (DbLock)
