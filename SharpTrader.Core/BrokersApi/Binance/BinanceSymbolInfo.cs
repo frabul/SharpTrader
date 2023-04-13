@@ -34,7 +34,8 @@ namespace SharpTrader.Core.BrokersApi.Binance
         public void Update(ExchangeInfoSymbol binanceSymbol)
         {
             var lotSize = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterLotSize) as ExchangeInfoSymbolFilterLotSize;
-            var minNotional = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterMinNotional) as ExchangeInfoSymbolFilterMinNotional;
+            var minNotional = binanceSymbol.filters.FirstOrDefault(f => f is ExchangeInfoSymbolFilterMinNotional) as ExchangeInfoSymbolFilterMinNotional;
+            var notional = binanceSymbol.filters.FirstOrDefault(f => f is ExchangeInfoSymbolFilterNotional) as ExchangeInfoSymbolFilterNotional;
             var pricePrecision = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterPrice) as ExchangeInfoSymbolFilterPrice;
 
             Key = binanceSymbol.symbol;
@@ -46,7 +47,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
 
             LotSizeStep = lotSize.StepSize;
             MinLotSize = lotSize.MinQty;
-            MinNotional = minNotional.MinNotional;
+            MinNotional = minNotional?.MinNotional ?? notional.MinNotional; 
             PricePrecision = pricePrecision.TickSize;
         }
 
