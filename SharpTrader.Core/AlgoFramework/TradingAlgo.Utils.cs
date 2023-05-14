@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.AlgoFramework
 {
+      
     public abstract partial class TradingAlgo : TraderBot
     {
 
@@ -53,10 +54,10 @@ namespace SharpTrader.AlgoFramework
 
         }
 
-        public async Task<(IOrder order, bool amountRemainingLow, bool OrderError)> TryLiquidateOperation(Operation op, string reason)
+        public async Task<(IOrder order, bool amountRemainingLow, bool OrderError, bool freeBalanceLow)> TryLiquidateOperation(Operation op, string reason)
         {
             var logger = Logger.ForContext("Symbol", op.Symbol);
-            (IOrder order, bool amountRemainingLow, bool OrderError) result = default;
+            (IOrder order, bool amountRemainingLow, bool OrderError, bool freeBalanceLow) result = default;
             await Executor.CancelAllOrders(op);
             logger.Information("{OperationId} - liquidation because {Reason}", op.Id, reason);
             if (op.AmountRemaining < 0)
@@ -77,7 +78,8 @@ namespace SharpTrader.AlgoFramework
 
             adj = ClampOrderAmount(symData, op.ExitTradeDirection, adj);
             if (adj.amount <= 0)
-            {
+            {   
+                result.freeBalanceLow = true;
                 logger.Warning("{OperationId} - unable to liquidate because not enough free balance", op.Id); ;
                 return result;
             }

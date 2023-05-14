@@ -81,6 +81,8 @@ namespace SharpTrader.AlgoFramework
                                 op.QuoteAmountInvested,
                                 op.QuoteAmountLiquidated,
                                 op.QuoteAmountRemaining,
+                                op.AmountInvested,
+                                op.AmountRemaining,
                                 op.Type,
                                 op.CloseDeadTime,
                                 op.LastInvestmentTime,
