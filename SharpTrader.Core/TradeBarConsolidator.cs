@@ -21,7 +21,10 @@ namespace SharpTrader
             this.SynchOnStartOfDay = synchOnStartOfDay;
             this.Resolution = resolution;
         }
-
+        public ITradeBar GetFormingBar()
+        {
+            return FormingCandle.IsDefault() ? null : FormingCandle;
+        }
         public void Update(IBaseData data)
         {
             if (data.Kind == MarketDataKind.TradeBar)
