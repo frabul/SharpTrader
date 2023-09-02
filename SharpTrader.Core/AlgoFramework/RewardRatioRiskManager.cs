@@ -22,6 +22,11 @@ namespace SharpTrader.AlgoFramework
             {
                 BaseLevel?.Reset();
             }
+
+            public void SetupIndicators()
+            {
+                throw new NotImplementedException();
+            }
         }
 
         class MyOperationData : IChangeTracking
