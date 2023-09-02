@@ -55,8 +55,11 @@ namespace SharpTrader.MarketSimulator
                 var text = System.IO.File.ReadAllText(Path.Combine(dataDir, name + "SymbolsTable.json"));
                 SymbolsTable = JsonConvert.DeserializeObject<SymbolsTable>(text);
                 //set all symbols trading
-                foreach (var sym in SymbolsTable.Values)
+                foreach (var sym in SymbolsTable.Values ) {
+                    sym.IsMarginTadingAllowed = true;
+                    sym.IsCrossMarginAllowed = true;
                     sym.IsTradingEnabled = true;
+                }
             }
             catch (Exception ex)
             {
