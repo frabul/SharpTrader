@@ -64,6 +64,11 @@ namespace SharpTrader.AlgoFramework
         private async Task ManageOperation(Operation op)
         {
             var symData = Algo.SymbolsData[op.Symbol.Key];
+            if (symData == null)
+            {
+                Logger.Error("Symbol data for {Symbol} not found.", op.Symbol);
+                return;
+            }
             //---
             if (op.AmountRemaining > 0 && !op.RiskManaged)
             {
@@ -91,7 +96,7 @@ namespace SharpTrader.AlgoFramework
                 {
                     if (Algo.Time > myData.NextTry)
                     {
-                        
+
                         var (_, amount) = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget);
                         bool remainingAmountSmall = (op.AmountInvested == 0 || amount <= 0);
                         if (remainingAmountSmall)
