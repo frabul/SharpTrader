@@ -47,8 +47,15 @@ namespace SharpTrader.Core.BrokersApi.Binance
 
             LotSizeStep = lotSize.StepSize;
             MinLotSize = lotSize.MinQty;
-            MinNotional = minNotional?.MinNotional ?? notional.MinNotional; 
+
             PricePrecision = pricePrecision.TickSize;
+            MinNotional = 0;
+            if (minNotional != null)
+            {
+                MinNotional = minNotional.MinNotional;
+            }
+            if (notional != null && notional.MinNotional > MinNotional)
+                MinNotional = notional.MinNotional;
         }
 
         public override string ToString()
