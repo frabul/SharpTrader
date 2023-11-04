@@ -234,7 +234,7 @@ namespace SharpTrader.MarketSimulator
                 {
                     var order = PendingOrders[i];
                     var feed = SymbolsFeeds[order.Symbol];
-                    if (order.Type == OrderType.Limit)
+                    if (order.Type == OrderType.Limit && feed.LastTick.Time >= order.Time)
                     {
                         var orderCompletes = false;
                         decimal orderPrice = 0;
