@@ -2,16 +2,17 @@
 using System.Threading.Tasks;
 using System.Linq;
 using System;
+using System.Diagnostics;
 
 namespace SharpTrader.AlgoFramework
 {
     public class FixedAmountAllocator : FundsAllocator
     {
-        private List<Signal> PendingSignals = new List<Signal>();
         public TimeSpan CoolDown { get; set; } = TimeSpan.FromMinutes(0);
         public bool ProportionalToProfit { get; set; } = false;
         public decimal TargetProfit { get; set; } = 0.05m;
         public int MaxActiveOperationsPerSymbol { get; set; } = 1;
+        public int MaxOperationsWithPendingEntry { get; set; } = 1;
         public decimal Budget { get; set; } = 0;
         public decimal BudgetPerSymbol { get; set; } = 0;
         public AssetAmount BudgetPerOperation { get; set; }
@@ -38,7 +39,6 @@ namespace SharpTrader.AlgoFramework
             if (freeBudged <= 0)
             {
                 Algo.StopEntries();
-                PendingSignals.AddRange(slice.NewSignals);
             }
             else
             {
@@ -63,22 +63,22 @@ namespace SharpTrader.AlgoFramework
                     //     with bad signal
                     if (Algo.Time >= lastInvestment + CoolDown && symData.ActiveOperations.Count < this.MaxActiveOperationsPerSymbol)
                     {
-                        //if cooldown has elapsed we can open a new operation
-                        var freeSymbolBudget = BudgetPerSymbol - Algo.Executor.GetInvestedOrLockedAmount(signal.Symbol, BudgetPerOperation.Asset);
+                        int operationsWaitingForEntry = symData.ActiveOperations.Count(o => o.IsActive && o.AmountInvested == 0);
+                        if (operationsWaitingForEntry < MaxOperationsWithPendingEntry)
+                        {
+                            //if cooldown has elapsed we can open a new operation
+                            var freeSymbolBudget = BudgetPerSymbol - Algo.Executor.GetInvestedOrLockedAmount(signal.Symbol, BudgetPerOperation.Asset);
 
-                        var budget = new[] { freeSymbolBudget, freeBudged, newAmount }.Min();
-                        
-                        if (budget >= 0.2m * newAmount)
-                        {
-                            //create operations
-                            var operType = signal.Kind == SignalKind.Buy ? OperationType.BuyThenSell : OperationType.SellThenBuy;
-                            var newOper = new Operation(Algo.GetNewOperationId(), signal, new AssetAmount(BudgetPerOperation.Asset, budget), operType);
-                            newOper.OnNewTrade += (o, t) => { (symData.AllocatorData as MySymbolData).LastInvestmentTime = t.Time; };
-                            slice.Add(newOper);
-                        }
-                        else
-                        {
-                            PendingSignals.Add(signal);
+                            var budget = new[] { freeSymbolBudget, freeBudged, newAmount }.Min();
+
+                            if (budget >= 0.2m * newAmount)
+                            {
+                                //create operations
+                                var operType = signal.Kind == SignalKind.Buy ? OperationType.BuyThenSell : OperationType.SellThenBuy;
+                                var newOper = new Operation(Algo.GetNewOperationId(), signal, new AssetAmount(BudgetPerOperation.Asset, budget), operType);
+                                newOper.OnNewTrade += (o, t) => { (symData.AllocatorData as MySymbolData).LastInvestmentTime = t.Time; };
+                                slice.Add(newOper);
+                            }
                         }
                     }
                 }
