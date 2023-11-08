@@ -137,8 +137,9 @@ namespace SharpTrader.BrokersApi.Binance
                 UserDataStreamManager = Task.Run(ServiceUserDataStream);
                 OrdersAndTradesSynchTask = Task.Run(ServiceSynchOrdersAndTrades);
             }
-
-
+            
+            while(!ExchangeInfoInitialized)
+                await Task.Delay(100);
             Logger.Information("BinanceMarketApi initialization completed");
         }
 
