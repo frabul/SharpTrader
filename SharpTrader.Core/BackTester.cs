@@ -105,6 +105,7 @@ namespace SharpTrader
 
         public BackTester(Configuration config, TradeBarsRepository db, Serilog.ILogger logger, Serilog.ILogger algoLogger)
         {
+
             Config = config;
             Logger = logger;
             if (Logger == null)
@@ -157,6 +158,7 @@ namespace SharpTrader
         {
             if (Started)
                 return;
+            StringBuilder outputBuffer = new StringBuilder();
             this.BenchmarkStats = new Statistics();
             this.BotStats = new Statistics();
             Logger.ForContext("Config", Config, true)
@@ -179,6 +181,8 @@ namespace SharpTrader
             double currentBenchmarkVal = (double)Config.StartingBalance.Amount;
 
             int partialResultsLines = 0; // how many lines the partial results printed on console  
+            int cursorPositionAfterPartialResults = -1;
+
             while (MarketSimulator.NextTick() && MarketSimulator.Time < EndTime)
             {
                 if (startingBal < 0)
@@ -230,16 +234,22 @@ namespace SharpTrader
 
                 //print partial results
                 if (steps % (60 * 24) == 0)
-                {
-                    // delete partial results output on console 
-                    Console.SetCursorPosition(0, Console.CursorTop - partialResultsLines);
-                    var initialCursorPosition = Console.CursorTop;
+                { 
                     // print partial results
                     var prcDone = (double)(MarketSimulator.Time - StartTime).Ticks / (EndTime - StartTime).Ticks * 100;
-                    DeleteConsoleLines(1);
-                    Console.WriteLine($"Simulation time: {MarketSimulator.Time} - {prcDone:f2}% completed");
-                    PrintStats(true);
-                    partialResultsLines = Console.CursorTop - initialCursorPosition;
+
+                    outputBuffer.AppendLine($"Simulation time: {MarketSimulator.Time} - {prcDone:f2}% completed");
+                    PrintStats(true, outputBuffer); 
+                    var toWrite = outputBuffer.ToString();
+                    outputBuffer.Clear();
+                    if (cursorPositionAfterPartialResults == Console.CursorTop)
+                    {
+                        Console.SetCursorPosition(0, Console.CursorTop - partialResultsLines);
+                        DeleteConsoleLines(toWrite.Split('\n').Length);
+                    }
+                    Console.WriteLine(toWrite);
+                    partialResultsLines = toWrite.Split('\n').Length;
+                    cursorPositionAfterPartialResults = Console.CursorTop;
                 }
 
                 steps++;
@@ -254,10 +264,10 @@ namespace SharpTrader
                 fig.PlotCandlesticks("Candlesticks", plot.Candles);
                 // add lines 
                 int lineCount = 0;
-                foreach(var line in plot.Lines)
+                foreach (var line in plot.Lines)
                 {
                     var points = line.Points.Select(p => new IndicatorDataPoint(p.X, p.Y));
-                    fig.PlotLine("li" + lineCount++, points, line.Color, axis:line.AxisId);
+                    fig.PlotLine("li" + lineCount++, points, line.Color, axis: line.AxisId);
                 }
                 // todo convertire tutto il resto
                 chart.Serialize(Path.Combine(Config.LogDir, $"{chart.Name}_{DateTime.Now:yyyyMMddmmss}.json"));
@@ -267,8 +277,9 @@ namespace SharpTrader
             sw.Stop();
             Logger.Information("Test terminated in {Duration} ms.", sw.ElapsedMilliseconds);
             Console.WriteLine("Test terminated in {0} ms.", sw.ElapsedMilliseconds);
-            PrintStats(false);
-
+            PrintStats(false, outputBuffer);
+            Console.WriteLine(outputBuffer.ToString());
+            outputBuffer.Clear();
             if (Config.PlotResults)
             {
                 Chart chart = new Chart(this.Config.SessionName + " Equity");
@@ -306,7 +317,7 @@ namespace SharpTrader
             Console.CursorTop -= cnt;
         }
 
-        private void PrintStats(bool consoleOnly)
+        private void PrintStats(bool consoleOnly, StringBuilder output)
         {
             var totalBal = MarketSimulator.GetEquity(BaseAsset);
 
@@ -322,28 +333,27 @@ namespace SharpTrader
             var lostInFee = feeList.Sum();
             var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
 
-            DeleteConsoleLines(2);
-            Console.WriteLine(
+
+            output.AppendLine(
                 $"Time: {MarketSimulator.Time:yyyy/MM/dd hh:mm}\n" +
                 $"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
 
             var profitPerOper = operations.Count > 0 ? BotStats.Profit / operations.Count : 0;
 
-            DeleteConsoleLines(2);
+
             if (operations.Count > 0)
             {
-                Console.WriteLine($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {profitPerOper:F8} ");
-                Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+                output.AppendLine($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {profitPerOper:F8} ");
+                output.AppendLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
             }
             else
             {
-                Console.WriteLine($"Algorithm => No data");
-                Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+                output.AppendLine($"Algorithm => No data");
+                output.AppendLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
             }
 
             if (!consoleOnly)
-            {
-                DeleteConsoleLines(4);
+            { 
                 Logger.Information("Backtest results:\n" +
                     "Balance: {totalBal:F4} - Operations:{OperationsCount} - Lost in fee:{lostInFee:F4}\n" +
                     "Algorithm => {@AlgoStats} \n" +
