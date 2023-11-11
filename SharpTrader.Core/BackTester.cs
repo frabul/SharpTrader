@@ -234,12 +234,12 @@ namespace SharpTrader
 
                 //print partial results
                 if (steps % (60 * 24) == 0)
-                { 
+                {
                     // print partial results
                     var prcDone = (double)(MarketSimulator.Time - StartTime).Ticks / (EndTime - StartTime).Ticks * 100;
 
                     outputBuffer.AppendLine($"Simulation time: {MarketSimulator.Time} - {prcDone:f2}% completed");
-                    PrintStats(true, outputBuffer); 
+                    PrintStats(true, outputBuffer);
                     var toWrite = outputBuffer.ToString();
                     outputBuffer.Clear();
                     if (cursorPositionAfterPartialResults == Console.CursorTop)
@@ -353,15 +353,16 @@ namespace SharpTrader
             }
 
             if (!consoleOnly)
-            { 
-                Logger.Information("Backtest results:\n" +
-                    "Balance: {totalBal:F4} - Operations:{OperationsCount} - Lost in fee:{lostInFee:F4}\n" +
-                    "Algorithm => {@AlgoStats} \n" +
-                    "BenchMark => {@BenchmarkStats}",
-                    totalBal, operations.Count, lostInFee,
-                    new { BotStats.StartingEquity, BotStats.Profit, BotStats.ProfitOverMaxDrowDown, ProfitPerOper = profitPerOper, BotStats.MaxDrowDown, BotStats.BalancePeak },
-                    new { BenchmarkStats.StartingEquity, BenchmarkStats.Profit, BenchmarkStats.ProfitOverMaxDrowDown, BenchmarkStats.MaxDrowDown, BenchmarkStats.BalancePeak }
-                    );
+            {
+                Logger.ForContext("Config", Config, true)
+                    .Information("Backtest results:\n" +
+                        "Balance: {totalBal:F4} - Operations:{OperationsCount} - Lost in fee:{lostInFee:F4}\n" +
+                        "Algorithm => {@AlgoStats} \n" +
+                        "BenchMark => {@BenchmarkStats}",
+                        totalBal, operations.Count, lostInFee,
+                        new { BotStats.StartingEquity, BotStats.Profit, BotStats.ProfitOverMaxDrowDown, ProfitPerOper = profitPerOper, BotStats.MaxDrowDown, BotStats.BalancePeak },
+                        new { BenchmarkStats.StartingEquity, BenchmarkStats.Profit, BenchmarkStats.ProfitOverMaxDrowDown, BenchmarkStats.MaxDrowDown, BenchmarkStats.BalancePeak }
+                        );
             }
         }
     }
