@@ -122,7 +122,7 @@ namespace SharpTrader.Storage
             var fiName = Path.GetFileName(filePath);
             if (ChunkId_BinancePublic.TryParse(fiName, out var id))
             {
-                using var file = File.OpenRead(filePath);
+                using var file = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 using var zip = new ZipArchive(file, ZipArchiveMode.Read);
                 var allCandles = zip.Entries.SelectMany(entry =>
                 {
