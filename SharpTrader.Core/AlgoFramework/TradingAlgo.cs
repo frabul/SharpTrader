@@ -86,8 +86,8 @@ namespace SharpTrader.AlgoFramework
                                 op.Type,
                                 op.CloseDeadTime,
                                 op.LastInvestmentTime,
-                                Entries = op.Entries.Select(t => t.Id).ToArray(),
-                                Exits = op.Exits.Select(t => t.Id).ToArray()
+                                Entries = op.Entries.ToArray(),
+                                Exits = op.Exits.ToArray()
                             })
                 .Enrich.With(new MarketTimeEnricher(marketApi))
                 .Enrich.WithProperty("AlgoName", this.Name)
