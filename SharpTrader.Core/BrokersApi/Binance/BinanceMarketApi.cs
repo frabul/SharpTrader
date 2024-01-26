@@ -447,8 +447,15 @@ namespace SharpTrader.BrokersApi.Binance
 
         private void RemoveOpenOrder(Order order)
         {
-            DbOpenOrders.Delete(order.Id);
-            OpenOrders.Remove(order);
+            try
+            { 
+                DbOpenOrders.Delete(order.Id);
+                OpenOrders.Remove(order);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error while removing open order from db {ClientOrderId}", order.ClientId);
+            }
         }
 
         /// <summary>
@@ -792,11 +799,19 @@ namespace SharpTrader.BrokersApi.Binance
         {
             lock (LockOrdersTrades)
             {
-                if (newOrder.Time < TimeToArchive)
-                    //the order is archived or we should archive it
-                    OrdersArchive.Upsert(newOrder);
-                else
-                    Orders.Upsert(newOrder);
+                try
+                {
+
+                    if (newOrder.Time < TimeToArchive)
+                        //the order is archived or we should archive it
+                        OrdersArchive.Upsert(newOrder);
+                    else
+                        Orders.Upsert(newOrder);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Error while updating Orders db (ord {ClientOrderId})", newOrder.ClientId);
+                }
             }
         }
 
@@ -805,27 +820,35 @@ namespace SharpTrader.BrokersApi.Binance
             Order finalOrder;
             lock (LockOrdersTrades)
             {
+
                 //first we check if we already have an instance of this order
                 finalOrder = OpenOrders.FirstOrDefault(oo => oo.Id == newOrder.Id);
-                if (finalOrder != null)
+                try
                 {
-                    finalOrder.Update(newOrder);
-                    if (finalOrder.IsClosed)
+                    if (finalOrder != null)
                     {
-                        OpenOrders.Remove(newOrder);
-                        DbOpenOrders.Delete(newOrder.Id);
+                        finalOrder.Update(newOrder);
+                        if (finalOrder.IsClosed)
+                        {
+                            OpenOrders.Remove(newOrder);
+                            DbOpenOrders.Delete(newOrder.Id);
+                        }
+                        else
+                            DbOpenOrders.Upsert(newOrder);
                     }
                     else
-                        DbOpenOrders.Upsert(newOrder);
-                }
-                else
-                {
-                    finalOrder = newOrder;
-                    if (!finalOrder.IsClosed)
                     {
-                        OpenOrders.Add(finalOrder);
-                        DbOpenOrders.Upsert(finalOrder);
+                        finalOrder = newOrder;
+                        if (!finalOrder.IsClosed)
+                        {
+                            OpenOrders.Add(finalOrder);
+                            DbOpenOrders.Upsert(finalOrder);
+                        }
                     }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Error while updating OpenOrders db (ord {ClientOrderId})", finalOrder.ClientId);
                 }
             }
             return finalOrder;
@@ -1259,8 +1282,10 @@ namespace SharpTrader.BrokersApi.Binance
                         });
                     newApiOrder = new Order(newOrd);
                 }
+
                 newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
                 OrdersUpdateOrInsert(newApiOrder);
+
 
                 // lock the balance in advance
                 lock (LockBalances)
