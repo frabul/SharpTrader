@@ -19,29 +19,86 @@ namespace SharpTrader
     {
         public class Statistics
         {
-            public List<IndicatorDataPoint> EquityHistory { get; set; } = new List<IndicatorDataPoint>();
+            public List<IndicatorDataPoint> EquityHistory { get; set; } = new List<IndicatorDataPoint>() { };
+            public List<IndicatorDataPoint> EquityHistoryByDay { get; set; } = new List<IndicatorDataPoint>();
             public decimal BalancePeak { get; private set; }
             public decimal MaxDrowDown { get; private set; }
             public decimal StartingEquity { get; private set; }
+            public DateTime StartingTime { get; private set; }
+            public DateTime CurrentDay { get; private set; }
             public decimal Profit { get; private set; }
             public decimal ProfitOverMaxDrowDown { get; private set; }
             private bool IsFirstRecord = true;
+            private bool IsDirty = true;
+            private double _GainSquareOverStdDev = 0;
+            private object Locker = new object();
             internal void Update(DateTime time, decimal equity)
             {
-                if (IsFirstRecord)
-                    StartingEquity = equity;
+                lock (Locker)
+                { 
+                    IsDirty = true;
+                    if (IsFirstRecord)
+                    {
+                        StartingEquity = equity;
+                        StartingTime = time;
+                        CurrentDay = time.Date.AddDays(-1);
+                        EquityHistoryByDay.Add(new IndicatorDataPoint(CurrentDay, (double)equity)); // first day is the day preceding the first sample
+                    }
 
-                IsFirstRecord = false;
-                EquityHistory.Add(new IndicatorDataPoint(time, (double)equity));
-                BalancePeak = equity > BalancePeak ? equity : BalancePeak;
-                if (BalancePeak - equity > MaxDrowDown)
-                    MaxDrowDown = BalancePeak - equity;
+                    IsFirstRecord = false;
+                    EquityHistory.Add(new IndicatorDataPoint(time, (double)equity));
 
-                Profit = equity - StartingEquity;
-                if (MaxDrowDown != 0)
-                    ProfitOverMaxDrowDown = Profit / MaxDrowDown;
-                else
-                    ProfitOverMaxDrowDown = decimal.MaxValue;
+                    //if the old day is ended add new points to EquityHistoryByDay until it reach the current time
+                    while (time.Date > CurrentDay)
+                    {
+                        // the value of the new point is taken from the last point of EquityHistoryByDay
+                        CurrentDay = CurrentDay.AddDays(1);
+                        EquityHistoryByDay.Add(new IndicatorDataPoint(CurrentDay, EquityHistoryByDay.Last().Value));
+                    }
+                    // update the current day with the 
+                    EquityHistoryByDay[EquityHistoryByDay.Count - 1] = new IndicatorDataPoint(CurrentDay, (double)equity);
+                    // calculate the peak and the max drowdown
+                    BalancePeak = equity > BalancePeak ? equity : BalancePeak;
+                    if (BalancePeak - equity > MaxDrowDown)
+                        MaxDrowDown = BalancePeak - equity;
+
+                    Profit = equity - StartingEquity;
+                    if (MaxDrowDown != 0)
+                        ProfitOverMaxDrowDown = Profit / MaxDrowDown;
+                    else
+                        ProfitOverMaxDrowDown = 1000;
+                }
+            }
+
+            public double GainSquareOverStdDev
+            {
+                get
+                {
+                    lock (Locker)
+                    {
+                        if (this.IsDirty && EquityHistoryByDay.Count > 1)
+                        {
+
+                            var os = EquityHistoryByDay[0].Value;
+                            // calculate gain curve by subtracting the starting value
+                            var gainCurve = EquityHistoryByDay.Select(p => p.Value - os).ToList();
+                            var dEdt = gainCurve.Last() / (gainCurve.Count - 1);
+                            if (dEdt != 0)
+                            { 
+                                var diff_sqr_sum = 0.0;
+                                for (int x = 0; x < gainCurve.Count; x++)
+                                {
+                                    var diffsq = Math.Pow((gainCurve[x] - (dEdt * x)) / dEdt, 2);
+                                    diff_sqr_sum += diffsq;
+                                }
+                                var diff_sqr_avg_root = Math.Sqrt(diff_sqr_sum / gainCurve.Count);
+                                _GainSquareOverStdDev = Math.Sign(gainCurve.Last()) * (gainCurve.Last() * gainCurve.Last() / (1 + diff_sqr_avg_root));
+                            }
+                            IsDirty = false;
+                        }
+                    }
+                    return _GainSquareOverStdDev;
+                }
             }
         }
 
@@ -191,46 +248,24 @@ namespace SharpTrader
                 if (!warmUpCompleted)
                     Algo.RequestStopEntries().Wait();
                 else
+                {
                     Algo.RequestResumeEntries();
+                    // add initial point to stats
+                    if (BotStats.EquityHistory.Count < 1)
+                    {
+                        BotStats.Update(MarketSimulator.Time, MarketSimulator.GetEquity(BaseAsset));
+                        BenchmarkStats.Update(MarketSimulator.Time, (decimal)currentBenchmarkVal);
+                    }
+                }
 
+
+                // run algo
                 Algo.OnTickAsync().Wait();
 
                 //---- update equity and benchmark ---------- 
                 if (steps % 60 == 0 && warmUpCompleted)
-                {
-                    var balance = MarketSimulator.GetEquity(BaseAsset);
-                    BotStats.Update(MarketSimulator.Time, balance);
-                    //--- calculate benchmark change
-                    double changeSum = 0;
-                    int changeCount = 0;
-                    foreach (var symData in Algo.SymbolsData.Values)
-                    {
-                        if (symData.Feed != null && symData.Feed.Ask > 0 && symData.Feed.Bid > 0)
-                        {
-                            var sk = symData.Feed.Symbol.Key;
-                            if (symData.Feed != null && LastPrices.ContainsKey(sk))
-                            {
-                                changeCount++;
-                                var inc = (symData.Feed.Bid - LastPrices[sk]) / LastPrices[sk];
-                                if (inc > 5)
-                                {
-                                    Logger.Warning("Anomalous increase {Inc} for symbol {Symbol} at {Time}",
-                                                   inc,
-                                                   symData.Feed.Symbol.Key,
-                                                   symData.Feed.Time);
-                                }
-                                changeSum += inc;
+                    currentBenchmarkVal = UpdateStats(currentBenchmarkVal);
 
-                            }
-                            LastPrices[sk] = symData.Feed.Ask;
-                        }
-                    }
-                    if (changeCount > 0)
-                    {
-                        currentBenchmarkVal += changeSum * currentBenchmarkVal / changeCount;
-                        BenchmarkStats.Update(MarketSimulator.Time, (decimal)currentBenchmarkVal);
-                    }
-                }
 
                 //print partial results
                 if (steps % (60 * 24) == 0)
@@ -254,7 +289,10 @@ namespace SharpTrader
 
                 steps++;
             }
+            // add last sample to the stats
+            currentBenchmarkVal = UpdateStats(currentBenchmarkVal);
 
+            // print final results
             int pcount = 0;
             foreach (var plot in Algo.Plots)
             {
@@ -309,6 +347,44 @@ namespace SharpTrader
             }
         }
 
+        private double UpdateStats(double currentBenchmarkVal)
+        {
+            var balance = MarketSimulator.GetEquity(BaseAsset);
+            BotStats.Update(MarketSimulator.Time, balance);
+            //--- calculate benchmark change
+            double changeSum = 0;
+            int changeCount = 0;
+            foreach (var symData in Algo.SymbolsData.Values)
+            {
+                if (symData.Feed != null && symData.Feed.Ask > 0 && symData.Feed.Bid > 0)
+                {
+                    var sk = symData.Feed.Symbol.Key;
+                    if (symData.Feed != null && LastPrices.ContainsKey(sk))
+                    {
+                        changeCount++;
+                        var inc = (symData.Feed.Bid - LastPrices[sk]) / LastPrices[sk];
+                        if (inc > 5)
+                        {
+                            Logger.Warning("Anomalous increase {Inc} for symbol {Symbol} at {Time}",
+                                           inc,
+                                           symData.Feed.Symbol.Key,
+                                           symData.Feed.Time);
+                        }
+                        changeSum += inc;
+
+                    }
+                    LastPrices[sk] = symData.Feed.Ask;
+                }
+            }
+            if (changeCount > 0)
+            {
+                currentBenchmarkVal += changeSum * currentBenchmarkVal / changeCount;
+                BenchmarkStats.Update(MarketSimulator.Time, (decimal)currentBenchmarkVal);
+            }
+
+            return currentBenchmarkVal;
+        }
+
         private static void DeleteConsoleLines(int cnt)
         {
             var blankLine = new string(' ', Console.BufferWidth);
@@ -343,8 +419,8 @@ namespace SharpTrader
 
             if (operations.Count > 0)
             {
-                output.AppendLine($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {profitPerOper:F8} ");
-                output.AppendLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+                output.AppendLine($"Algorithm => Profit: {BotStats.Profit:F2} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F2} - Profit/oper: {profitPerOper:F6} - GSOSD: {BotStats.GainSquareOverStdDev:F3}");
+                output.AppendLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F2}  ");
             }
             else
             {
@@ -360,8 +436,8 @@ namespace SharpTrader
                         "Algorithm => {@AlgoStats} \n" +
                         "BenchMark => {@BenchmarkStats}",
                         totalBal, operations.Count, lostInFee,
-                        new { BotStats.StartingEquity, BotStats.Profit, BotStats.ProfitOverMaxDrowDown, ProfitPerOper = profitPerOper, BotStats.MaxDrowDown, BotStats.BalancePeak },
-                        new { BenchmarkStats.StartingEquity, BenchmarkStats.Profit, BenchmarkStats.ProfitOverMaxDrowDown, BenchmarkStats.MaxDrowDown, BenchmarkStats.BalancePeak }
+                        new { BotStats.StartingEquity, BotStats.Profit, BotStats.ProfitOverMaxDrowDown, ProfitPerOper = profitPerOper, BotStats.MaxDrowDown, BotStats.BalancePeak, BotStats.GainSquareOverStdDev },
+                        new { BenchmarkStats.StartingEquity, BenchmarkStats.Profit, BenchmarkStats.ProfitOverMaxDrowDown, BenchmarkStats.MaxDrowDown, BenchmarkStats.BalancePeak, BotStats.GainSquareOverStdDev }
                         );
             }
         }
