@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -255,7 +255,7 @@ namespace SharpTrader.MarketSimulator
                             var trade = new Trade(
                                 market: this.MarketName,
                                 symbol: feed.Symbol.Key,
-                                time: feed.LastTick.Time,
+                                time: feed.LastTick.Time - (feed.Resolution / 2),
                                 price: order.Price,
                                 amount: order.Amount,
                                 type: order.TradeType,
