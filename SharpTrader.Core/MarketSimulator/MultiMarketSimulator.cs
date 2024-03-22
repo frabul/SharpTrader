@@ -32,9 +32,10 @@ namespace SharpTrader.MarketSimulator
             HistoryDb = historyDb;
             this._Markets = new MarketEmulator[Config.Markets.Length];
             int i = 0;
+            var allSymbols = historyDb.ListAvailableData();
             foreach (var mc in Config.Markets)
             {
-                var market = new MarketEmulator(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
+                var market = new MarketEmulator(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack, allSymbols);
                 market.AllowBorrow = mc.AllowBorrow;
                 _Markets[i++] = market;
             }
@@ -52,12 +53,12 @@ namespace SharpTrader.MarketSimulator
             HistoryDb = historyDb;
             var text = File.ReadAllText(Path.Combine(dataDirectory, ConfigFile));
             Config = Newtonsoft.Json.JsonConvert.DeserializeObject<Configuration>(text);
-
+            var allSymbols = historyDb.ListAvailableData();
             this._Markets = new MarketEmulator[Config.Markets.Length];
             int i = 0;
             foreach (var mc in Config.Markets)
             {
-                var market = new MarketEmulator(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack);
+                var market = new MarketEmulator(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack, allSymbols);
                 market.AllowBorrow = mc.AllowBorrow;
                 _Markets[i++] = market;
             }

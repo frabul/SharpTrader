@@ -12,7 +12,7 @@ namespace SharpTrader.MarketSimulator
     public class SymbolFeed : ISymbolFeed
     {
         public event Action<ISymbolFeed, IBaseData> OnData;
-        private TimeSpan Resolution = TimeSpan.FromSeconds(60);
+        private TimeSpan _Resolution = TimeSpan.FromSeconds(60);
         private List<IBaseData> NewData = new List<IBaseData>(10);
 
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
@@ -24,7 +24,7 @@ namespace SharpTrader.MarketSimulator
         public double Spread { get; set; }
         public ISymbolHistory DataSource { get; set; }
         public IBaseData LastTick { get; private set; }
-
+        public TimeSpan Resolution { get => _Resolution;   }
         public SymbolFeed(string market, BinanceSymbolInfo symbol)
         {
             this.Symbol = symbol;
