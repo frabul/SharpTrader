@@ -70,7 +70,7 @@ namespace SharpTrader.BrokersApi.Binance
         public TimeSpan OperationsKeepAliveTime { get; set; } = TimeSpan.FromDays(15);
         public TimeSpan BalanceAndTimeSynchPeriod { get; set; } = TimeSpan.FromSeconds(30);
         public TimeSpan TradesAndOrdersSynchPeriod { get; set; } = TimeSpan.FromSeconds(120);
-        IEnumerable<ITrade> IMarketApi.Trades => Trades.FindAll().ToArray();
+        IEnumerable<ITrade> IMarketApi.Trades { get { lock (LockOrdersTrades) return Trades.FindAll().ToArray(); } }
 
         IEnumerable<IOrder> IMarketApi.OpenOrders { get { lock (LockOrdersTrades) return OpenOrders.ToArray(); } }
 
@@ -302,7 +302,10 @@ namespace SharpTrader.BrokersApi.Binance
 
         public async Task SynchSymbolOrders(string sym)
         {
-            var lastOrder = Orders.Find(o => o.Symbol == sym)?.OrderBy(o => o.OrderId).LastOrDefault();
+            Order lastOrder;
+            lock (LockOrdersTrades)
+                lastOrder = Orders.Find(o => o.Symbol == sym)?.OrderBy(o => o.OrderId).LastOrDefault();
+
             long start = (lastOrder != null) ? lastOrder.OrderId + 1 : 0;
             bool finish = false;
             List<Order> orders = new List<Order>();
@@ -315,15 +318,20 @@ namespace SharpTrader.BrokersApi.Binance
                     start = toInsert.LastOrDefault().OrderId + 1;
                 else finish = true;
             }
-            foreach (var ord in orders)
-                Orders.Insert(ord);
+            lock (LockOrdersTrades)
+            {
+                foreach (var ord in orders)
+                    Orders.Insert(ord);
+            }
             //if (orders.Count > 1)
             //    OrdersC.InsertBulk(orders );
         }
 
         private async Task SynchAllSymbolTrades(string sym)
         {
-            var lastTrade = Trades.Find(o => o.Symbol == sym)?.OrderBy(o => o.TradeId).LastOrDefault();
+            Trade lastTrade;
+            lock (LockOrdersTrades)
+                lastTrade = Trades.Find(o => o.Symbol == sym)?.OrderBy(o => o.TradeId).LastOrDefault();
             long start = (lastTrade != null) ? lastTrade.TradeId + 1 : 0;
             bool finish = false;
             List<Trade> trades = new List<Trade>();
@@ -333,9 +341,12 @@ namespace SharpTrader.BrokersApi.Binance
                 var toInsert = responses.Select(or => new Trade(or)).OrderBy(o => o.TradeId).ToArray();
                 foreach (var tr in toInsert)
                 {
-                    var order = Orders.FindOne(o => o.OrderId == tr.OrderId);
+
+                    Order order = null;
+                    lock (LockOrdersTrades)
+                        order = Orders.FindOne(o => o.OrderId == tr.OrderId);
                     if (order == null)
-                        order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as Order;
+                        order = (await OrderSynchAsync(tr.Symbol + tr.OrderId)).Result as Order;
                     tr.ClientOrderId = order.ClientId;
                 }
 
@@ -346,7 +357,8 @@ namespace SharpTrader.BrokersApi.Binance
                     finish = true;
             }
             if (trades.Count > 1)
-                Trades.InsertBulk(trades);
+                lock (LockOrdersTrades)
+                    Trades.InsertBulk(trades);
         }
 
         private async Task ServiceSynchServerTime()
@@ -448,9 +460,12 @@ namespace SharpTrader.BrokersApi.Binance
         private void RemoveOpenOrder(Order order)
         {
             try
-            { 
-                DbOpenOrders.Delete(order.Id);
-                OpenOrders.Remove(order);
+            {
+                lock (LockOrdersTrades)
+                {
+                    DbOpenOrders.Delete(order.Id);
+                    OpenOrders.Remove(order);
+                }
             }
             catch (Exception ex)
             {
@@ -1030,7 +1045,9 @@ namespace SharpTrader.BrokersApi.Binance
         {
             try
             {
-                var result = Trades.FindOne(o => o.Id == id);
+                Trade result;
+                lock (LockOrdersTrades)
+                    result = Trades.FindOne(o => o.Id == id);
                 if (result == null)
                 {
                     return Task.FromResult<IRequest<ITrade>>(
@@ -1356,7 +1373,8 @@ namespace SharpTrader.BrokersApi.Binance
             try
             {
                 Order order = null;
-                order = this.Orders.FindOne(or => or.Id == id);
+                lock (LockOrdersTrades)
+                    order = this.Orders.FindOne(or => or.Id == id);
                 if (order != null)
                 {
                     var cancel = await this.Client.CancelOrder(new CancelOrderRequest()
@@ -1437,12 +1455,14 @@ namespace SharpTrader.BrokersApi.Binance
 
         public ITrade GetTradeById(string tradeId)
         {
-            return Trades.FindById(tradeId);
+            lock (LockOrdersTrades)
+                return Trades.FindById(tradeId);
         }
 
         public IOrder GetOrderById(string orderId)
         {
-            return Orders.FindById(orderId);
+            lock (LockOrdersTrades)
+                return Orders.FindById(orderId);
         }
 
         public void FlushDatabase()
@@ -1487,7 +1507,8 @@ namespace SharpTrader.BrokersApi.Binance
                     var order = OpenOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
 
                     if (order == null)
-                        order = Orders.FindById(value["_id"].AsString);
+                        lock (LockOrdersTrades)
+                            order = Orders.FindById(value["_id"].AsString);
                     bool notFoundIndOrders = order == null;
                     Logger.Warning("Order not found in orders");
                     if (order == null)
