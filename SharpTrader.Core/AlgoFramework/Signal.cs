@@ -100,5 +100,11 @@ namespace SharpTrader.AlgoFramework
         {
             return Id.GetHashCode();
         }
+
+        public bool IsAssociatedOperationStarted()
+        {
+            bool lastSignalOperationStarted = Operation != null && Operation.AmountInvested > 0;
+            return lastSignalOperationStarted;
+        }
     }
 }
