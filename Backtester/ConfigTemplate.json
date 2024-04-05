@@ -26,7 +26,7 @@
     "EntryEdge": 0.019,
     "Target": 0.019,
     "HighPassExitEdge": 0.011,
-    "MaximuOperationDuration": "04:00:00",
+    "MaximuOperationDuration": "12:00:00",
     "TotalBudget": 12.0,
     "BudgetPerSymbol": 1.0,
     "BudgetPerOperation": 1.0,
