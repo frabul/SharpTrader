@@ -46,9 +46,9 @@ namespace SharpTrader.MarketSimulator
             //let's make the start and end times a multiple of Resolution timespan
             //var startTimeTicks = simulationStartTime.Ticks - simulationStartTime.Ticks % Resolution.Ticks;
             //var endTimeTicks = endTime.Ticks - endTime.Ticks % Resolution.Ticks; 
-            this.Time = simulationStartTime;
-            StartTime = simulationStartTime;
-            EndTime = endTime;
+            this.Time = simulationStartTime.ToUniversalTime();
+            StartTime = simulationStartTime.ToUniversalTime();
+            EndTime = endTime.ToUniversalTime();
 
             HistoryDb = historyDb;
             var text = File.ReadAllText(Path.Combine(dataDirectory, ConfigFile));
