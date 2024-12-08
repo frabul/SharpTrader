@@ -288,7 +288,12 @@ namespace SharpTrader.AlgoFramework
                 var ar = " AR%: -";
                 var gainprc = "";
                 if (AmountInvested > 0 && AmountRemaining / AmountInvested < 0.05m && this.AverageEntryPrice > 0)
-                    gainprc = $", G%: {(this.AverageExitPrice - this.AverageEntryPrice) * 100 / this.AverageEntryPrice: 0.000}";
+                {
+                    var gain = (this.AverageExitPrice - this.AverageEntryPrice) * 100 / this.AverageEntryPrice;
+                    if (this.Type == OperationType.SellThenBuy)
+                        gain = -gain;
+                    gainprc = $", G%: {gain: 0.000}";
+                }
 
                 if (AmountInvested > 0)
                     ar = $" AR%: {this.AmountRemaining * 100 / this.AmountInvested:0.000}";
