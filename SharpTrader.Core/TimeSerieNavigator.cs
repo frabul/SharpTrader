@@ -20,9 +20,7 @@ namespace SharpTrader
 
         private int _Cursor = -1;
         private Stack<int> PositionSaveStack = new Stack<int>();
-        private bool disposed;
-        private TimeSerieNavigator<ITradeBar> items;
-
+        private bool disposed; 
         protected TimeRecordCollection<T> Records { get; private set; }
 
         public int Count { get { return Records.Count; } }

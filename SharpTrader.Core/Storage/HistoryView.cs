@@ -4,22 +4,23 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using NLog;
-using ProtoBuf;
 
 namespace SharpTrader.Storage
 {
     class HistoryView
     {
         Logger Logger = LogManager.GetLogger("HistoryView");
+        private SymbolHistoryMetaDataInternal SymbolHistory;
         private List<Candlestick> _Ticks = new List<Candlestick>();
         public SymbolHistoryId Id { get; set; }
         public HashSet<HistoryChunkId> LoadedFiles { get; set; } = new HashSet<HistoryChunkId>();
         public DateTime StartOfData { get; set; } = DateTime.MaxValue;
         public DateTime EndOfData { get; set; } = DateTime.MinValue;
 
-        public HistoryView(SymbolHistoryId id)
+        public HistoryView(SymbolHistoryMetaDataInternal index)
         {
-            Id = id;
+            SymbolHistory = index;
+            Id = SymbolHistory.HistoryId;
             _Ticks = new List<Candlestick>();
         }
 
@@ -116,11 +117,65 @@ namespace SharpTrader.Storage
 
         }
 
+        internal void Save(string dataDir, ChunkFileVersion chunkFileVersion, ChunkSpan chunkSpan)
+        {
+            Func<HistoryChunkId, List<Candlestick>, HistoryChunk> chunkFactory;
+            Func<SymbolHistoryId, DateTime, DateTime, HistoryChunkId> idFactory;
+
+
+            switch (chunkFileVersion)
+            {
+                case ChunkFileVersion.V2:
+                    chunkFactory = (newChunkId, candles) =>
+                    {
+                        return new HistoryChunkV2()
+                        {
+                            ChunkId = newChunkId,
+                            Ticks = candles,
+                        };
+                    };
+                    idFactory = (symId, t1, t2) => new HistoryChunkIdV2(symId, t1);
+                    if (chunkSpan != ChunkSpan.OneMonth)
+                        throw new InvalidOperationException("The chunk file version V2 supports only OneMonth span");
+                    break;
+                case ChunkFileVersion.V3:
+                    chunkFactory = (newChunkId, candles) =>
+                    {
+                        return new HistoryChunkV3()
+                        {
+                            ChunkId = newChunkId,
+                            Ticks = candles,
+                        };
+                    };
+                    idFactory = (symId, t1, t2) => new HistoryChunkIdV3(symId, t1, t2);
+                    break;
+                default:
+                    throw new NotImplementedException($"Unknown ChunkFileVersion {chunkFileVersion}");
+            }
+
+            switch (chunkSpan)
+            {
+                case ChunkSpan.OneMonth:
+                    Save_month(dataDir, idFactory, chunkFactory);
+                    break;
+                case ChunkSpan.OneDay:
+                    Save_daily(dataDir, idFactory, chunkFactory);
+                    break;
+            }
+
+
+
+
+        }
+
         /// <summary>
         /// Saves all data to disk and updates LoadedFiles list
         /// </summary>
         /// <param name="dataDir"></param>
-        public void Save_Protobuf(string dataDir)
+        public void Save_month(
+            string dataDir,
+            Func<SymbolHistoryId, DateTime, DateTime, HistoryChunkId> idFactory,
+            Func<HistoryChunkId, List<Candlestick>, HistoryChunk> chunkFactory)
         {
             lock (_Ticks)
             {
@@ -137,27 +192,69 @@ namespace SharpTrader.Storage
                     }
 
                     //load the existing file and merge candlesticks 
-                    HistoryChunkId newChunkId = new HistoryChunkId(this.Id, startDate);
+                    HistoryChunkId newChunkId = idFactory(this.Id, startDate, endDate);
                     var fileToLoad = newChunkId.GetFilePath(dataDir);
                     if (File.Exists(fileToLoad))
                     {
-                        var loadedChunk = HistoryChunk.Load(fileToLoad);
+                        var loadedChunk = HistoryChunk.Load(fileToLoad).Result;
                         foreach (var candle in loadedChunk.Ticks)
-                            if (candle.Time >= startDate && candle.OpenTime <= endDate)
+                            if (candle.Time > startDate && candle.OpenTime < endDate)
                                 candlesOfMont.AddRecord(candle, true);
                     }
+                    HistoryChunk dataToSave = chunkFactory(newChunkId, candlesOfMont.ToList());
 
-
-                    //finally save data 
-                    HistoryChunk dataToSave = new HistoryChunk()
-                    {
-                        ChunkId = newChunkId,
-                        Ticks = candlesOfMont.ToList(),
-                    };
-                    using (var fs = File.Open(newChunkId.GetFilePath(dataDir), FileMode.Create))
-                        Serializer.Serialize<HistoryChunk>(fs, dataToSave);
+                    dataToSave.SaveAsync(dataDir).Wait();
 
                     this.LoadedFiles.Add(newChunkId);
+                }
+            }
+        }
+
+        public void Save_daily(
+            string dataDir,
+            Func<SymbolHistoryId, DateTime, DateTime, HistoryChunkId> idFactory,
+            Func<HistoryChunkId, List<Candlestick>, HistoryChunk> chunkFactory)
+        {
+
+            lock (_Ticks)
+            {
+                int i = 0;
+                while (i < this.Ticks.Count)
+                {
+                    var curTick = this.Ticks[i];
+                    DateTime startDate = new DateTime(curTick.Time.Year, curTick.Time.Month, curTick.Time.Day, 0, 0, 0, DateTimeKind.Utc);
+                    DateTime endDate = startDate.AddDays(1);
+                    TimeSerie<Candlestick> chunkBars = new TimeSerie<Candlestick>();
+                    //load all the chunks that overlap this period
+                    //delete loaded chunks
+                    var chunks = this.SymbolHistory.Chunks.Where(c => c.Overlaps(startDate, endDate));
+                    foreach (var chunkToLoad in chunks)
+                    {
+                        var filePath = chunkToLoad.GetFilePath(dataDir);
+                        if (!LoadedFiles.Contains(chunkToLoad) && File.Exists(filePath))
+                        {
+                            var loadedChunk = HistoryChunk.Load(filePath).Result;
+                            foreach (var candle in loadedChunk.Ticks)
+                                if (candle.Time > startDate && candle.OpenTime < endDate)
+                                    chunkBars.AddRecord(candle, true);
+
+                        }
+                        LoadedFiles.Remove(chunkToLoad);
+                        if (File.Exists(filePath))
+                            File.Delete(filePath);
+                    }
+
+                    //add bars from this view
+                    while (i < this.Ticks.Count && this.Ticks[i].OpenTime < endDate)
+                    {
+                        chunkBars.AddRecord(new Candlestick(this.Ticks[i]), true);
+                        i++;
+                    }
+
+                    //finally save data 
+                    HistoryChunk dataToSave = chunkFactory(idFactory(SymbolHistory.HistoryId, startDate, endDate), chunkBars.ToList()); 
+                    dataToSave.SaveAsync(dataDir).Wait(); 
+                    this.LoadedFiles.Add(dataToSave.ChunkId);
                 }
             }
         }

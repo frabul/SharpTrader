@@ -30,7 +30,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         }
 
         //--------------------------------------------
-        public BinanceTradeBarsRepository(string dataDir, double rateLimitFactor = 0.4f) : base(dataDir)
+        public BinanceTradeBarsRepository(string dataDir, ChunkFileVersion cv, ChunkSpan chunkSpan, double rateLimitFactor = 0.4f) : base(dataDir, cv, chunkSpan)
         {
             Client = new BinanceClient(new ClientConfiguration { ApiKey = "asd", SecretKey = "asd", EnableRateLimiting = false, RateLimitFactor = rateLimitFactor });
             DownloadCandlesSemaphore = new SemaphoreSlim(ConcurrencyCount, ConcurrencyCount);

@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using ProtoBuf;
 using System.Globalization;
 using System.Diagnostics;
 using LiteDB;
@@ -14,24 +13,37 @@ using NLog;
 
 namespace SharpTrader.Storage
 {
+    public enum ChunkFileVersion
+    {
+        V2,
+        V3
+    }
+    public enum ChunkSpan { OneMonth, OneDay }
     //TODO make thread safe
     public class TradeBarsRepository
     {
         private Logger Logger = LogManager.GetLogger("TradeBarsRepository");
         private static readonly CandlestickTimeComparer<Candlestick> CandlestickTimeComparer = new CandlestickTimeComparer<Candlestick>();
         private string DataDir;
-
         private LiteDatabase Db;
         private ILiteCollection<SymbolHistoryMetaDataInternal> DbSymbolsMetaData;
         private Dictionary<string, SymbolHistoryMetaDataInternal> SymbolsMetaData;
-
-        public TradeBarsRepository(string dataDir)
+        public ChunkFileVersion ChunkFileVersion { get; private set; }
+        public ChunkSpan ChunkSpan { get; private set; }
+        public TradeBarsRepository(string dataDir) : this(dataDir, ChunkFileVersion.V3, ChunkSpan.OneDay)
         {
+
+        }
+        public TradeBarsRepository(string dataDir, ChunkFileVersion cv, ChunkSpan chunkSpan)
+        {
+            this.ChunkFileVersion = cv;
+            this.ChunkSpan = chunkSpan;
             DataDir = Path.Combine(dataDir, "RatesDB");
             if (!Directory.Exists(DataDir))
                 Directory.CreateDirectory(DataDir);
 
             Init();
+
         }
 
         public SymbolHistoryMetaData GetMetaData(SymbolHistoryId historyInfo) => GetMetaDataInternal(historyInfo);
@@ -43,6 +55,7 @@ namespace SharpTrader.Storage
                 {
                     metaData = new SymbolHistoryMetaDataInternal(historyInfo);
                     SymbolsMetaData.Add(historyInfo.Key, metaData);
+                    metaData.SetSaveMode(ChunkFileVersion, ChunkSpan);
                 }
                 return metaData;
             }
@@ -96,16 +109,20 @@ namespace SharpTrader.Storage
 
             if (DbSymbolsMetaData.FindOne(e => true) == null)
             {
-                Update1();
-                Update2();
+                RebuildAllDatabase();
             }
 
             SymbolsMetaData = DbSymbolsMetaData.FindAll().ToDictionary(md => md.Id);
-            ValidateSymbolsMetadata();
+            foreach (var item in SymbolsMetaData)
+                item.Value.SetSaveMode(ChunkFileVersion, ChunkSpan);
+
+            ValidateIndex();
         }
 
-        private void ValidateSymbolsMetadata()
+        private void ValidateIndex()
         {
+            List<HistoryChunkId> allChunks = DiscoverChunks(DataDir);
+
             foreach (var symData in SymbolsMetaData.Values.ToArray())
             {
                 bool ok = true;
@@ -143,7 +160,7 @@ namespace SharpTrader.Storage
                         Logger.Error("Error: history file {0} does not exist.", newPath);
                     }
                     if (canAddChunk)
-                        symData.Chunks.Add(new HistoryChunkId(chunk.HistoryId, chunk.StartDate));
+                        symData.Chunks.Add(chunk);
                 }
                 //rebuild history if needed
                 if (ok == false)
@@ -151,91 +168,75 @@ namespace SharpTrader.Storage
                     Logger.Info("Rebuilding corrupted {0} history", symData.Id);
                     symData.ClearView();
                     var newSymData = new SymbolHistoryMetaDataInternal(symData.HistoryId);
-                    foreach (var chunk in symData.Chunks)
+                    newSymData.SetSaveMode(ChunkFileVersion, ChunkSpan);
+                    //load data of all chunks of the symbol for each of them, load file, add data, delete file
+                    foreach (var chunk in allChunks.Where(c => c.HistoryId.Key == symData.HistoryId.Key))
                     {
-                        var chunkData = HistoryChunk.Load(chunk.GetFilePath(DataDir));
+                        var chunkData = HistoryChunk.Load(chunk.GetFilePath(DataDir)).Result;
                         newSymData.AddBars(chunkData.Ticks);
+                        File.Delete(chunk.GetFilePath(DataDir));
                     }
+
                     //save data
                     newSymData.Flush(this.DataDir);
+
                     //update dictionary
                     SymbolsMetaData[newSymData.Id] = newSymData;
+
                     //update db
                     DbSymbolsMetaData.Upsert(newSymData);
                     newSymData.Validated = true;
-
                 }
                 symData.Validated = true;
             }
         }
 
+        public static List<HistoryChunkId> DiscoverChunks(string dataDir)
+        {
+            // discover ass chunk files in directory  
+            List<HistoryChunkId> allChunks = new List<HistoryChunkId>();
+            foreach (var file in Directory.GetFiles(dataDir))
+            {
+                if (HistoryChunkId.TryParse(file, out var chunkId))
+                    allChunks.Add(chunkId);
+            }
+            return allChunks;
+        }
+
         /// <summary>
         /// Loads all files then saves them again ( so format is updates )
         /// </summary>
-        private void Update1()
+        private void RebuildAllDatabase()
         {
             //get a
-            var files = Directory.GetFiles(DataDir, "*.bin");
-            IEnumerable<IGrouping<string, string>> filesGrouped;
-            //if (files.Length > 0)
+            var chunks = DiscoverChunks(DataDir);
+            IEnumerable<IGrouping<string, HistoryChunkId>> filesGrouped;
+            filesGrouped = chunks.GroupBy(c => c.HistoryId.Key);
+
+            var data = new List<SymbolHistoryMetaDataInternal>();
+            foreach (var group in filesGrouped)
             {
-                files = files.Concat(Directory.GetFiles(DataDir, "*.bin2")).ToArray();
-                filesGrouped = files.GroupBy(
-                    f =>
-                        {
-                            var info = HistoryChunkId.Parse(f);
-                            return info.HistoryId.Key;
-                        }
-                );
-                foreach (var group in filesGrouped)
+                var histMetadata = new SymbolHistoryMetaDataInternal(group.First().HistoryId);
+                histMetadata.SetSaveMode(ChunkFileVersion, ChunkSpan);
+                foreach (var chunk in group)
                 {
-                    var info = HistoryChunkId.Parse(group.First());
-                    var histMetadata = new SymbolHistoryMetaDataInternal(info.HistoryId);
-                    foreach (var fpath in group)
-                    {
-                        var fdata = HistoryChunk.Load(fpath);
-                        histMetadata.AddBars(fdata.Ticks);
-                        if (Path.GetExtension(fpath) == ".bin")
-                            File.Delete(fpath);
-                    }
-                    histMetadata.Flush(DataDir);
+                    var chunkFilePath = chunk.GetFilePath(DataDir);
+                    var fdata = HistoryChunk.Load(chunkFilePath).Result;
+                    histMetadata.AddBars(fdata.Ticks);
+                    File.Delete(chunkFilePath);
                 }
-            }
-
-
-        }
-
-        private void Update2()
-        {
-            var data = new Dictionary<string, SymbolHistoryMetaDataInternal>();
-            var files = Directory.GetFiles(DataDir, "*.bin2");
-
-            foreach (var filePath in files)
-            {
-                var fileInfo = HistoryChunkId.Parse(filePath);
-                //-- get metaData --
-                if (!data.ContainsKey(fileInfo.HistoryId.Key))
-                    data.Add(fileInfo.HistoryId.Key, new SymbolHistoryMetaDataInternal(fileInfo.HistoryId));
-                var symData = data[fileInfo.HistoryId.Key];
-
-                symData.Chunks.Add(fileInfo);
-
-                //update first and last tick time
-                HistoryChunk fileData = HistoryChunk.Load(filePath);
-                if (fileData.Ticks.Count > 0)
-                {
-                    symData.UpdateLastBar(fileData.Ticks.First());
-                    symData.UpdateLastBar(fileData.Ticks.Last());
-                }
+                histMetadata.Flush(DataDir);
+                data.Add(histMetadata);
             }
             //reinsert everything
             DbSymbolsMetaData.DeleteAll();
             Db.Checkpoint();
-            var allData = data.Values.ToArray();
-            foreach (var dat in allData)
+            foreach (var dat in data)
                 DbSymbolsMetaData.Upsert(dat);
             Db.Checkpoint();
         }
+
+
 
         public SymbolHistoryId[] ListAvailableData()
         {
