@@ -1167,6 +1167,12 @@ namespace SharpTrader.BrokersApi.Binance
             return Orders.FindById(orderId);
         }
 
+        public void FlushDatabase()
+        {
+            var allOpenHistories = HistoryDb.ListAvailableData();
+            foreach (var hist in allOpenHistories)
+                HistoryDb.SaveAndClose(hist, true);
+        }
 
         public void RegisterCustomSerializers(BsonMapper mapper)
         {
