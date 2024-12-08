@@ -44,6 +44,12 @@ namespace SharpTrader
             else
                 throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair");
         }
+
+        public override string ToString()
+        {
+            return $"{{ {Asset}, {Amount:f9} }}";
+        }
+
     }
 
 }

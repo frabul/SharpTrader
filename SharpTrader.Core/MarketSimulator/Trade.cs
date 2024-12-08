@@ -6,6 +6,8 @@ namespace SharpTrader.MarketSimulator
     public class Trade : ITrade
     {
         private static long IdCounter = 0;
+
+        public static void ResetIdCounter() => IdCounter = 0;
         public Trade()
         {
 

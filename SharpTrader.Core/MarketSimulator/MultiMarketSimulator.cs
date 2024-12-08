@@ -16,6 +16,7 @@ namespace SharpTrader.MarketSimulator
         private TradeBarsRepository HistoryDb;
         private Configuration Config;
         private TimeSpan Resolution = TimeSpan.FromSeconds(60);
+        private NLog.Logger Logger = NLog.LogManager.GetLogger(nameof(MultiMarketSimulator));
         public IEnumerable<IMarketApi> Markets => _Markets;
         public DateTime StartTime { get; private set; }
         public DateTime EndTime { get; private set; }
@@ -131,6 +132,8 @@ namespace SharpTrader.MarketSimulator
         {
             if (Time >= market.NextDataLoadTime)
             {
+                int totalLoaded = 0;
+                int loadedSymbols = 0;
                 // we load the data from current time to the end of month
                 var chunkEndTime = new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1);
                 foreach (var feed in market.SymbolsFeeds.Values)
@@ -143,8 +146,14 @@ namespace SharpTrader.MarketSimulator
                         new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1));
                     this.HistoryDb.SaveAndClose(histInfo, false);
                     market.FistTickPassed = true;
+                    if(feed.DataSource.Ticks.Count > 0)
+                    {
+                        totalLoaded+= feed.DataSource.Ticks.Count;
+                        loadedSymbols++;
+                    }
                 }
                 market.NextDataLoadTime = chunkEndTime.AddMinutes(0.5); //the first candle of new month is output at minute 1
+                Logger.Debug($"Loaded {loadedSymbols} symbols for a total of {totalLoaded} ticks.");
             }
         }
 

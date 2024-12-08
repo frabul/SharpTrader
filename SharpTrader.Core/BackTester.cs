@@ -216,11 +216,11 @@ namespace SharpTrader
                     var prcDone = (double)(MarketSimulator.Time - StartTime).Ticks / (EndTime - StartTime).Ticks * 100;
                     if (oldCursor == Console.CursorTop)
                     {
-                        if (Console.CursorTop > 3)
-                            Console.CursorTop -= 4;
+                        if (Console.CursorTop > 4)
+                            Console.CursorTop -= 5;
                         DeleteConsoleLines(4);
                     }
-                  
+
                     Console.WriteLine($"Simulation time: {MarketSimulator.Time} - {prcDone:f2}% completed");
                     PrintStats(true);
                     oldCursor = Console.CursorTop;
@@ -269,7 +269,7 @@ namespace SharpTrader
 
         private static void DeleteConsoleLines(int cnt)
         {
-            var blankLine = new string(' ', Console.BufferWidth); 
+            var blankLine = new string(' ', Console.BufferWidth);
             for (int i = 0; i < cnt; i++)
                 Console.WriteLine(blankLine);
             Console.CursorTop -= cnt;
@@ -281,6 +281,7 @@ namespace SharpTrader
             if (consoleOnly)
                 printAction = s => Console.WriteLine(s);
             var totalBal = MarketSimulator.GetEquity(BaseAsset);
+
             //get the total fee paid calculated on commission asset
             var feeList = MarketSimulator.Trades.Select(
                                                 tr =>
@@ -292,7 +293,9 @@ namespace SharpTrader
                                                 });
             var lostInFee = feeList.Sum();
             var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
-            printAction($"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
+            printAction(
+                $"Time: {MarketSimulator.Time:yyyy/MM/dd hh:mm}\n" +
+                $"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
             if (operations.Count > 0)
             {
                 printAction($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
@@ -304,6 +307,17 @@ namespace SharpTrader
                 printAction($"Algorithm => No data");
                 printAction($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
             }
+
+            //print final balances
+            //if (!consoleOnly)
+            //{
+            //    var balances = from el in (MarketSimulator.Markets.First() as MarketEmulator).Balances
+            //                   let am = new AssetAmount(el.Symbol, el.bal.Total)
+            //                   where am.Amount != 0
+            //                   select am;
+            //    var balStr = string.Join(Environment.NewLine, balances);
+            //    Logger.Info("Balances: " + Environment.NewLine + balStr);
+            //}
 
         }
     }
