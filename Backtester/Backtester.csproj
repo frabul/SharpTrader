@@ -8,7 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\SharpTraderBots\SharpTrader.Bots.csproj" />
     <ProjectReference Include="..\..\SharpTrader\SharpTrader.Core\SharpTrader.Core.csproj" />
-    <ProjectReference Include="..\..\SharpTrader\SharpTrader.Plotting\SharpTrader.Plotting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

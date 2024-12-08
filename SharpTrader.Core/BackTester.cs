@@ -1,12 +1,14 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SharpTrader.AlgoFramework;
+using SharpTrader.Charts;
 using SharpTrader.Indicators;
 using SharpTrader.MarketSimulator;
 using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -179,8 +181,7 @@ namespace SharpTrader
 
             this.Algo.Start(true).Wait();
 
-            int steps = 1;
-            decimal BalancePeak = 0;
+            int steps = 1; 
 
 
             var startingBal = -1m;
@@ -251,25 +252,26 @@ namespace SharpTrader
 
             if (Config.PlotResults)
             {
-                PlotHelper plot = new PlotHelper("Equity");
+                Chart chart = new Chart(this.Config.SessionName + " Equity");
+                var plot = chart.NewFigure();
                 int skipCount = (BotStats.EquityHistory.Count + 2000) / 2000;
                 List<IndicatorDataPoint> botPoints = new List<IndicatorDataPoint>();
                 List<IndicatorDataPoint> benchPoints = new List<IndicatorDataPoint>();
-               
+
                 for (int i = 0; i < BotStats.EquityHistory.Count; i += skipCount)
                 {
                     var e = BotStats.EquityHistory[i];
                     botPoints.Add(new IndicatorDataPoint(e.Time, e.Value));
-                    if(BenchmarkStats.EquityHistory.Count > i)
+                    if (BenchmarkStats.EquityHistory.Count > i)
                     {
                         e = BenchmarkStats.EquityHistory[i];
                         benchPoints.Add(new IndicatorDataPoint(e.Time, e.Value));
-                    } 
+                    }
                 }
-                plot.PlotLine(botPoints, ARGBColors.Purple);
-                plot.PlotLine(benchPoints, ARGBColors.MediumPurple, "asdasd");
-                plot.InitialView = (Config.StartTime, Config.EndTime);
-                ShowPlotCallback?.Invoke(plot);
+                plot.PlotLine("Equity", botPoints, ARGBColors.Purple);
+                plot.PlotLine("Benchmark", benchPoints, ARGBColors.MediumPurple);
+
+                chart.Serialize(Path.Combine(".", "Logs", $"Chart_{this.Config.SessionName}_equity.json")); 
             }
         }
     }
