@@ -94,7 +94,6 @@ namespace SharpTrader.Storage
         internal void UpdateFirstKnownData(SymbolHistoryId info, ITradeBar firstAvailable)
         {
             var data = GetMetaDataInternal(info);
-            data.FirstKnownData = firstAvailable;
         }
 
         private void Init()

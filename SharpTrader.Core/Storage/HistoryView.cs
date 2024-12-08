@@ -83,18 +83,18 @@ namespace SharpTrader.Storage
         {
             lock (_Ticks)
             {
-                ITradeBar lastCandle = this.Ticks.Count > 0 ? this.Ticks[this.Ticks.Count - 1] : null;
+                Candlestick lastCandle = this.Ticks.Count > 0 ? this.Ticks[this.Ticks.Count - 1] : new Candlestick();
                 if (c.Timeframe != this.Id.Resolution)
                 {
                     Logger.Error("Bad timeframe for candle");
-                    throw new InvalidOperationException("Bad timeframe for candle"); 
+                    throw new InvalidOperationException("Bad timeframe for candle");
                 }
                 else
                 {
                     this.UpdateStartAndEnd(c);
                     //if this candle open is preceding last candle open we need to insert it in sorted fashion
                     var toAdd = c; //new Candlestick(c);
-                    if (lastCandle != null && lastCandle.OpenTime >= toAdd.OpenTime)
+                    if (!lastCandle.IsDefault() && lastCandle.OpenTime >= toAdd.OpenTime)
                     {
                         int i = this.Ticks.BinarySearch(toAdd, CandlestickTimeComparer.Instance);
                         int index = i;
@@ -252,8 +252,8 @@ namespace SharpTrader.Storage
                     }
 
                     //finally save data 
-                    HistoryChunk dataToSave = chunkFactory(idFactory(SymbolHistory.HistoryId, startDate, endDate), chunkBars.ToList()); 
-                    dataToSave.SaveAsync(dataDir).Wait(); 
+                    HistoryChunk dataToSave = chunkFactory(idFactory(SymbolHistory.HistoryId, startDate, endDate), chunkBars.ToList());
+                    dataToSave.SaveAsync(dataDir).Wait();
                     this.LoadedFiles.Add(dataToSave.ChunkId);
                 }
             }

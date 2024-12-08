@@ -10,8 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Plotting\dist\**" />
     <Compile Remove="Plotting\node_modules\**" />
+    <EmbeddedResource Remove="Plotting\dist\**" />
     <EmbeddedResource Remove="Plotting\node_modules\**" />
+    <None Remove="Plotting\dist\**" />
     <None Remove="Plotting\node_modules\**" />
   </ItemGroup>
 

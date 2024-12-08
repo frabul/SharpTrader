@@ -48,6 +48,7 @@ namespace SharpTrader
             public string SessionName = "Backetester";
             public string DataDir { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
             public string HistoryDb { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
+            public string LogDir => $"{DataDir}/logs/{SessionName}";
             public bool PlottingEnabled { get; set; } = false;
             public bool PlotResults { get; set; } = false;
             public string AlgoClass;
@@ -181,7 +182,7 @@ namespace SharpTrader
 
             this.Algo.Start(true).Wait();
             this.Algo.RequestResumeEntries();
-            int steps = 1; 
+            int steps = 1;
 
 
             var startingBal = -1m;
@@ -213,7 +214,7 @@ namespace SharpTrader
                                 if (inc > 5)
                                     Logger.Info($"Anomalous increase {inc} for symbol {symData.Feed.Symbol.Key}");
                                 changeSum += inc;
-                         
+
                             }
                             LastPrices[sk] = symData.Feed.Ask;
                         }
@@ -275,7 +276,8 @@ namespace SharpTrader
                 plot.PlotLine("Equity", botPoints, ARGBColors.Purple);
                 plot.PlotLine("Benchmark", benchPoints, ARGBColors.MediumPurple);
 
-                chart.Serialize(Path.Combine(".", "Logs", $"Chart_{this.Config.SessionName}_equity.json")); 
+                Directory.CreateDirectory(Config.LogDir);
+                chart.Serialize(Path.Combine(Config.LogDir, $"Chart_{this.Config.SessionName}_equity.json"));
             }
         }
     }

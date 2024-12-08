@@ -15,25 +15,25 @@ namespace SharpTrader
         private DateTime closeTime;
         [Key(0)]
         [ProtoMember(1)]
-        public virtual DateTime OpenTime { get => openTime; set => openTime = value.Kind == DateTimeKind.Unspecified ? new DateTime(value.Ticks, DateTimeKind.Utc) : value; }
+        public DateTime OpenTime { get => openTime; set => openTime = value.Kind == DateTimeKind.Unspecified ? new DateTime(value.Ticks, DateTimeKind.Utc) : value; }
         [Key(1)]
         [ProtoMember(2)]
-        public virtual DateTime CloseTime { get => closeTime; set => closeTime = value.Kind == DateTimeKind.Unspecified ? new DateTime(value.Ticks, DateTimeKind.Utc) : value; }
+        public DateTime CloseTime { get => closeTime; set => closeTime = value.Kind == DateTimeKind.Unspecified ? new DateTime(value.Ticks, DateTimeKind.Utc) : value; }
         [Key(2)]
         [ProtoMember(3)]
-        public virtual double Open { get; set; }
+        public double Open { get; set; }
         [Key(3)]
         [ProtoMember(4)]
-        public virtual double High { get; set; }
+        public double High { get; set; }
         [Key(4)]
         [ProtoMember(5)]
-        public virtual double Low { get; set; }
+        public double Low { get; set; }
         [Key(5)]
         [ProtoMember(6)]
-        public virtual double Close { get; set; }
+        public double Close { get; set; }
         [Key(6)]
         [ProtoMember(7)]
-        public virtual double QuoteAssetVolume { get; set; }
+        public double QuoteAssetVolume { get; set; }
 
         [ProtoIgnore]
         [IgnoreMember]
@@ -45,7 +45,7 @@ namespace SharpTrader
 
         [ProtoIgnore]
         [IgnoreMember]
-        public virtual double Length { get { return this.High - this.Low; } }
+        public double Length { get { return this.High - this.Low; } }
         [ProtoIgnore]
         [IgnoreMember]
         public double Value => this.Close;
@@ -53,8 +53,23 @@ namespace SharpTrader
         [IgnoreMember]
         public MarketDataKind Kind => MarketDataKind.TradeBar;
 
+        public bool IsDefault()
+        {
+            return CloseTime == default(DateTime);
+        }
+
         public Candlestick() { }
 
+        public Candlestick(DateTime ot, DateTime ct, double o, double c, double h, double l, double vol)
+        {
+            Open = o;
+            Close = c;
+            High = h;
+            Low = l;
+            QuoteAssetVolume = 0;
+            openTime = ot;
+            closeTime = ct;
+        }
         public Candlestick(DateTime openTime, ITradeBar toCopy, TimeSpan duration)
         {
             Open = toCopy.Open;
@@ -62,8 +77,10 @@ namespace SharpTrader
             High = toCopy.High;
             Low = toCopy.Low;
             QuoteAssetVolume = toCopy.QuoteAssetVolume;
-            OpenTime = openTime;
-            CloseTime = openTime + duration;
+            this.openTime = toCopy.OpenTime;
+            closeTime = toCopy.CloseTime;
+            OpenTime = toCopy.OpenTime;
+            CloseTime = toCopy.OpenTime + duration;
         }
 
         public Candlestick(ITradeBar toCopy)
@@ -73,6 +90,8 @@ namespace SharpTrader
             High = toCopy.High;
             Low = toCopy.Low;
             QuoteAssetVolume = toCopy.QuoteAssetVolume;
+            openTime = toCopy.OpenTime;
+            closeTime = toCopy.CloseTime;
             OpenTime = toCopy.OpenTime;
             CloseTime = toCopy.CloseTime;
         }

@@ -31,10 +31,10 @@ namespace SharpTrader
         
         public void Scan(DateTime timeNow)
         {
-            if (FormingCandle != null && timeNow >= FormingCandle.Time)
+            if (!FormingCandle.IsDefault() && timeNow >= FormingCandle.Time)
             {
                 OnConsolidated?.Invoke(FormingCandle);
-                FormingCandle = null;
+                FormingCandle = default;
             }
         }
 
@@ -49,7 +49,7 @@ namespace SharpTrader
             DateTime tclose = newCandle.Time;
             DateTime topen = newCandle.OpenTime;
 
-            if (FormingCandle == null)
+            if (FormingCandle.IsDefault())
             {
                 //tbere isn't any currently forming candle, create one using new candle as generator
                 var opeTime = GetOpenTime(newCandle.CloseTime, Resolution);
@@ -71,7 +71,7 @@ namespace SharpTrader
                 if (tclose == FormingCandle.Time)
                 {
                     OnConsolidated?.Invoke(FormingCandle);
-                    FormingCandle = null;
+                    FormingCandle = default;
                 }
             }
         }
