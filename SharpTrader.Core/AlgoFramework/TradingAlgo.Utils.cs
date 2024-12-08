@@ -8,6 +8,51 @@ namespace SharpTrader.AlgoFramework
 {
     public abstract partial class TradingAlgo : TraderBot
     {
+
+        public async Task TrySellAllAmount(string symbolKey, string reason)
+        {
+            try
+            {
+                var feed = await Market.GetSymbolFeedAsync(symbolKey);
+                if(feed == null)
+                {
+                    Logger.Error($"Error while selling {symbolKey}: symbol not found.");
+                    return;
+                }
+                var amount = Market.GetFreeBalance(feed.Symbol.Asset); 
+                var adj = feed.GetOrderAmountAndPriceRoundedDown(amount, (decimal)feed.Bid);
+                Logger.Info($"Try selling {adj.amount} {symbolKey } @ {adj.price}.");
+                if (adj.amount > 0)
+                {
+                    //immediatly liquidate everything with a market order 
+                    
+                    var orderInfo = new OrderInfo()
+                    {
+                        Symbol = symbolKey,
+                        Type = OrderType.Market,
+                        Effect = this.DoMarginTrading ? MarginOrderEffect.ClosePosition : MarginOrderEffect.None,
+                        Amount = adj.amount,
+                        ClientOrderId = null,
+                        Direction = TradeDirection.Sell
+                    };
+                    var request = await Market.PostNewOrder(orderInfo);
+                    if (!request.IsSuccessful) 
+                    {
+                        Logger.Info($"Error while selling {adj.amount} {symbolKey } @ {adj.price}.");
+                    }
+                }
+                else
+                { 
+                    Logger.Error($"Unable to sell {symbolKey } because amount ( {amount} ) is too low");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"Error during try sell {symbolKey}: {ex.Message}");
+            }
+
+        }
+
         public async Task<(IOrder order, bool amountRemainingLow, bool OrderError)> TryLiquidateOperation(Operation op, string reason)
         {
             (IOrder order, bool amountRemainingLow, bool OrderError) result = default;
@@ -33,7 +78,7 @@ namespace SharpTrader.AlgoFramework
                         ClientOrderId = op.GetNewOrderId(),
                         Direction = op.ExitTradeDirection
                     };
-                    var request = await Market.PostNewOrder(orderInfo); 
+                    var request = await Market.PostNewOrder(orderInfo);
                     if (request.IsSuccessful)
                         result.order = request.Result;
                     else
