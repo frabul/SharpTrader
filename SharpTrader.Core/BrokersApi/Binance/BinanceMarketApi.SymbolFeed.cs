@@ -19,10 +19,12 @@ namespace SharpTrader.BrokersApi.Binance
 {
     class SymbolFeed : ISymbolFeed, IDisposable
     {
+        private readonly TimeSpan FinalCandleUpdateTimeout = TimeSpan.FromSeconds(3.5);
         public event Action<ISymbolFeed, IBaseData> OnData;
         private Serilog.ILogger Logger;
         private BinanceClient Client;
         private CombinedWebSocketClient WebSocketClient;
+        private BinanceMarketApi Market;
         private BinanceTradeBarsRepository HistoryDb;
         private Task HearthBeatTask;
         private Stopwatch KlineWatchdog = new Stopwatch();
@@ -41,62 +43,52 @@ namespace SharpTrader.BrokersApi.Binance
 
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
         public BinanceSymbolInfo Symbol { get; private set; }
-        public DateTime Time { get; private set; }
+        public DateTime Time => Market.Time;
         public double Ask { get; private set; }
         public double Bid { get; private set; }
-        public string Market { get; private set; }
+        public string MarketName => Market.MarketName;
         public double Spread { get; set; }
+        public DateTime LastUpdate { get; private set; }
         public double Volume24H { get; private set; }
         public bool Disposed { get; private set; }
         internal volatile int Users = 0;
 
-        public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, BinanceTradeBarsRepository hist, string market, BinanceSymbolInfo symbol, DateTime timeNow)
+        public SymbolFeed(BinanceMarketApi api, Serilog.ILogger logger, CombinedWebSocketClient websocket, BinanceTradeBarsRepository hist, BinanceSymbolInfo symbol)
         {
+            Market = api;
             HistoryDb = hist;
-            this.Client = client;
             this.WebSocketClient = websocket;
             this.Symbol = symbol;
-            this.Market = market;
-            this.Time = timeNow;
-            Logger = Serilog.Log
+
+            Logger = logger
                 .ForContext<SymbolFeed>()
                 .ForContext("Symbol", symbol.ToString());
 
-            HistoryId = new SymbolHistoryId(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
+            HistoryId = new SymbolHistoryId(this.MarketName, Symbol.Key, TimeSpan.FromSeconds(60));
 
         }
 
-        internal async Task Initialize()
+        internal Task Initialize()
         {
-            var book = await Client.GetOrderBook(Symbol.Key, false);
-
-            if (book.Asks.Count > 0)
-                Ask = (double)book.Asks.FirstOrDefault().Price;
-            else
-                Ask = float.MaxValue;
-            if (book.Bids.Count > 0)
-                Bid = (double)book.Bids.FirstOrDefault().Price;
-            else
-                Bid = 0;
             KlineListen();
             PartialDepthListen();
             DepthWatchdog.Restart();
             KlineWatchdog.Restart();
             HearthBeatTask = HearthBeat();
+            return Task.CompletedTask;
         }
 
         private async Task HearthBeat()
         {
             while (!Disposed)
             {
-                
                 if (KlineWatchdog.Elapsed > TimeSpan.FromSeconds(120))
-                { 
+                {
                     if (DateTime.UtcNow > LastKlineWarn.AddSeconds(900))
                     {
                         Logger.Warning("{Symbol} - Kline websocket looked like frozen", Symbol);
                         LastKlineWarn = DateTime.UtcNow;
-                    } 
+                    }
                 }
                 if (DepthWatchdog.Elapsed > TimeSpan.FromSeconds(240))
                 {
@@ -105,8 +97,8 @@ namespace SharpTrader.BrokersApi.Binance
                     {
                         Logger.Warning("{Symbol} - Depth websocket looked like frozen", Symbol);
                         LastDepthWarn = DateTime.UtcNow;
-                    } 
-                } 
+                    }
+                }
 
                 DigestPartialDepthMessageQueue();
                 DigestKlineMessageQueue();
@@ -169,7 +161,7 @@ namespace SharpTrader.BrokersApi.Binance
                     Bid = 0;
                 Spread = Ask - Bid;
 
-                this.Time = messageData.EventTime;
+                this.LastUpdate = messageData.EventTime;
             }
         }
 
@@ -194,7 +186,6 @@ namespace SharpTrader.BrokersApi.Binance
                     continue;
                 }
 
-                this.Time = msg.EventTime;
                 var candleReceived = KlineToCandlestick(msg.Kline);
 
                 //trace final bar  
@@ -214,42 +205,41 @@ namespace SharpTrader.BrokersApi.Binance
                     LastEmittedCandled = candleReceived;
                     CandlesToAdd.Add(LastEmittedCandled);
                     //the new forming candle is a filler
-                    FormingCandle = new Candlestick(
-                                LastEmittedCandled.CloseTime,
-                                LastEmittedCandled.CloseTime + resolution,
-                                LastEmittedCandled.Close,
-                                LastEmittedCandled.Close,
-                                LastEmittedCandled.Close,
-                                LastEmittedCandled.Close,
-                                0
-                            );
+                    FormingCandle = GetFiller(resolution);
                 }
 
             }
-            //instad of waiting for the candle we just emit forming candle  
-            if (!LastEmittedCandled.IsDefault())
-                if (DateTime.UtcNow > LastEmittedCandled.Time.AddSeconds(3.5) + resolution)
-                {
-                    Logger.Verbose("{Symbol} SymbolFeed: emitting forming candle ", Symbol.Key);
-                    this.Time = DateTime.UtcNow;
-                    LastEmittedCandled = FormingCandle;
-                    CandlesToAdd.Add(LastEmittedCandled);
-                    FormingCandle = new Candlestick(
-                                    LastEmittedCandled.CloseTime,
-                                    LastEmittedCandled.CloseTime + resolution,
-                                    LastEmittedCandled.Close,
-                                    LastEmittedCandled.Close,
-                                    LastEmittedCandled.Close,
-                                    LastEmittedCandled.Close,
-                                    0
-                                );
-                }
-            if (CandlesToAdd.Count > 0)
-                HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
-            foreach (var c in CandlesToAdd)
+
+            //instad of waiting for the candle we just emit forming candle   
+            var finalCandleUpdateTimeoutElapsed = DateTime.UtcNow > LastEmittedCandled.Time + resolution + FinalCandleUpdateTimeout;
+            if (!LastEmittedCandled.IsDefault() && Market.IsServiceAvailable && finalCandleUpdateTimeoutElapsed)
             {
-                this.OnData?.Invoke(this, c);
+                Logger.Verbose("{Symbol} SymbolFeed: emitting forming candle ", Symbol.Key);
+                LastEmittedCandled = FormingCandle;
+                CandlesToAdd.Add(LastEmittedCandled);
+                FormingCandle = GetFiller(resolution);
             }
+
+            if (CandlesToAdd.Count > 0)
+            { 
+                HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
+
+                foreach (var c in CandlesToAdd)
+                    this.OnData?.Invoke(this, c);
+            }
+        }
+
+        private Candlestick GetFiller(TimeSpan resolution)
+        {
+            return new Candlestick(
+               LastEmittedCandled.CloseTime,
+               LastEmittedCandled.CloseTime + resolution,
+               LastEmittedCandled.Close,
+               LastEmittedCandled.Close,
+               LastEmittedCandled.Close,
+               LastEmittedCandled.Close,
+               0
+           );
         }
 
         private static Candlestick KlineToCandlestick(BinanceKline kline)
