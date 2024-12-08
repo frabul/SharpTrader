@@ -1037,8 +1037,11 @@ namespace SharpTrader.BrokersApi.Binance
                 var symInfo_target_to_asset = GetSymbolInfo(conversionTargetAsset + bal.Asset);
                 var symInfo_asset_to_mid = GetSymbolInfo(bal.Asset + midAsset);
                 var symInfo_mid_to_asset = GetSymbolInfo(midAsset + bal.Asset);
-
-                if (symInfo_asset_to_target != null && symInfo_asset_to_target.IsTradingEnabled)
+                if (bal.Asset == conversionTargetAsset)
+                {
+                    convert = 1;
+                }
+                else if (symInfo_asset_to_target != null && symInfo_asset_to_target.IsTradingEnabled)
                 {
                     //direct conversion!
                     var q = allPrices.FirstOrDefault(p => p.symbol.Key == symInfo_asset_to_target.Key);
@@ -1072,8 +1075,6 @@ namespace SharpTrader.BrokersApi.Binance
                         Logger.Error("Unable to find price for symbol {Symbol}", symInfo_mid_to_asset);
 
                 }
-                else
-                { }
 
                 var bb = new AssetBalance { Asset = bal.Asset, Free = bal.Free * convert, Locked = bal.Locked * convert };
                 list.Add(bb);
