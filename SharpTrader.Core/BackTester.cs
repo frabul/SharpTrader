@@ -102,15 +102,16 @@ namespace SharpTrader
         {
 
         }
-     
+
         public BackTester(Configuration config, TradeBarsRepository db, Serilog.ILogger logger, Serilog.ILogger algoLogger)
         {
             Config = config;
             Logger = logger;
             if (Logger == null)
-                Logger = Serilog.Log
-                    .ForContext<BackTester>()
-                    .ForContext("BacktestSession", config.SessionName);
+                Logger = Serilog.Log.Logger;
+
+            Logger = Logger.ForContext<BackTester>()
+                           .ForContext("BacktestSession", config.SessionName);
             if (algoLogger == null)
                 algoLogger = Logger;
             else
@@ -144,7 +145,7 @@ namespace SharpTrader
                 throw new Exception($"Unable to translate from provided algo config to ${configClass.FullName }: ${ex.Message}");
             }
 
-   
+
             this.Algo = myctor.Invoke(new[] { MarketSimulator.GetMarketApi(config.Market), algoLogger, algoConfig }) as TradingAlgo;
             this.Algo.IsPlottingEnabled = Config.PlottingEnabled;
             this.Algo.ShowPlotCallback = (pl) => this?.ShowPlotCallback(pl);
@@ -329,7 +330,7 @@ namespace SharpTrader
 
             if (!consoleOnly)
             {
-             
+
                 Logger.Information("Backtest results:\n" +
                     "Balance: {totalBal:F4} - Operations:{OperationsCount} - Lost in fee:{lostInFee:F4}\n" +
                     "Algorithm => {@AlgoStats} \n" +
