@@ -13,7 +13,8 @@ chartData.figures[0].series[1].points.forEach(point => {
 function AddCandlesSerie(chart: IChartApi, seriesData: any) {
     var lineSeries = chart.addCandlestickSeries({
         priceLineVisible: false,
-        lastValueVisible: false
+        lastValueVisible: true,
+        baseLineVisible: false
     });
     lineSeries.setData(seriesData.Points);
 }
@@ -47,9 +48,11 @@ function CreateFigure(figureData) {
                     } else
                         return businessDayOrTimestamp;
                 },
-                priceFormatter: price => price.toFixed(7)
+                priceFormatter: price => { if (price >= 0) return "+" + price.toFixed(7); else return price.toFixed(7); }
             },
-
+            rightPriceScale: {
+                drawTicks: false
+            },
             timeScale: {
                 timeVisible: true
             }
@@ -111,4 +114,3 @@ charts[0].subscribeCrosshairMove(function (par: MouseEventParams) {
     });
 });
 
- 
