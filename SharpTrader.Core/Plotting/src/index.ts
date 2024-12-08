@@ -1,11 +1,12 @@
 
-import { createChart, IChartApi, TimeRange, MouseEventParams, Point, Coordinate } from 'lightweight-charts';
+import { createChart, IChartApi, TimeRange, MouseEventParams, Point, Coordinate, BarPrice, BarData, BarPrices } from 'lightweight-charts';
 
 
 class Figure {
     Chart: IChartApi;
     LastCrosshairForcedPoint: Point;
     Container: HTMLElement;
+    LegendFirstRow: HTMLDivElement;
     constructor(chart: IChartApi, container: HTMLElement) {
         this.Chart = chart;
         this.Container = container;
@@ -16,24 +17,37 @@ class Figure {
 var charts: Figure[] = [];
 var lastVisibleRangeSet: TimeRange = { from: "", to: "" };
 
-function AddCandlesSerie(chart: IChartApi, seriesData: any) {
-    var lineSeries = chart.addCandlestickSeries({
+function AddCandlesSerie(figure: Figure, seriesData: any) {
+    var lineSeries = figure.Chart.addCandlestickSeries({
         priceLineVisible: false,
         lastValueVisible: true,
         baseLineVisible: false
     });
     lineSeries.setData(seriesData.Points);
+    lineSeries.setMarkers(seriesData.Markers);
+
+
+
+
+    figure.Chart.subscribeCrosshairMove((param) => {
+        if (param.time) {
+            var pointedElem: BarPrices = param.seriesPrices.get(lineSeries) as BarPrices;
+            if (pointedElem != undefined)
+                figure.LegendFirstRow.innerText = `${seriesData.Name} - O:${pointedElem.open.toFixed(7)} - H:${pointedElem.high.toFixed(7)}`;
+        }
+        else {
+            figure.LegendFirstRow.innerText = seriesData.Name;
+        }
+    });
 }
 
 function AddLineSerie(chart: IChartApi, series: any) {
     var lineSeries = chart.addLineSeries({
-        color: series.Color,
-        lineWidth: series.LineWidth,
-        
         priceLineVisible: false,
         lastValueVisible: false
     });
-    lineSeries.applyOptions({ color: series.Color })
+
+    lineSeries.applyOptions(series.Options)
     lineSeries.setData(series.Points);
     lineSeries.setMarkers(series.Markers);
 }
@@ -49,27 +63,31 @@ function CreateFigure(figureData) {
     chart.applyOptions(
         {
             localization: {
-                timeFormatter: businessDayOrTimestamp => {
-                    if (typeof (businessDayOrTimestamp) == 'number') {
-                        var date = new Date(businessDayOrTimestamp * 1000);
-                        return date.toTimeString();
-                    } else
-                        return businessDayOrTimestamp;
-                },
+                // timeFormatter: businessDayOrTimestamp => {
+                //     if (typeof (businessDayOrTimestamp) == 'number') {
+                //         var date = new Date(businessDayOrTimestamp * 1000);
+                //         return date.toTimeString();
+                //     } else
+                //         return businessDayOrTimestamp;
+                // },
                 priceFormatter: price => { if (price >= 0) return "+" + price.toFixed(7); else return price.toFixed(7); }
             },
             rightPriceScale: {
                 drawTicks: false
             },
             timeScale: {
-                timeVisible: true
+                timeVisible: true,
+                secondsVisible: false
             }
         }
     )
+    var figure = new Figure(chart, box);
+    charts.push(figure);
+
     figureData.Series.forEach(series => {
         switch (series.Type) {
             case "Candlestick":
-                AddCandlesSerie(chart, series);
+                AddCandlesSerie(figure, series);
                 break;
             case "Line":
                 AddLineSerie(chart, series);
@@ -77,7 +95,6 @@ function CreateFigure(figureData) {
         }
     });
 
-    charts.push(new Figure(chart, box));
 
     function onVisibleTimeRangeChanged(newVisibleTimeRange: TimeRange) {
 
@@ -107,6 +124,16 @@ function CreateFigure(figureData) {
         });
     });
 
+    //-- create legend --
+    var legend = document.createElement('div');
+    legend.classList.add('legend');
+    figure.Container.appendChild(legend);
+
+    var firstRow = document.createElement('div');
+    firstRow.innerText = '';
+    legend.appendChild(firstRow);
+    figure.LegendFirstRow = firstRow;
+    //-- start auto resize --
     var intervalId = setInterval(function () {
         chart.resize(box.clientWidth, box.clientHeight);
     }, 200);
