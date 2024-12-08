@@ -15,10 +15,10 @@ namespace SharpTrader.BrokersApi.Binance
 
         }
 
-        public Trade(string symbol, AccountTradeReponse tr)
+        public Trade(AccountTradeReponse tr)
         {
             Market = "Binance";
-            Symbol = symbol;
+            Symbol = tr.Symbol;
             Direction = tr.IsBuyer ? TradeDirection.Buy : TradeDirection.Sell;
             Price = tr.Price;
             Amount = tr.Quantity;
@@ -41,7 +41,7 @@ namespace SharpTrader.BrokersApi.Binance
             CommissionAsset = tr.AssetCommissionTakenFrom;
             Time = tr.TimeStamp;
             OrderId = tr.OrderId;
-            ClientOrderId = tr.OriginalClientOrderId;
+            ClientOrderId = !String.IsNullOrEmpty(tr.OriginalClientOrderId) ? tr.OriginalClientOrderId : tr.NewClientOrderId;
             TradeId = tr.TradeId;
             Id = Symbol + TradeId;
         }

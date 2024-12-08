@@ -93,7 +93,8 @@ namespace SharpTrader.BrokersApi.Binance
         public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1, bool publicOnly = false, Serilog.ILogger logger = null)
         {
             PublicAccessOnly = publicOnly;
-            Logger = logger ?? Serilog.Log.Logger.ForContext<BinanceMarketApi>();
+            logger = logger ?? Serilog.Log.Logger;
+            Logger = logger.ForContext<BinanceMarketApi>();
             Logger.Information("BinanceMarketApi Starting initialization...");
             OperationsDbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
             OperationsArchivePath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd_archive.db");
@@ -328,7 +329,7 @@ namespace SharpTrader.BrokersApi.Binance
             while (!finish)
             {
                 var responses = await Client.GetAccountTrades(new AllTradesRequest() { FromId = start, Symbol = sym });
-                var toInsert = responses.Select(or => new Trade(sym, or)).OrderBy(o => o.TradeId).ToArray();
+                var toInsert = responses.Select(or => new Trade(or)).OrderBy(o => o.TradeId).ToArray();
                 foreach (var tr in toInsert)
                 {
                     var order = Orders.FindOne(o => o.OrderId == tr.OrderId);
@@ -499,7 +500,7 @@ namespace SharpTrader.BrokersApi.Binance
                     if (force || symData.LastOrderAtTradesSynch != lastOrder.OrderId || hasActiveOrders)
                     {
                         var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = tradesCountLimit });
-                        var trades = resp.Select(tr => new Trade(sym, tr));
+                        var trades = resp.Select(tr => new Trade(tr));
                         foreach (var tr in trades)
                         {
                             //ignore trades older than the StartOfOperation
@@ -737,7 +738,9 @@ namespace SharpTrader.BrokersApi.Binance
             if (!newOrder.ResultingTrades.Contains(tradeUpdate.TradeId))
                 newOrder.ResultingTrades.Add(tradeUpdate.TradeId);
 
-            Logger.Debug("UserDataSocket notified trade {TradeId} from order {OrderId} / {RawOrderId}", tradeUpdate.Id, tradeUpdate.ClientOrderId, tradeUpdate.OrderId);
+            Logger
+                .ForContext("Trade", tradeUpdate, true)
+                .Debug("UserDataSocket notified trade {TradeId} from order {OrderId} / {RawOrderId}", tradeUpdate.Id, tradeUpdate.ClientOrderId, tradeUpdate.OrderId);
 
             //reinsert the order
             OrdersUpdateOrInsert(newOrder);
@@ -794,8 +797,9 @@ namespace SharpTrader.BrokersApi.Binance
             lock (LockOrdersTrades)
             {
                 var tradeInDb = Trades.FindOne(t => t.Id == newTrade.Id);
-                if (newTrade.ClientOrderId == null || newTrade.ClientOrderId == "null")
+                if (newTrade.ClientOrderId == null || newTrade.ClientOrderId == "null" || newTrade.ClientOrderId == "")
                 {
+                    Logger.Warning("Received {TradeId} - {@Trade} without ClientOrderId", newTrade.Id, newTrade);
                     var order = Orders.FindOne(o => o.OrderId == newTrade.OrderId && o.Symbol == newTrade.Symbol);
                     newTrade.ClientOrderId = order?.ClientId;
                 }
