@@ -12,13 +12,13 @@ using System.IO;
 using LiteDB;
 using SharpTrader.Storage;
 using SharpTrader.Core.BrokersApi.Binance;
+using Newtonsoft.Json;
 
 namespace SharpTrader.MarketSimulator
 {
     public class MarketEmulator : IMarketApi
     {
         object LockObject = new object();
-        //private Dictionary<string, decimal> _Balances = new Dictionary<string, decimal>();
         private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
         private List<Trade> _Trades = new List<Trade>();
         internal Dictionary<string, SymbolFeed> SymbolsFeeds = new Dictionary<string, SymbolFeed>();
@@ -52,22 +52,18 @@ namespace SharpTrader.MarketSimulator
             MarketName = name;
             MakerFee = makerFee;
             TakerFee = takerFee;
-            var text = System.IO.File.ReadAllText(Path.Combine(dataDir, name + "SymbolsTable.json"));
-            JObject table = JObject.Parse(text);
-            SymbolsTable = new SymbolsTable();
-            foreach (var token in table)
+            try
             {
-                var simInfo = new BinanceSymbolInfo()
-                {
-                    Key = token.Key,
-                    Asset = token.Value["Asset"].ToObject<string>(),
-                    IsMarginTadingAllowed = token.Value["IsMarginTadingAllowed"].ToObject<bool>(),
-                    IsSpotTadingAllowed = token.Value["IsSpotTadingAllowed"].ToObject<bool>(),
-                    IsCrossMarginAllowed = token.Value["IsCrossMarginAllowed"].ToObject<bool>(),
-                    IsIsolatedMarginAllowed = token.Value["IsIsolatedMarginAllowed"].ToObject<bool>(),
-                    QuoteAsset = token.Value["QuoteAsset"].ToObject<string>(),
-                };
-                this.SymbolsTable.Add(simInfo.Key, simInfo);
+                var text = System.IO.File.ReadAllText(Path.Combine(dataDir, name + "SymbolsTable.json"));
+                SymbolsTable = JsonConvert.DeserializeObject<SymbolsTable>(text);
+                //set all symbols trading
+                foreach(var sym in SymbolsTable.Values)
+                    sym.IsTradingEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Unable to load symbols table for Binance {0}", ex.Message);
+                throw;
             }
         }
 

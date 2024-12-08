@@ -13,7 +13,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         public string QuoteAsset { get; set; }
         public bool IsMarginTadingAllowed { get; set; }
         public bool IsCrossMarginAllowed { get; set; }
-        public bool IsIsolatedMarginAllowed { get; set; }
+        public bool IsIsolatedMarginAllowed => IsMarginTadingAllowed;
         public bool IsSpotTadingAllowed { get; set; }
         public decimal MinLotSize { get; set; }
         public decimal LotSizeStep { get; set; }
@@ -38,6 +38,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             IsTradingEnabled = binanceSymbol.status == "TRADING";
             IsMarginTadingAllowed = binanceSymbol.isMarginTradingAllowed;
             IsSpotTadingAllowed = binanceSymbol.isSpotTradingAllowed;
+           
             LotSizeStep = lotSize.StepSize;
             MinLotSize = lotSize.MinQty;
             MinNotional = minNotional.MinNotional;
