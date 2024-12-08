@@ -389,18 +389,25 @@ namespace SharpTrader.BrokersApi.Binance
             Stopwatch sw = new Stopwatch();
             while (!IsDisposing && !IsDisposed)
             {
-                sw.Restart();
-                var req = await Client.GetSymbolsOrderBookTicker();
-                foreach (var book in req)
+                try
                 {
-                    if (Feeds.TryGetValue(book.Symbol, out var feed))
+                    sw.Restart();
+                    var req = await Client.GetSymbolsOrderBookTicker();
+                    foreach (var book in req)
                     {
-                        feed.BookUpdate(book);
+                        if (Feeds.TryGetValue(book.Symbol, out var feed))
+                        {
+                            feed.BookUpdate(book);
+                        }
                     }
+                    while (sw.Elapsed < TimeSpan.FromSeconds(2.5))
+                        await Task.Delay(200);
                 }
-
-                while (sw.Elapsed < TimeSpan.FromSeconds(2.5))
-                    await Task.Delay(200);
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Exception in ServiceUpdateOrderBooks.");
+                    await Task.Delay(500);
+                }  
             }
         }
         private async Task ServiceSynchBalance()
