@@ -193,7 +193,7 @@ namespace SharpTrader.Storage
                     return false;
                 }
             }
-            catch (Exception _ex)
+            catch (Exception)
             {
                 return false;
                 //Console.WriteLine($"Error while parsing file info for file {filePath}: {_ex.Message}");
