@@ -14,8 +14,45 @@ namespace TestConsole
 {
     class Program
     {
+        interface IFoo
+        {
+            int A { get; }
+        }
+        class Foo : IFoo
+        {
+            public int A { get; set; } = 2;
+        }
+        class Foo2 : IFoo
+        {
+            public int A { get; set; } = 2;
+        }
+        class Bar
+        {
+            public IFoo theFoo { get; set; } = new Foo();
+            public int B { get; set; } = 3;
+        }
+
         static async Task Main(string[] args)
         {
+            LiteDB.LiteDatabase db = new LiteDB.LiteDatabase("test.db");
+            var dummyMapper = new LiteDB.BsonMapper();
+            db.Mapper.RegisterType<IFoo>(
+                serialize: (obj) =>
+                {
+                    return dummyMapper.Serialize(obj);
+                },
+                deserialize: (bson) =>
+                {
+                    return new Foo2() { A = bson["A"].AsInt32 };
+                }
+            );
+
+            var bars = db.GetCollection<Bar>("FooCollection");
+            bars.Upsert(new Bar());
+
+            var ret = bars.FindAll().ToList();
+
+
             Console.WriteLine("Running charts test");
             await ChartsTest.Run();
             Console.WriteLine("Completed. Press enter to continue.");
