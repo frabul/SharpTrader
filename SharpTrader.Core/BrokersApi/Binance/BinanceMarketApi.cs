@@ -37,9 +37,9 @@ namespace SharpTrader.BrokersApi.Binance
 
         private readonly object LockOrdersTrades = new object();
         private readonly object LockBalances = new object();
-        private readonly HashSet<Order> OpenOrders = new HashSet<Order>();
         private readonly Stopwatch StopwatchSocketClose = new Stopwatch();
         private readonly Stopwatch UserDataPingStopwatch = new Stopwatch();
+        private HashSet<Order> OpenOrders = new HashSet<Order>();
 
         private ILiteCollection<SymbolData> SymbolsData;
         private ILiteCollection<Order> DbOpenOrders;
@@ -252,6 +252,7 @@ namespace SharpTrader.BrokersApi.Binance
             DbOpenOrders = TradesAndOrdersDb.GetCollection<Order>("OpenOrders");
             Orders = TradesAndOrdersDb.GetCollection<Order>("Orders");
             Trades = TradesAndOrdersDb.GetCollection<Trade>("Trades");
+            OpenOrders = new HashSet<Order>(DbOpenOrders.FindAll());
             SymbolsData = TradesAndOrdersDb.GetCollection<SymbolData>("SymbolsData");
 
             OrdersArchive = TradesAndOrdersArch.GetCollection<Order>("Orders");
@@ -1178,11 +1179,14 @@ namespace SharpTrader.BrokersApi.Binance
 
                     if (order == null)
                         order = Orders.FindById(value["_id"].AsString);
+                    bool notFoundIndOrders = order == null;
+
                     if (order == null)
                         order = defaultMapper.Deserialize<Order>(value);
-
-                    if (order != null)
+                    //if the order was not found in the oders db we add it to openOrders so it will be checked during orders synchronization
+                    if (order != null && notFoundIndOrders)
                         OpenOrders.Add(order);
+
                     return order;
                 }
             }
