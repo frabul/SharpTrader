@@ -512,6 +512,8 @@ namespace SharpTrader.BrokersApi.Binance
                                     order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
                                     if (order == null)
                                         order = OrdersArchive.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
+                                    if (string.IsNullOrEmpty(order.ClientId))
+                                        order = null;
                                 }
                                 // put out of lokc to prevent deadlock
                                 if (order == null)
@@ -804,7 +806,7 @@ namespace SharpTrader.BrokersApi.Binance
                     newTrade.ClientOrderId = order?.ClientId;
                 }
 
-                if (tradeInDb != null)
+                if (tradeInDb != null && !string.IsNullOrEmpty(newTrade.ClientOrderId))
                     Trades.Update(newTrade);
                 else if (TradesArchive.FindOne(tr => tr.Id == newTrade.Id) != null)
                 {
