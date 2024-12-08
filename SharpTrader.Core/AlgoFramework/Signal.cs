@@ -84,5 +84,16 @@ namespace SharpTrader.AlgoFramework
         {
             _IsChanged = false; 
         }
+
+        public override bool Equals(object obj)
+        {
+            if( obj is Signal sign)
+                return sign.Id == Id;
+            return false;
+        }
+        public override int GetHashCode()
+        {
+            return Id.GetHashCode();
+        }
     }
 }

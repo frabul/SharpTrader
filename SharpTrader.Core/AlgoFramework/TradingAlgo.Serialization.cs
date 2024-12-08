@@ -78,9 +78,9 @@ namespace SharpTrader.AlgoFramework
         private ILiteCollection<Operation> DbClosedOperations;
         private ILiteCollection<Operation> DbActiveOperations;
 
-        private List<Signal> SignalsDeserialized = new List<Signal>();
+        private Dictionary<string, Signal> SignalsDeserialized = new Dictionary<string, Signal>();
         private BsonMapperCustom NaiveMapper = new BsonMapperCustom();
-        private EntityMapper symInfoEntityMapper;
+
 
         public void ConfigureSerialization()
         {
@@ -91,21 +91,23 @@ namespace SharpTrader.AlgoFramework
             this.RiskManager?.RegisterCustomSerializers(DbMapper);
             this.Sentry?.RegisterCustomSerializers(DbMapper);
 
-           
-            //---- add mapper for signals
-            Signal deserializeSignal(BsonValue bson)
-            {
-                var id = bson["Id"].AsString ?? bson["_id"].AsString;
-                //we must assure that there is only one instance of the same signal
-                var signal = SignalsDeserialized.FirstOrDefault(s => s.Id == id);
-                if (signal == null)
+            //---- add mapper for signals 
+            DbMapper.RegisterType<Signal>(
+                serialize: null,
+                deserialize: (bson) =>
                 {
-                    signal = new Signal(id);
-                    SignalsDeserialized.Add(signal);
+                    var id = bson["Id"].AsString ?? bson["_id"].AsString;
+                    //we must assure that there is only one instance of the same signal
+
+                    if (SignalsDeserialized.TryGetValue(id, out var signal))
+                    {
+                        signal = new Signal(id);
+                        SignalsDeserialized.Add(id, signal);
+                    }
+                    return signal;
+
                 }
-                return signal;
-            }
-            DbMapper.Entity<Signal>().Ctor(deserializeSignal);
+            );
 
 
             //build db path
