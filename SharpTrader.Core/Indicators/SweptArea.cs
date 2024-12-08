@@ -21,6 +21,7 @@ namespace SharpTrader.Indicators
 
         protected override IndicatorDataPoint Calculate(IBaseData input)
         {
+            Inputs.Add(input);
             if (Inputs.Count < Period)
                 return IndicatorDataPoint.Zero;
 

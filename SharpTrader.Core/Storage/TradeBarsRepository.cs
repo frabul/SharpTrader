@@ -207,11 +207,14 @@ namespace SharpTrader.Storage
         {
             //get a
             var chunks = DiscoverChunks(filesPath);
-            var filesGrouped = chunks.GroupBy(c => c.Value.HistoryId.Key);
+            var filesGrouped = chunks.GroupBy(c => c.Value.HistoryId.Key).ToList();
 
             var data = new List<SymbolHistoryMetaDataInternal>();
+            Logger.Info("Found {0} groups", filesGrouped.Count);
+            int cnt = 0;
             foreach (var group in filesGrouped)
             {
+                Logger.Info("Converting {0}/{1}", cnt++, filesGrouped.Count);
                 var histMetadata = new SymbolHistoryMetaDataInternal(group.First().Value.HistoryId);
                 histMetadata.SetSaveMode(ChunkFileVersion, ChunkSpan);
                 foreach (var chunk in group)
