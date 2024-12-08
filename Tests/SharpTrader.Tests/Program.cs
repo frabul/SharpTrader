@@ -16,6 +16,9 @@ namespace TestConsole
     {
         static async Task Main(string[] args)
         {
+            Console.WriteLine("Running charts test");
+            await ChartsTest.Run();
+            Console.ReadLine();
             await TestHistoryDB.RebuildDb();
             //HistoryDB_Benchmark.Run();
             await SharpTrader.Tests.TestHistoryDB.RunAsync();
