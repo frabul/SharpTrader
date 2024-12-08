@@ -43,7 +43,7 @@ namespace SharpTrader.BrokersApi.Binance
         private ILiteCollection<Trade> Trades;
         private ILiteCollection<Order> OrdersArchive;
         private ILiteCollection<Trade> TradesArchive;
-        private BinanceTradeBarsRepository HistoryDb;
+        public BinanceTradeBarsRepository HistoryDb { get; set; }
         private BinanceWebSocketClient WSClient;
         private CombinedWebSocketClient CombinedWebSocketClient;
 
