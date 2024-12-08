@@ -193,6 +193,18 @@ namespace SharpTrader.AlgoFramework
             return trade.ClientOrderId.StartsWith(this.Id + "-");
         }
 
+        public static string GetOperationIdFromClientOrderId(string clientOrderId)
+        {
+            if (!string.IsNullOrEmpty(clientOrderId))
+            {
+                var dash = clientOrderId.IndexOf("-");
+                if (dash > -1)
+                    return clientOrderId.Substring(0, dash); 
+            }
+            return "null";
+        }
+
+
         public bool IsEntryExpired(DateTime time)
         {
             return time >= this.Signal.EntryExpiry;
