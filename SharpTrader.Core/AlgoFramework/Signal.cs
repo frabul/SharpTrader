@@ -6,9 +6,9 @@ using System.Dynamic;
 using System.Reflection;
 
 namespace SharpTrader.AlgoFramework
-{ 
+{
     public class Signal : IChangeTracking
-    { 
+    {
         public event Action<Signal> OnModify;
         private volatile bool _IsChanged = true;
         /// <summary>
@@ -18,12 +18,13 @@ namespace SharpTrader.AlgoFramework
         {
 
         }
-        public Signal(string id, ISymbolInfo symbol, SignalKind kind, DateTime creationTime)
+
+        public Signal(string _id, ISymbolInfo symbol, SignalKind kind, DateTime creationTime)
         {
-            Id = id;
+            Id = _id;
             Symbol = symbol;
             Kind = kind;
-            CreationTime = creationTime;
+            ModifyTime = creationTime;
         }
 
         /// <summary>
@@ -33,6 +34,7 @@ namespace SharpTrader.AlgoFramework
         {
             Id = id;
         }
+        [BsonId]
         public string Id { get; }
 
         /// <summary>
@@ -43,7 +45,9 @@ namespace SharpTrader.AlgoFramework
 
         public ISymbolInfo Symbol { get; private set; }
         public SignalKind Kind { get; private set; }
-        public DateTime CreationTime { get; private set; }
+
+        [BsonField("CreationTime")]
+        public DateTime ModifyTime { get; private set; }
         public decimal PriceTarget { get; private set; }
 
         /// <summary>
@@ -64,8 +68,9 @@ namespace SharpTrader.AlgoFramework
 
         public bool IsChanged => _IsChanged;
 
-        public void ModifyConditions(decimal entry, DateTime entryExpiry, decimal target, DateTime targetExpiry)
+        public void ModifyConditions(DateTime timeNow, decimal entry, DateTime entryExpiry, decimal target, DateTime targetExpiry)
         {
+            ModifyTime = timeNow;
             PriceEntry = entry;
             EntryExpiry = entryExpiry;
             PriceTarget = target;
@@ -82,12 +87,12 @@ namespace SharpTrader.AlgoFramework
 
         public void AcceptChanges()
         {
-            _IsChanged = false; 
+            _IsChanged = false;
         }
 
         public override bool Equals(object obj)
         {
-            if( obj is Signal sign)
+            if (obj is Signal sign)
                 return sign.Id == Id;
             return false;
         }

@@ -60,14 +60,18 @@ namespace SharpTrader.AlgoFramework
                 _Signal.Operation = this;
                 _Signal.OnModify -= OnSignalModified;
                 _Signal.OnModify += OnSignalModified;
-                CreationTime = _Signal.CreationTime;
+                CreationTime = _Signal.ModifyTime;
             }
         }
 
         private void OnSignalModified(Signal s)
         {
             if (s == this.Signal)
+            {
                 this.Resume();
+                CreationTime = _Signal.ModifyTime;
+                this.SetChanged();
+            }
         }
 
         public AssetAmount AmountTarget { get; private set; }
@@ -319,7 +323,7 @@ namespace SharpTrader.AlgoFramework
                     var amout = from e in _Entries.Concat(_Exits)
                                 let dir = e.Direction == TradeDirection.Buy ? -1 : 1 //if we buy then amount is spent, if we sell it's gained
                                 select dir * e.Amount * e.Price - e.Commission;
-                    var total = amout.Sum(); 
+                    var total = amout.Sum();
                     return total;
                 }
                 else

@@ -82,10 +82,12 @@ namespace SharpTrader.AlgoFramework
 
         private Dictionary<string, Signal> SignalsDeserialized = new Dictionary<string, Signal>();
         private BsonMapperCustom NaiveMapper = new BsonMapperCustom();
-
+        private BsonMapperCustom defaultMapper;
+        private EntityMapper signalMapper;
         public void ConfigureSerialization()
         {
-            var defaultMapper = new BsonMapperCustom();
+            defaultMapper = new BsonMapperCustom();
+
             NaiveMapper.RegisterType<ISymbolInfo>(
                 serialize: obj => defaultMapper.Serialize<ISymbolInfo>(obj),
                 deserialize: bson =>
@@ -112,18 +114,27 @@ namespace SharpTrader.AlgoFramework
                    return defaultMapper.Deserialize<SharpTrader.MarketSimulator.Trade>(bson);
                }
             );
-
+            NaiveMapper.RegisterType<Signal>(
+               serialize: o => defaultMapper.Serialize<Signal>(o),
+               deserialize: bson =>
+               {
+                   var id = bson["Id"].AsString ?? bson["_id"].AsString;
+                   var signal = new Signal(id);
+                   NaiveMapper.PopulateObjectProperties(signalMapper, signal, bson as BsonDocument);
+                   return signal;
+               }
+            );
             DbMapper = new BsonMapperCustom();
-
+            signalMapper = DbMapper.BuildEntityMapper(typeof(Signal));
             Market.RegisterCustomSerializers(DbMapper);
             this.Executor?.RegisterCustomSerializers(DbMapper);
             this.RiskManager?.RegisterCustomSerializers(DbMapper);
             this.Sentry?.RegisterCustomSerializers(DbMapper);
 
             //---- add mapper for signals  
-            var signalMapper = DbMapper.BuildEntityMapper(typeof(Signal));
+
             DbMapper.RegisterType<Signal>(
-                serialize: (obj) => NaiveMapper.Serialize<Signal>(obj),
+                serialize: (obj) => defaultMapper.Serialize<Signal>(obj),
                 deserialize: (bson) =>
                 {
                     var id = bson["Id"].AsString ?? bson["_id"].AsString;
@@ -163,6 +174,7 @@ namespace SharpTrader.AlgoFramework
             foreach (var oper in this.Db.GetCollection("ClosedOperations").FindAll())
             {
                 var op = this.OperationFromBson(oper);
+
                 var isOld = op.CreationTime < purgeLimit;
                 var entryZero = op.AmountInvested <= 0 && op.AmountLiquidated <= 0;
                 if (isOld && entryZero)
