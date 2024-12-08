@@ -93,7 +93,7 @@ namespace SharpTrader.Storage
                     this.UpdateStartAndEnd(c);
                     //if this candle open is preceding last candle open we need to insert it in sorted fashion
                     var toAdd = c; //new Candlestick(c);
-                    if (lastCandle?.OpenTime > toAdd.OpenTime)
+                    if (lastCandle != null && lastCandle.OpenTime >= toAdd.OpenTime)
                     {
                         int i = this.Ticks.BinarySearch(toAdd, CandlestickTimeComparer.Instance);
                         int index = i;
@@ -105,9 +105,9 @@ namespace SharpTrader.Storage
                             this.Ticks.Insert(index, toAdd);
                         }
                         if (index > 0)
-                            Debug.Assert(this.Ticks[index].OpenTime >= this.Ticks[index - 1].OpenTime);
+                            Debug.Assert(this.Ticks[index].OpenTime > this.Ticks[index - 1].OpenTime);
                         if (index + 1 < this.Ticks.Count)
-                            Debug.Assert(this.Ticks[index].OpenTime <= this.Ticks[index + 1].OpenTime);
+                            Debug.Assert(this.Ticks[index].OpenTime < this.Ticks[index + 1].OpenTime);
                     }
                     else
                         this.Ticks.Add(toAdd);

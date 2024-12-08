@@ -93,20 +93,25 @@ namespace SharpTrader.Storage
             }
         }
 
-        internal void Save(string dataDir)
+        internal void Flush(string dataDir)
         {
+            HistoryView oldView;
             lock (this.Locker)
             {
-                //save the view
-                if (this.View != null)
-                {
-                    this.View.Save_Protobuf(dataDir);
+                oldView = this.View;
+                View = new HistoryView(View.Id);
+            }
 
+            //save the view
+            if (oldView != null)
+            {
+                oldView.Save_Protobuf(dataDir);
+                lock (this.Locker)
+                {
                     //check that saved chucks are present in chunks cache
                     foreach (var chunk in View.LoadedFiles)
                         this.Chunks.Add(chunk);
                 }
-
             }
         }
 
