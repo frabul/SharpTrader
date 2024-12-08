@@ -589,9 +589,8 @@ namespace SharpTrader.BrokersApi.Binance
                         Logger.Error(ex, "Exception while keep alive listen key.");
                         if (ex is BinanceException binex && binex.ErrorDetails.Code == -1125)
                         {
-                            Logger.Warning(ex, "Invalidating UserDataSocket because of exception.");
-                            UserDataSocket = Guid.Empty;
-
+                            Logger.Warning(ex, "Invalidating UserDataSocket because of exception."); 
+                            nextHandOverTime = DateTime.UtcNow;
                         }
                     }
                 }
@@ -622,7 +621,11 @@ namespace SharpTrader.BrokersApi.Binance
                             nextKeepAliveTime = DateTime.UtcNow.AddMinutes(15);
                             //close old socket
                             if (oldSocket != Guid.Empty)
+                            {
                                 CloseSocket(oldSocket);
+                                oldSocket = Guid.Empty;  
+
+                            } 
                         }
                         catch (Exception ex)
                         {
