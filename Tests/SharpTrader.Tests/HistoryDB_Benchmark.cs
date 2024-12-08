@@ -21,7 +21,6 @@ namespace TestConsole
         DateTime startTime = new DateTime(2020, 06, 01);
         DateTime endTime = new DateTime(2021, 06, 01);
 
-
         public static void Run()
         {
             var summary = BenchmarkRunner.Run<HistoryDB_Benchmark>();
