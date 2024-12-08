@@ -187,6 +187,13 @@ namespace SharpTrader
             SeekNearestBefore(unixTime.ToDatetime());
         }
 
+        internal void Clear()
+        {
+            this.Records.Clear();
+            this._Cursor = -1;
+
+        }
+
         /// <summary>
         /// Sets the cursor to the nearest tick after or exactly at provided time.
         /// If the provided time is higher or lower than the know prices range it will be set to the last tick or first tick
@@ -465,7 +472,12 @@ namespace SharpTrader
 
         internal List<T> ToList()
         {
-            return this.Items.ToList();
+            return ReadOperation(() => this.Items.ToList());
+        }
+
+        internal void Clear()
+        {
+            WriteOperation(() => this.Items.Clear());
         }
     }
 }
