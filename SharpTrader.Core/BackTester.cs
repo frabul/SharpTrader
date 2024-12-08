@@ -245,6 +245,23 @@ namespace SharpTrader
                 steps++;
             }
 
+            int pcount = 0;
+            foreach (var plot in Algo.Plots)
+            {
+                ShowPlotCallback?.Invoke(plot);
+                Chart chart = new Chart(this.Config.SessionName + "_plot" + pcount++);
+                var fig = chart.NewFigure();
+                fig.PlotCandlesticks("Candlesticks", plot.Candles);
+                // add lines 
+                int lineCount = 0;
+                foreach(var line in plot.Lines)
+                {
+                    var points = line.Points.Select(p => new IndicatorDataPoint(p.X, p.Y));
+                    fig.PlotLine("li" + lineCount++, points, line.Color, axis:line.AxisId);
+                }
+                // todo convertire tutto il resto
+                chart.Serialize(Path.Combine(Config.LogDir, $"{chart.Name}_{DateTime.Now:yyyyMMddmmss}.json"));
+            }
 
             //get profit 
             sw.Stop();
