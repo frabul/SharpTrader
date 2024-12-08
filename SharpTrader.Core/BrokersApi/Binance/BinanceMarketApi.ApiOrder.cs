@@ -145,6 +145,7 @@ namespace SharpTrader.BrokersApi.Binance
                 case be.Enums.OrderStatus.Rejected:
                     return OrderStatus.Rejected;
                 case be.Enums.OrderStatus.Expired:
+                case be.Enums.OrderStatus.ExpiredInMatch:
                     return OrderStatus.Expired;
                 default:
                     throw new Exception("Unknown order status");
