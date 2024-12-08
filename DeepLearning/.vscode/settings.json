@@ -1,7 +1,0 @@
-{
-    "python.pythonPath": "D:\\Anaconda3\\envs\\Keras\\python.exe",
-    "python.linting.lintOnSave": true ,
-    "python.linting.pylintArgs": [
-        "--disable=C0103,C0111"
-    ],
-}
