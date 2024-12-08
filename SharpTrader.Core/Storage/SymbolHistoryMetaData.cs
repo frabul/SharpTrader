@@ -109,7 +109,7 @@ namespace SharpTrader.Storage
                 lock (this.Locker)
                 {
                     //check that saved chucks are present in chunks cache
-                    foreach (var chunk in View.LoadedFiles)
+                    foreach (var chunk in oldView.LoadedFiles)
                         this.Chunks.Add(chunk);
                 }
             }
