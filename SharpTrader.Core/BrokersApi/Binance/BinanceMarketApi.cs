@@ -7,10 +7,9 @@ using BinanceExchange.API.Models.Response.Error;
 using BinanceExchange.API.Models.WebSocket;
 using BinanceExchange.API.Websockets;
 using LiteDB;
-using Newtonsoft.Json.Linq;
 using NLog;
+using SharpTrader.AlgoFramework;
 using SharpTrader.Core.BrokersApi.Binance;
-using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -201,7 +200,7 @@ namespace SharpTrader.BrokersApi.Binance
             Logger.Info("initialization complete");
         }
 
-  
+
         private void ArchiveOldOperations()
         {
 
@@ -1197,7 +1196,21 @@ namespace SharpTrader.BrokersApi.Binance
 
         public void RegisterCustomSerializers(BsonMapper mapper)
         {
-            BsonMapper defaultMapper = new BsonMapper();
+            BsonMapperCustom defaultMapper = new BsonMapperCustom();
+            var simInfoMapper = defaultMapper.BuildEntityMapper(typeof(BinanceSymbolInfo));
+            //---- add mapper for BinanceSymbolInfo 
+            mapper.RegisterType<BinanceSymbolInfo>(
+                serialize: (obj) => defaultMapper.Serialize<ISymbolInfo>(obj),
+                deserialize: (bson) =>
+                {
+                    var sym = this.GetSymbolInfo(bson["Key"].AsString) as BinanceSymbolInfo;
+                    if (sym == null)
+                        sym = defaultMapper.Deserialize<BinanceSymbolInfo>(bson);
+
+                    return sym;
+                }
+            );
+
             Order BsonToOrder(BsonValue value)
             {
                 lock (LockOrdersTrades)
@@ -1207,7 +1220,7 @@ namespace SharpTrader.BrokersApi.Binance
                     if (order == null)
                         order = Orders.FindById(value["_id"].AsString);
                     bool notFoundIndOrders = order == null;
-
+                    Logger.Debug("Order not found in orders");
                     if (order == null)
                         order = defaultMapper.Deserialize<Order>(value);
                     //if the order was not found in the oders db we add it to openOrders so it will be checked during orders synchronization
@@ -1217,8 +1230,9 @@ namespace SharpTrader.BrokersApi.Binance
                     return order;
                 }
             }
-            mapper.RegisterType<Order>(
-                serialize: (obj) => defaultMapper.Serialize<Order>(obj),
+
+            mapper.RegisterType<IOrder>(
+                serialize: (obj) => defaultMapper.Serialize<IOrder>(obj),
                 deserialize: BsonToOrder
             );
 
@@ -1231,25 +1245,12 @@ namespace SharpTrader.BrokersApi.Binance
                     result = defaultMapper.Deserialize<Trade>(value);
                 return result;
             }
-            mapper.RegisterType<Trade>(
-                serialize: (obj) => defaultMapper.Serialize<Trade>(obj),
+
+            mapper.RegisterType<ITrade>(
+                serialize: (obj) => defaultMapper.Serialize<ITrade>(obj),
                 deserialize: DeserializeTrade
-                );
-
-            //---- add mapper for BinanceSymbolInfo 
-            mapper.RegisterType<BinanceSymbolInfo>(
-                serialize: (obj) => defaultMapper.Serialize<BinanceSymbolInfo>(obj),
-                deserialize: (bson) =>
-                {
-                    var sym = this.GetSymbolInfo(bson["Key"].AsString) as BinanceSymbolInfo;
-                    if (sym == null)
-                        sym = defaultMapper.Deserialize<BinanceSymbolInfo>(bson);
-                    return sym;
-                }
-            );
-
+                );  
         }
-
 
         class Request<T> : IRequest<T>
         {

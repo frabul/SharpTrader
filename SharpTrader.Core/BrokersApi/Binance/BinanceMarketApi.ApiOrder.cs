@@ -7,8 +7,8 @@ using System.Collections.Generic;
 using be = BinanceExchange.API;
 
 namespace SharpTrader.BrokersApi.Binance
-{  
-    class Order : IOrder
+{
+    public class Order : IOrder
     {
         [BsonId]
         public string Id { get; set; }

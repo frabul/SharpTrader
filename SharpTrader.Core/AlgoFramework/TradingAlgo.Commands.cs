@@ -12,7 +12,7 @@ namespace SharpTrader.AlgoFramework
     {
         ConcurrentQueue<Command> Commands = new ConcurrentQueue<Command>();
 
-        public bool DoMarginTrading { get; private set; }
+ 
 
         public Task<string> ForceCloseOperation(string id)
         {

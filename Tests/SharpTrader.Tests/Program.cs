@@ -20,11 +20,13 @@ namespace TestConsole
         }
         class Foo : IFoo
         {
-            public int A { get; set; } = 2;
+            public int A { get; set; } = 1;
+            public int C { get; set; } = 2;
         }
         class Foo2 : IFoo
         {
-            public int A { get; set; } = 2;
+            public int A { get; set; } = 3;
+            public int D { get; set; } = 4;
         }
         class Bar
         {
@@ -35,21 +37,44 @@ namespace TestConsole
         static async Task Main(string[] args)
         {
             LiteDB.LiteDatabase db = new LiteDB.LiteDatabase("test.db");
+
             var dummyMapper = new LiteDB.BsonMapper();
-            db.Mapper.RegisterType<IFoo>(
+            var mapper2 = new LiteDB.BsonMapper();
+
+            db.Mapper.RegisterType<Foo>(
                 serialize: (obj) =>
                 {
-                    return dummyMapper.Serialize(obj);
+                    return dummyMapper.Serialize<IFoo>(obj);
                 },
                 deserialize: (bson) =>
                 {
-                    return new Foo2() { A = bson["A"].AsInt32 };
+                    return dummyMapper.Deserialize<Foo>(bson);
                 }
             );
 
+        
+           
+           
+
             var bars = db.GetCollection<Bar>("FooCollection");
+            bars.DeleteAll();
             bars.Upsert(new Bar());
 
+            db.Mapper.RegisterType<IFoo>(
+               serialize: (obj) =>
+               {
+                   return dummyMapper.Serialize(obj);
+               },
+               deserialize: (bson) =>
+               {
+                   var tofoo2 = dummyMapper.Deserialize<Foo2>(bson);
+                   return new Foo() { A = bson["A"].AsInt32 };
+               }
+           );
+
+
+            var ret1 = db.GetCollection("FooCollection").FindOne( e => true) ;
+            //var obj = mapper2.Deserialize<Bar>(ret1);
             var ret = bars.FindAll().ToList();
 
 

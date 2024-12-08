@@ -55,7 +55,7 @@ namespace SharpTrader.AlgoFramework
         public DateTime Time => Market.Time;
         public DateTime NextUpdateTime { get; private set; } = DateTime.MinValue;
         public TimeSpan Resolution { get; set; } = TimeSpan.FromSeconds(10);
-
+        public bool DoMarginTrading { get; private set; }
         public bool EntriesSuspended => State.EntriesSuspendedByUser || EntriesStopppedByStrategy || Config.LiquidationOnly;
         public bool IsPlottingEnabled { get; set; } = false;
 
