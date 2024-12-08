@@ -109,7 +109,7 @@ namespace SharpTrader.Storage
             foreach (var symData in SymbolsMetaData.Values.ToArray())
             {
                 bool ok = true;
-                var chunks = symData.Chunks.ToList(); 
+                var chunks = symData.Chunks.ToList();
                 symData.Chunks.Clear();
                 foreach (var chunk in chunks)
                 {
@@ -281,71 +281,6 @@ namespace SharpTrader.Storage
             }
         }
 
-        public void DownloadMissingData(Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
-        {
-            foreach (var fi in ListAvailableData())
-                DownloadMissingData(fi, DateTime.MinValue, DateTime.MaxValue, downloadCandlesCallback);
-        }
-
-        public void DownloadMissingData(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime, Func<string, DateTime, DateTime, Candlestick[]> downloadCandlesCallback)
-        {
-            int duplicates = 0;
-            int matchErrors = 0;
-            Console.WriteLine($"Checking {histInfo.Symbol} history data ");
-            var meta = GetMetaDataInternal(histInfo);
-            meta.LoadHistory(DataDir, fromTime, toTime);
-
-
-            var oldTicks = meta.View.Ticks;
-            var newTicks = new List<Candlestick>();
-            Candlestick lastAdded() => newTicks[newTicks.Count - 1];
-            if (oldTicks.Count > 0)
-            {
-                newTicks.Add(oldTicks[0]);
-                for (int i = 1; i < oldTicks.Count; i++)
-                {
-                    var candleToAdd = oldTicks[i];
-                    if (candleToAdd.OpenTime == lastAdded().OpenTime)
-                    {
-                        //we skip this
-                        if (candleToAdd.Equals(lastAdded()))
-                            matchErrors++;
-                        duplicates++;
-                    }
-                    else if (candleToAdd.OpenTime < lastAdded().OpenTime)
-                    {
-                        Console.WriteLine($"   Bad candle at {candleToAdd.OpenTime}");
-                    }
-                    else
-                    {
-                        //check holes
-                        if (candleToAdd.OpenTime - lastAdded().OpenTime > histInfo.Resolution)
-                        {
-                            //hole
-                            Console.WriteLine($"   Hole found {lastAdded().OpenTime} -> {candleToAdd.OpenTime}");
-                            //redownload data
-                            if (downloadCandlesCallback != null)
-                            {
-                                var candlesToAdd = downloadCandlesCallback(histInfo.Symbol, lastAdded().OpenTime, candleToAdd.OpenTime)
-                                                    .Where(c => c.OpenTime > lastAdded().OpenTime)
-                                                    .OrderBy(c => c.OpenTime).ToArray();
-                                newTicks.AddRange(candlesToAdd);
-                                Console.WriteLine($"       Hole fixed!{candlesToAdd.FirstOrDefault()?.OpenTime} -> {candlesToAdd.LastOrDefault()?.OpenTime} ");
-                            }
-                        }
-                        //finally add the candle
-                        if (candleToAdd.OpenTime > lastAdded().OpenTime)
-                            newTicks.Add(candleToAdd);
-                    }
-                }
-                meta.View.Ticks.Clear();
-                meta.View.Ticks.AddRange(newTicks);
-                SaveAndClose(histInfo);
-            }
-
-            Console.WriteLine($"   Fixing {histInfo.Symbol} completed: duplicates {duplicates} - matchErrors {matchErrors}");
-        }
-
         public void ValidateData(SymbolHistoryId finfo)
         {
             lock (SymbolsMetaData)
@@ -353,14 +288,18 @@ namespace SharpTrader.Storage
                 var myData = GetMetaDataInternal(finfo);
                 if (myData.View != null)
                 {
-                    var ticks = myData.View.Ticks;
-                    for (int i = 1; i < ticks.Count; i++)
+                    var ticks = myData.View.TicksUnsafe;
+                    lock (ticks)
                     {
-                        if (ticks[i].OpenTime < ticks[i - 1].OpenTime)
+                        for (int i = 1; i < ticks.Count; i++)
                         {
-                            Console.WriteLine($"{finfo.Market} - {finfo.Symbol} - {finfo.Resolution} -> bad data at {i}");
+                            if (ticks[i].OpenTime < ticks[i - 1].OpenTime)
+                            {
+                                Console.WriteLine($"{finfo.Market} - {finfo.Symbol} - {finfo.Resolution} -> bad data at {i}");
+                            }
                         }
                     }
+
                 }
             }
         }
