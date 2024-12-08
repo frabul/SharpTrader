@@ -309,17 +309,16 @@ namespace SharpTrader.AlgoFramework
         {
             if (_Entries.Count > 0 && _Exits.Count > 0)
             {
-                if (this.Type == OperationType.BuyThenSell)
+                if (Exits.First().CommissionAsset == Symbol.QuoteAsset && Entries.First().CommissionAsset == Symbol.QuoteAsset)
                 {
-                    if (Exits.First().CommissionAsset == Symbol.QuoteAsset && Entries.First().CommissionAsset == Symbol.QuoteAsset)
-                        return this.Exits.Sum(e => e.Amount * e.Price - e.Commission) - this.Entries.Sum(e => e.Amount * e.Price - e.Commission);
-                    else
-                        throw new NotImplementedException();
+                    var amout = from e in _Entries.Concat(_Exits)
+                                let dir = e.Direction == TradeDirection.Buy ? -1 : 1 //if we buy then amount is spent, if we sell it's gained
+                                select dir * e.Amount * e.Price - e.Commission;
+                    var total = amout.Sum(); 
+                    return total;
                 }
                 else
-                {
                     throw new NotImplementedException();
-                }
             }
             return 0;
         }
