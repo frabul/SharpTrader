@@ -410,11 +410,11 @@ namespace SharpTrader.AlgoFramework
         {
             if (Time >= NextUpdateTime)
             {
-
                 //ClearClosedOperations(TimeSpan.FromHours(1));
-                if (!BackTesting && Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
-                    Logger.Warning("OnTick duration longer than expected. " +
-                        "Expected {Expected} - elapsed {Elapsed}", Resolution, Time - NextUpdateTime + Resolution);
+                if (NextUpdateTime != DateTime.MinValue)// skip this warning for first iteration
+                    if (!BackTesting && Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
+                        Logger.Warning("OnTick duration longer than expected. " +
+                            "Expected {Expected} - elapsed {Elapsed}", Resolution, Time - NextUpdateTime + Resolution);
 
                 TimeSlice curSlice;
                 lock (WorkingSliceLock)
