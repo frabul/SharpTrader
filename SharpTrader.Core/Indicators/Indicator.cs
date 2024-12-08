@@ -6,7 +6,13 @@ using System.Threading.Tasks;
 
 namespace SharpTrader.Indicators
 {
-    public abstract class Indicator<TIn, TOut> where TIn : IBaseData where TOut : IBaseData
+    public interface IIndicator
+    {
+        IBaseData Current { get; }
+        double Value { get; }
+        void Update(IBaseData datum);
+    }
+    public abstract class Indicator<TIn, TOut> : IIndicator where TIn : IBaseData where TOut : IBaseData
     {
         NLog.Logger Log { get; }
 
@@ -27,6 +33,8 @@ namespace SharpTrader.Indicators
         public virtual double Value => Current.Value;
 
         public virtual int SamplesCount { get; private set; }
+
+        IBaseData IIndicator.Current => this.Current;
 
         public Indicator(string name)
         {
@@ -96,5 +104,7 @@ namespace SharpTrader.Indicators
         {
             throw new NotSupportedException($"{ this.GetType().Name} indicator doesn't support peek.");
         }
+
+        public void Update(IBaseData datum) => Update((TIn)datum);
     }
 }
