@@ -25,14 +25,11 @@ namespace SharpTrader.AlgoFramework
         }
 
 
-        public override Task Update(TimeSlice slice)
+        public override async Task Update(TimeSlice slice)
         {
-            List<Task> tasks = new List<Task>();
             foreach (var symData in Algo.SymbolsData.Values)
-            {
-                tasks.Add(ManageSymbol(symData, slice));
-            }
-            return Task.WhenAll(tasks);
+                await ManageSymbol(symData, slice);
+            return;
         }
         protected override Task OnInitialize()
         {
