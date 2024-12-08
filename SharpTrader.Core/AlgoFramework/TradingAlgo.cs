@@ -337,7 +337,7 @@ namespace SharpTrader.AlgoFramework
         private void Market_OnNewTrade(IMarketApi market, ITrade trade)
         {
             lock (WorkingSliceLock)
-                WorkingSlice.Add(SymbolsData[trade.Symbol].Symbol, trade);
+                WorkingSlice.Add(Market.GetSymbolInfo(trade.Symbol), trade);
         }
 
         public Task<ISymbolFeed> GetSymbolFeed(string symbolKey)
