@@ -6,8 +6,7 @@ using System.Dynamic;
 using System.Reflection;
 
 namespace SharpTrader.AlgoFramework
-{
-    [Obfuscation(Exclude = true)]
+{ 
     public class Signal : IChangeTracking
     { 
         public event Action<Signal> OnModify;
@@ -19,7 +18,7 @@ namespace SharpTrader.AlgoFramework
         {
 
         }
-        public Signal(string id, SymbolInfo symbol, SignalKind kind, DateTime creationTime)
+        public Signal(string id, ISymbolInfo symbol, SignalKind kind, DateTime creationTime)
         {
             Id = id;
             Symbol = symbol;
@@ -42,7 +41,7 @@ namespace SharpTrader.AlgoFramework
         [BsonIgnore]
         public Operation Operation { get; set; }
 
-        public SymbolInfo Symbol { get; private set; }
+        public ISymbolInfo Symbol { get; private set; }
         public SignalKind Kind { get; private set; }
         public DateTime CreationTime { get; private set; }
         public decimal PriceTarget { get; private set; }

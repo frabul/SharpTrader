@@ -49,8 +49,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
                         QuoteAsset = symb.quoteAsset,
                         Key = symb.symbol,
                         IsMarginTadingAllowed = symb.isMarginTradingAllowed,
-                        IsSpotTadingAllowed = symb.isSpotTradingAllowed,
-                        IsBorrowAllowed = symb.isMarginTradingAllowed
+                        IsSpotTadingAllowed = symb.isSpotTradingAllowed 
                     });
 
             }

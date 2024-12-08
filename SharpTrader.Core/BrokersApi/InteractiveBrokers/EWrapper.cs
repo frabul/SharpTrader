@@ -293,6 +293,12 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
         public decimal MinNotional => 1;
         public decimal PricePrecision => 0.01m;
         public string QuoteAsset => base.Currency;
+
+        public bool IsCrossMarginAllowed => throw new NotImplementedException();
+
+        public bool IsIsolatedMarginAllowed => throw new NotImplementedException();
+
+        public bool IsTradingEnabled => throw new NotImplementedException();
     }
 
 

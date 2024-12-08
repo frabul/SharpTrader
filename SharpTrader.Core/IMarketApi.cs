@@ -44,8 +44,8 @@ namespace SharpTrader
         /// Get all available symbols for in this market
         /// </summary>
         /// <returns></returns>
-        IEnumerable<SymbolInfo> GetSymbols();
-        SymbolInfo GetSymbolInfo(string asString);
+        IEnumerable<ISymbolInfo> GetSymbols();
+        ISymbolInfo GetSymbolInfo(string asString);
         /// <summary>
         /// Get all currently open orders
         /// </summary> 

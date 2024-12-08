@@ -16,6 +16,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="BrokersApi\InteractiveBrokers\EWrapper.cs" />
+    <Compile Remove="BrokersApi\InteractiveBrokers\SymbolFeed.cs" />
+    <Compile Remove="BrokersApi\InteractiveBrokers\TwsApi.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="BrokersApi\InteractiveBrokers\EWrapper.cs" />
+    <None Include="BrokersApi\InteractiveBrokers\SymbolFeed.cs" />
+    <None Include="BrokersApi\InteractiveBrokers\TwsApi.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="LiteDB" Version="5.0.10" />
     <PackageReference Include="MessagePack" Version="2.2.85" />
     <PackageReference Include="MessagePackAnalyzer" Version="2.2.85" />

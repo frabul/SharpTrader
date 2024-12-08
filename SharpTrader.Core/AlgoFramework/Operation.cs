@@ -80,7 +80,7 @@ namespace SharpTrader.AlgoFramework
         public decimal AmountRemaining { get; private set; }
         public decimal QuoteAmountRemaining { get; private set; }
         public OperationType Type { get; private set; }
-        [BsonIgnore] public SymbolInfo Symbol => Signal.Symbol;
+        [BsonIgnore] public ISymbolInfo Symbol => Signal.Symbol;
 
         public TradeDirection EntryTradeDirection { get; private set; }
         public TradeDirection ExitTradeDirection { get; private set; }

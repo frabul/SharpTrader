@@ -118,7 +118,7 @@ namespace SharpTrader.AlgoFramework
 
         }
 
-        public override decimal GetInvestedOrLockedAmount(SymbolInfo symbol, string asset)
+        public override decimal GetInvestedOrLockedAmount(ISymbolInfo symbol, string asset)
         {
             decimal total = 0;
             foreach (var op in Algo.SymbolsData[symbol.Key].ActiveOperations)

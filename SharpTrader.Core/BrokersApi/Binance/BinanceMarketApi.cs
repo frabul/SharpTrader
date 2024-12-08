@@ -1172,14 +1172,14 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
-        public SymbolInfo GetSymbolInfo(string key)
+        public ISymbolInfo GetSymbolInfo(string key)
         {
             if (Symbols.ContainsKey(key))
                 return Symbols[key];
             else
                 return null;
         }
-        public IEnumerable<SymbolInfo> GetSymbols()
+        public IEnumerable<ISymbolInfo> GetSymbols()
         {
             return Symbols.Values.Where(sym => sym.IsTradingEnabled).ToArray();
         }

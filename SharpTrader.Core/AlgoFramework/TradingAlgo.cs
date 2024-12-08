@@ -310,7 +310,7 @@ namespace SharpTrader.AlgoFramework
             return (State.TotalSignals++).ToString();
         }
 
-        private SymbolData GetSymbolData(SymbolInfo sym)
+        private SymbolData GetSymbolData(ISymbolInfo sym)
         {
             SymbolData symbolData;
             if (!_SymbolsData.TryGetValue(sym.Key, out symbolData))

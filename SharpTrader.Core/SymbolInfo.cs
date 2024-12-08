@@ -1,8 +1,7 @@
 ﻿using System.Reflection;
 
 namespace SharpTrader
-{
-    [Obfuscation(Exclude = true)]
+{ 
     public class SymbolInfo : ISymbolInfo
     {
         public string Key { get; set; }
@@ -15,14 +14,14 @@ namespace SharpTrader
         public decimal MinLotSize { get; internal set; }
         public decimal LotSizeStep { get; internal set; }
         public decimal MinNotional { get; internal set; }
-        public decimal PricePrecision { get; internal set; }
-        public bool IsBorrowAllowed { get; internal set; }
+        public decimal PricePrecision { get; internal set; } 
         public bool IsTradingEnabled { get; internal set; }
 
         public SymbolInfo()
         {
 
         }
+
         public override string ToString()
         {
             return Key;
