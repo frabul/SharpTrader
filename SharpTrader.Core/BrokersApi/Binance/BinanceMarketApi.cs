@@ -527,8 +527,9 @@ namespace SharpTrader.BrokersApi.Binance
                     {
                         var resp = await Client.GetAccountTrades(new AllTradesRequest { Symbol = sym, Limit = tradesCountLimit });
                         var trades = resp.Select(tr => new Trade(tr));
-                        foreach (var tr in trades)
+                        foreach (var ttr in trades)
                         {
+                            var tr = ttr;
                             //ignore trades older than the StartOfOperation
                             if (tr.Time >= StartOperationDate)
                             {
@@ -538,7 +539,7 @@ namespace SharpTrader.BrokersApi.Binance
                                     order = Orders.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
                                     if (order == null)
                                         order = OrdersArchive.FindOne(o => o.OrderId == tr.OrderId && o.Symbol == tr.Symbol);
-                                    if (string.IsNullOrEmpty(order.ClientId))
+                                    if (string.IsNullOrEmpty(order?.ClientId))
                                         order = null;
                                 }
                                 // put out of lokc to prevent deadlock
