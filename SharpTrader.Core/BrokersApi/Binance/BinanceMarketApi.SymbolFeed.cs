@@ -151,37 +151,17 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 //if this tick is a new candle and the last candle was not added to ticks
                 //then let's add it
-                var candle = new Candlestick()
-                {
-                    Close = (double)FormingCandle.Close,
-                    High = (double)FormingCandle.High,
-                    CloseTime = FormingCandle.StartTime.AddSeconds(60),
-                    OpenTime = FormingCandle.StartTime,
-                    Low = (double)FormingCandle.Low,
-                    Open = (double)FormingCandle.Open,
-                    QuoteAssetVolume = (double)FormingCandle.QuoteVolume
-                };
-
-                //HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
+                var candle =  KlineToCandlestick(FormingCandle);  
+                HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
                 this.OnData?.Invoke(this, candle);
                 FormingCandle = null;
             }
-
+           
             if (msg.Kline.IsBarFinal)
             {
                 KlineWatchdog.Restart();
-                var candle = new Candlestick()
-                {
-                    Close = (double)msg.Kline.Close,
-                    High = (double)msg.Kline.High,
-                    CloseTime = msg.Kline.StartTime.AddSeconds(60),
-                    OpenTime = msg.Kline.StartTime,
-                    Low = (double)msg.Kline.Low,
-                    Open = (double)msg.Kline.Open,
-                    QuoteAssetVolume = (double)msg.Kline.QuoteVolume
-                };
-
-                //HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
+                Candlestick candle = KlineToCandlestick(msg.Kline); 
+                HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
                 this.OnData?.Invoke(this, candle);
                 FormingCandle = null;
             }
@@ -189,6 +169,20 @@ namespace SharpTrader.BrokersApi.Binance
             {
                 FormingCandle = msg.Kline;
             }
+        }
+
+        private static Candlestick KlineToCandlestick(BinanceKline kline)
+        {
+            return new Candlestick()
+            {
+                Close = (double)kline.Close,
+                High = (double)kline.High,
+                CloseTime = kline.StartTime.AddSeconds(60),
+                OpenTime = kline.StartTime,
+                Low = (double)kline.Low,
+                Open = (double)kline.Open,
+                QuoteAssetVolume = (double)kline.QuoteVolume
+            };
         }
 
         public Task<TimeSerie<ITradeBar>> GetHistoryNavigator(DateTime historyStartTime)
