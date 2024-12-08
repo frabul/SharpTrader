@@ -172,9 +172,14 @@ namespace SharpTrader.AlgoFramework
             // register trades with their linked operations 
             foreach (ITrade trade in slice.Trades)
             {
+
                 //first search in active operations
-                var symData = _SymbolsData[trade.Symbol];
-                var activeOp = symData.ActiveOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
+                Operation activeOp = null;
+                if (_SymbolsData.ContainsKey(trade.Symbol))
+                {
+                    var symData = _SymbolsData[trade.Symbol];
+                    activeOp = symData.ActiveOperations.FirstOrDefault(op => op.IsTradeAssociated(trade));
+                }
                 if (activeOp != null)
                 {
                     if (activeOp.AddTrade(trade))
