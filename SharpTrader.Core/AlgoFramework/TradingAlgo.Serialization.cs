@@ -86,7 +86,14 @@ namespace SharpTrader.AlgoFramework
         public void ConfigureSerialization()
         {
             var defaultMapper = new BsonMapperCustom();
-            NaiveMapper.Entity<ISymbolInfo>().Ctor((doc) => new BinanceSymbolInfo());
+            NaiveMapper.RegisterType<ISymbolInfo>(
+                serialize: obj => defaultMapper.Serialize<ISymbolInfo>(obj),
+                deserialize: bson =>
+                {
+                    if (bson["_type"] != BsonValue.Null)
+                        return defaultMapper.Deserialize<ISymbolInfo>(bson);
+                    return defaultMapper.Deserialize<BinanceSymbolInfo>(bson);
+                });
             NaiveMapper.RegisterType<IOrder>(
                 serialize: null,
                 deserialize: bson =>
@@ -95,16 +102,16 @@ namespace SharpTrader.AlgoFramework
                         return defaultMapper.Deserialize<IOrder>(bson);
                     return defaultMapper.Deserialize<SharpTrader.MarketSimulator.Order>(bson);
                 }
-            ); 
+            );
             NaiveMapper.RegisterType<ITrade>(
                serialize: null,
                deserialize: bson =>
                {
                    if (bson["_type"] != BsonValue.Null)
-                       return defaultMapper.Deserialize<ITrade>(bson); 
+                       return defaultMapper.Deserialize<ITrade>(bson);
                    return defaultMapper.Deserialize<SharpTrader.MarketSimulator.Trade>(bson);
                }
-            ); 
+            );
 
             DbMapper = new BsonMapperCustom();
 
