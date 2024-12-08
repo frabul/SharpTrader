@@ -8,16 +8,21 @@ namespace SharpTrader
         public string Key { get; set; }
         public string Asset { get; set; }
         public string QuoteAsset { get; set; }
-        public bool IsMarginTadingAllowed { get; set; }
-        public bool IsCrossMarginAllowed { get; set; }
-        public bool IsIsolatedMarginAllowed { get; set; }
-        public bool IsSpotTadingAllowed { get; set; }
-        public decimal MinLotSize { get; set; }
-        public decimal LotSizeStep { get; set; }
-        public decimal MinNotional { get; set; }
-        public decimal PricePrecision { get; set; }
-        public bool IsBorrowAllowed { get; set; }
+        public bool IsMarginTadingAllowed { get; internal set; }
+        public bool IsCrossMarginAllowed { get; internal set; }
+        public bool IsIsolatedMarginAllowed { get; internal set; }
+        public bool IsSpotTadingAllowed { get; internal set; }
+        public decimal MinLotSize { get; internal set; }
+        public decimal LotSizeStep { get; internal set; }
+        public decimal MinNotional { get; internal set; }
+        public decimal PricePrecision { get; internal set; }
+        public bool IsBorrowAllowed { get; internal set; }
+        public bool IsTradingEnabled { get; internal set; }
 
+        public SymbolInfo()
+        {
+
+        }
         public override string ToString()
         {
             return Key;

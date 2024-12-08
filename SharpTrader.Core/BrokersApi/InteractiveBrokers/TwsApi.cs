@@ -128,5 +128,10 @@ namespace SharpTrader.BrokersApi.InteractiveBrokers
         {
             throw new NotImplementedException();
         }
+
+        public SharpTrader.SymbolInfo GetSymbolInfo(string asString)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

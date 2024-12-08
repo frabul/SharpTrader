@@ -64,9 +64,9 @@ namespace SharpTrader.BrokersApi.Binance
         private Task FastUpdatesTask;
         private Task OrdersAndTradesSynchTask;
 
-        private Dictionary<string, SymbolInfo> Symbols;
-        private Dictionary<string, List<SymbolInfo>> SymbolsByAsset;
-        private Dictionary<string, List<SymbolInfo>> SymbolsByQuoteAsset;
+        private Dictionary<string, SymbolInfo> Symbols = new Dictionary<string, SymbolInfo>();
+        private Dictionary<string, List<SymbolInfo>> SymbolsByAsset = new Dictionary<string, List<SymbolInfo>>();
+        private Dictionary<string, List<SymbolInfo>> SymbolsByQuoteAsset = new Dictionary<string, List<SymbolInfo>>();
 
         public DateTime StartOperationDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         public BinanceClient Client { get; private set; }
@@ -121,16 +121,17 @@ namespace SharpTrader.BrokersApi.Binance
                 var pricePrecision = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterPrice) as ExchangeInfoSymbolFilterPrice;
                 var symInfo = new SymbolInfo()
                 {
+                    Key = binanceSymbol.symbol,
                     Asset = binanceSymbol.baseAsset,
                     QuoteAsset = binanceSymbol.quoteAsset,
-                    Key = binanceSymbol.symbol,
+                    IsTradingEnabled = binanceSymbol.status == "TRADING",
                     IsMarginTadingAllowed = binanceSymbol.isMarginTradingAllowed,
                     IsSpotTadingAllowed = binanceSymbol.isSpotTradingAllowed,
                     LotSizeStep = lotSize.StepSize,
                     MinLotSize = lotSize.MinQty,
                     MinNotional = minNotional.MinNotional,
                     PricePrecision = pricePrecision.TickSize
-                };
+                };  
 
                 if (!SymbolsByAsset.ContainsKey(symInfo.Asset))
                     SymbolsByAsset.Add(symInfo.Asset, new List<SymbolInfo>());
@@ -140,7 +141,7 @@ namespace SharpTrader.BrokersApi.Binance
 
                 Symbols.Add(symInfo.Key, symInfo);
                 SymbolsByAsset[symInfo.Asset].Add(symInfo);
-                SymbolsByQuoteAsset[symInfo.Asset].Add(symInfo);
+                SymbolsByQuoteAsset[symInfo.QuoteAsset].Add(symInfo);
             }
             //initialize websocket
             WSClient = new BinanceWebSocketClient(Client);
@@ -1069,18 +1070,18 @@ namespace SharpTrader.BrokersApi.Binance
                     }
                     else
                     {
-                        var amountToLock = newApiOrder.Amount ;
+                        var amountToLock = newApiOrder.Amount;
                         var assetBal = this._Balances[symbol.Asset];
                         assetBal.Free -= amountToLock;
                         assetBal.Locked += amountToLock;
-                    } 
+                    }
                 }
                 return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
             }
             catch (Exception ex)
             {
                 return new Request<IOrder>(GetExceptionErrorInfo(ex));
-            } 
+            }
         }
 
         private be.Enums.TimeInForce? GetTimeInForce(TimeInForce? tif)
@@ -1158,12 +1159,19 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<object>(GetExceptionErrorInfo(ex));
             }
         }
-         
+
+        public SymbolInfo GetSymbolInfo(string key)
+        {
+            if (Symbols.ContainsKey(key))
+                return Symbols[key];
+            else
+                return null;
+        }
         public IEnumerable<SymbolInfo> GetSymbols()
         {
-            return Symbols.Values.Where(sym => sym.IsSpotTadingAllowed).ToArray();
+            return Symbols.Values.Where(sym => sym.IsTradingEnabled).ToArray();
         }
-         
+
         public void Dispose()
         {
             Trades = null;

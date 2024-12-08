@@ -494,6 +494,9 @@ namespace SharpTrader.MarketSimulator
             mapper.RegisterType<Trade>(SerializeTrade, DeserializeTrade);
         }
 
-
+        public SymbolInfo GetSymbolInfo(string asString)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

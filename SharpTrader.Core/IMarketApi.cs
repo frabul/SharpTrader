@@ -45,7 +45,7 @@ namespace SharpTrader
         /// </summary>
         /// <returns></returns>
         IEnumerable<SymbolInfo> GetSymbols();
-
+        SymbolInfo GetSymbolInfo(string asString);
         /// <summary>
         /// Get all currently open orders
         /// </summary> 
@@ -69,9 +69,7 @@ namespace SharpTrader
         void DisposeFeed(ISymbolFeed feed);
         ITrade GetTradeById(string tradeId);
         IOrder GetOrderById(string asString);
-
-
-
+    
     }
 
     public enum TimeInForce
