@@ -9,6 +9,8 @@ namespace SharpTrader.AlgoFramework
         public string[] SymbolsKeys { get; }
         public ISymbolInfo[] Symbols { get; private set; }
 
+        public override ISymbolInfo[] SymbolsPool => Symbols;
+
         public StaticSymbolsSelector(IEnumerable<string> symbolsKeys)
         {
             SymbolsKeys = symbolsKeys.ToArray();
