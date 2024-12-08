@@ -10,7 +10,10 @@ namespace SharpTrader
     {
         public string Asset { get; set; }
         public decimal Amount { get; set; }
-
+        /// <summary>
+        /// To use only for serialization
+        /// </summary>
+        public AssetAmount() { }
         public AssetAmount(string asset, decimal budget)
         {
             Asset = asset;
