@@ -277,7 +277,7 @@ namespace SharpTrader
                 plot.PlotLine("Benchmark", benchPoints, ARGBColors.MediumPurple);
 
                 Directory.CreateDirectory(Config.LogDir);
-                chart.Serialize(Path.Combine(Config.LogDir, $"Chart_{this.Config.SessionName}_equity.json"));
+                chart.Serialize(Path.Combine(Config.LogDir, $"Chart_equity.json"));
             }
         }
     }
