@@ -50,7 +50,7 @@ namespace SharpTrader
             public string SessionName { get; set; } = "Backetester";
             public string DataDir { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
             public string HistoryDb { get; set; } = @"D:\ProgettiBck\SharpTraderBots\Bin\Data\";
-            public string LogDir { get; } = $"./logs/";
+            public string LogDir => Path.Combine(DataDir, "logs");
             public bool PlottingEnabled { get; set; } = false;
             public bool PlotResults { get; set; } = false;
             public string AlgoClass;
@@ -142,7 +142,7 @@ namespace SharpTrader
             }
             catch (Exception ex)
             {
-                throw new Exception($"Unable to translate from provided algo config to ${configClass.FullName }: ${ex.Message}");
+                throw new Exception($"Unable to translate from provided algo config to ${configClass.FullName}: ${ex.Message}");
             }
 
 
@@ -281,7 +281,7 @@ namespace SharpTrader
                 plot.PlotLine("Benchmark", benchPoints, ARGBColors.MediumPurple);
 
                 Directory.CreateDirectory(Config.LogDir);
-                chart.Serialize(Path.Combine(Config.LogDir, $"{Config.SessionName}_Chart_equity.json"));
+                chart.Serialize(Path.Combine(Config.LogDir, $"{Config.SessionName}_{DateTime.Now:yyyyMMddmmss}_Chart_equity.json"));
             }
         }
 
