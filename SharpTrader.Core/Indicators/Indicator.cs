@@ -68,7 +68,7 @@ namespace SharpTrader.Indicators
 
         public void Update(TIn input)
         {
-            if (_previousInput != null && input.Time < _previousInput.Time)
+            if (_previousInput != null && input.Time <= _previousInput.Time)
             {
                 // if we receive a time in the past, log and return
                 Log.Error($"This is a forward only indicator: {Name} Input: {input.Time:u} Previous: {_previousInput.Time:u}. It will not be updated with this input.");
