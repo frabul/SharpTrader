@@ -23,7 +23,8 @@ function AddCandlesSerie(figure: Figure, seriesData: any) {
     var series = figure.Chart.addCandlestickSeries({
         priceLineVisible: false,
         lastValueVisible: true,
-        baseLineVisible: false
+        baseLineVisible: false,
+        priceFormat:{ precision: 7, minMove: 0.000001}
     });
     series.setData(seriesData.Points);
     series.setMarkers(seriesData.Markers);
@@ -34,7 +35,8 @@ function AddLineSerie(figure: Figure, seriesData: any) {
     var chart = figure.Chart;
     let series = chart.addLineSeries({
         priceLineVisible: false,
-        lastValueVisible: false
+        lastValueVisible: false, 
+        priceFormat:{ precision: 7, minMove: 0.000001}
     });
 
     series.applyOptions(seriesData.Options)

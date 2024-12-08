@@ -1,10 +1,10 @@
 ﻿using System;
 
- 
+
 
 namespace SharpTrader.MarketSimulator
-{ 
-    class Order : IOrder
+{
+    public class Order : IOrder
     {
         private static int idCounter = 0;
         public string Symbol { get; private set; }
