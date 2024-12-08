@@ -496,7 +496,7 @@ namespace SharpTrader.MarketSimulator
 
         public SymbolInfo GetSymbolInfo(string asString)
         {
-            throw new NotImplementedException();
+            return Feeds.Where(f => f.Symbol.Key == asString).Select(f => f.Symbol).FirstOrDefault() as SymbolInfo;
         }
     }
 }

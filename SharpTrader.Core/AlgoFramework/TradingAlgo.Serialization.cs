@@ -185,6 +185,8 @@ namespace SharpTrader.AlgoFramework
 
         public void SaveNonVolatileVars()
         {
+            if (!Config.SaveData)
+                return;
             lock (DbLock)
             {
                 //save my internal state
