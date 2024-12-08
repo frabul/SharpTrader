@@ -177,7 +177,8 @@ namespace SharpTrader
 
             var startingBal = -1m;
             double currentBenchmarkVal = (double)Config.StartingBalance.Amount;
-            var oldCursor = Console.CursorTop;
+
+            int partialResultsLines = 0; // how many lines the partial results printed on console  
             while (MarketSimulator.NextTick() && MarketSimulator.Time < EndTime)
             {
                 if (startingBal < 0)
@@ -230,17 +231,15 @@ namespace SharpTrader
                 //print partial results
                 if (steps % (60 * 24) == 0)
                 {
+                    // delete partial results output on console 
+                    Console.SetCursorPosition(0, Console.CursorTop - partialResultsLines);
+                    var initialCursorPosition = Console.CursorTop;
+                    // print partial results
                     var prcDone = (double)(MarketSimulator.Time - StartTime).Ticks / (EndTime - StartTime).Ticks * 100;
-                    if (oldCursor == Console.CursorTop)
-                    {
-                        if (Console.CursorTop > 4)
-                            Console.CursorTop -= 5;
-                        DeleteConsoleLines(4);
-                    }
-
+                    DeleteConsoleLines(1);
                     Console.WriteLine($"Simulation time: {MarketSimulator.Time} - {prcDone:f2}% completed");
                     PrintStats(true);
-                    oldCursor = Console.CursorTop;
+                    partialResultsLines = Console.CursorTop - initialCursorPosition;
                 }
 
                 steps++;
@@ -252,9 +251,6 @@ namespace SharpTrader
             Logger.Information("Test terminated in {Duration} ms.", sw.ElapsedMilliseconds);
             Console.WriteLine("Test terminated in {0} ms.", sw.ElapsedMilliseconds);
             PrintStats(false);
-
-            foreach (var p in Algo.Plots)
-                ShowPlotCallback?.Invoke(p);
 
             if (Config.PlotResults)
             {
@@ -309,13 +305,14 @@ namespace SharpTrader
             var lostInFee = feeList.Sum();
             var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
 
-
+            DeleteConsoleLines(2);
             Console.WriteLine(
                 $"Time: {MarketSimulator.Time:yyyy/MM/dd hh:mm}\n" +
                 $"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
 
             var profitPerOper = operations.Count > 0 ? BotStats.Profit / operations.Count : 0;
 
+            DeleteConsoleLines(2);
             if (operations.Count > 0)
             {
                 Console.WriteLine($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {profitPerOper:F8} ");
@@ -323,14 +320,13 @@ namespace SharpTrader
             }
             else
             {
-
                 Console.WriteLine($"Algorithm => No data");
                 Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
             }
 
             if (!consoleOnly)
             {
-
+                DeleteConsoleLines(4);
                 Logger.Information("Backtest results:\n" +
                     "Balance: {totalBal:F4} - Operations:{OperationsCount} - Lost in fee:{lostInFee:F4}\n" +
                     "Algorithm => {@AlgoStats} \n" +
