@@ -24,7 +24,7 @@ namespace SharpTrader.AlgoFramework
         {
             public long TotalOperations { get; set; }
             public long TotalSignals { get; set; }
-            public bool EntriesSuspendedByUser { get; set; }
+            public bool EntriesSuspendedByUser { get; set; } = true;
             public DateTime LastUpdate { get; set; }
         }
 
