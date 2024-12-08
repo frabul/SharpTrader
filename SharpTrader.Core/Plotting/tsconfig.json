@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    /* Visit https://aka.ms/tsconfig.json to read more about this file */
+
+    /* Basic Options */
+    "module": "es6",
+    "target": "es5", 
+    "outDir": "./dist/",              
+    "moduleResolution": "node",             
+    "esModuleInterop": true,   
+    "forceConsistentCasingInFileNames": true,        
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.spec.ts"]
+
+}
