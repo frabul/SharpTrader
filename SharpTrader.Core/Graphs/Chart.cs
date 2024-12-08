@@ -11,15 +11,15 @@ namespace SharpTrader.Drawing
 {
     public enum SeriesMarkerPosition { aboveBar, belowBar, inBar }
     public enum SeriesMarkerShape { circle, square, arrowUp, arrowDown }
-    public class Figure
+    public class ChartFigure
     {
         public string Name { get; set; }
         public decimal WidthRelative { get; set; } = 1;
         public decimal HeightRelative { get; set; } = 1;
-        public List<Series> Series { get; set; } = new List<Series>();
+        public List<ChartSeries> Series { get; set; } = new List<ChartSeries>();
         public List<PriceLine> HorizontalLines { get; set; } = new List<PriceLine>();
 
-        internal void AddSeries(Series series)
+        internal void AddSeries(ChartSeries series)
         {
             Series.Add(series);
         }
@@ -39,7 +39,7 @@ namespace SharpTrader.Drawing
                             LineStyle style = LineStyle.Solid,
                             Margins margins = null)
         {
-            var points = values.Select(v => new Point(v.Time, (decimal)v.Value)).ToList();
+            var points = values.Select(v => new ChartPoint(v.Time, (decimal)v.Value)).ToList();
 
             var options = new SeriesOptions()
             {
@@ -49,7 +49,7 @@ namespace SharpTrader.Drawing
                 style = style,
                 margins = margins,
             };
-            var chartLine = new Line() { Points = points, Options = options };
+            var chartLine = new ChartLine() { Points = points, Options = options };
             this.AddSeries(chartLine);
         }
 
@@ -73,7 +73,7 @@ namespace SharpTrader.Drawing
         }
     }
 
-    public abstract class Series
+    public abstract class ChartSeries
     {
         public abstract SeriesType Type { get; }
         public string Name { get; set; }
@@ -101,15 +101,15 @@ namespace SharpTrader.Drawing
         public LineStyle Style { get; set; } = LineStyle.Solid;
     }
 
-    public class CandlestickSeries : Series
+    public class CandlestickSeries : ChartSeries
     {
         public override SeriesType Type => SeriesType.Candlestick;
         public List<ChartCandlestick> Points { get; set; } = new List<ChartCandlestick>();
     }
 
-    public struct Point
+    public struct ChartPoint
     {
-        public Point(DateTime x, decimal y) { time = x; value = y; }
+        public ChartPoint(DateTime x, decimal y) { time = x; value = y; }
         public DateTime time { get; set; }
         public decimal value { get; set; }
     }
@@ -123,13 +123,13 @@ namespace SharpTrader.Drawing
         public Margins margins { get; set; }
         public string priceScaleId { get; set; }
     }
-    public class Line : Series
+    public class ChartLine : ChartSeries
     {
         public override SeriesType Type => SeriesType.Line;
-        public List<Point> Points { get; set; } = new List<Point>();
+        public List<ChartPoint> Points { get; set; } = new List<ChartPoint>();
     }
 
-    public class Histogram : Series
+    public class Histogram : ChartSeries
     {
         public override SeriesType Type => SeriesType.Histogram;
     }
@@ -164,7 +164,7 @@ namespace SharpTrader.Drawing
 
     public class Chart
     {
-        public List<Figure> Figures { get; set; } = new List<Figure>();
+        public List<ChartFigure> Figures { get; set; } = new List<ChartFigure>();
 
         public Chart()
         {
@@ -190,9 +190,9 @@ namespace SharpTrader.Drawing
 
         }
 
-        public Figure NewFigure()
+        public ChartFigure NewFigure()
         {
-            var fig = new Figure();
+            var fig = new ChartFigure();
             this.Figures.Add(fig);
             return fig;
         }
