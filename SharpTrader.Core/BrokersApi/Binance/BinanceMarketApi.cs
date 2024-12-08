@@ -884,6 +884,7 @@ namespace SharpTrader.BrokersApi.Binance
                 return _Balances.Values.ToArray();
             }
         }
+
         public decimal GetTotalBalance(string asset)
         {
             lock (LockBalances)
@@ -893,7 +894,64 @@ namespace SharpTrader.BrokersApi.Binance
             }
             return 0;
         }
+        /// <summary>
+        /// Return
+        /// </summary>
+        /// <param name="conversionTargetAsset"></param>
+        /// <returns>list of anonymous class instances { asset, free, locked, freeConverted, lockedConverted}</returns>
+        public async Task<List<AssetBalance>> GetAllBalancesConvertedAsync(string conversionTargetAsset)
+        {
+            var midAsset = "BTC";
 
+
+            //get all prices 
+            List<AssetBalance> list = new List<AssetBalance>();
+            var allPrices = from p in (await this.GetAllPrices())
+                            select
+                                new { symbol = this.GetSymbolInfo(p.Symbol), price = p.Price };
+
+            //calculate the value of target asset compared to BTC
+            decimal btcToFinal = 1;
+            if (conversionTargetAsset != midAsset)
+            {
+                var case1 = allPrices.FirstOrDefault(p => p.symbol.Asset == midAsset && p.symbol.QuoteAsset == conversionTargetAsset);
+                if (case1 != null)
+                    btcToFinal = case1.price;
+                else
+                {
+                    var case2 = allPrices.FirstOrDefault(p => p.symbol.QuoteAsset == midAsset && p.symbol.Asset == conversionTargetAsset);
+                    if (case2 == null)
+                        throw new Exception($"It is not possible to determine the value of {conversionTargetAsset}");
+                    btcToFinal = 1 / case2.price;
+                }
+            }
+
+            //
+            foreach (var bal in this.GetAllBalances())
+            {
+                var convert = btcToFinal;
+
+                if (bal.Asset != "BTC")
+                {
+                    var toBtc = allPrices.FirstOrDefault(p => p.symbol.Asset == bal.Asset && p.symbol.QuoteAsset == midAsset);
+                    if (toBtc != null)
+                        convert = convert * toBtc.price;
+                    else
+                    {
+                        var fromBtc = allPrices.FirstOrDefault(p => p.symbol.QuoteAsset == bal.Asset && p.symbol.Asset == midAsset);
+                        if (fromBtc != null)
+                            convert = convert / fromBtc.price;
+                        else
+                            convert = 0;
+                    }
+                }
+
+
+                var bb = new AssetBalance { Asset = bal.Asset, Free = bal.Free * convert, Locked = bal.Locked * convert };
+                list.Add(bb);
+            }
+            return list;
+        }
         public async Task<IRequest<decimal>> GetEquity(string asset)
         {
             try
@@ -1156,7 +1214,27 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<object>(GetExceptionErrorInfo(ex));
             }
         }
+        public async Task DustConvert()
+        {
+            List<AssetBalance> allBalances = await this.GetAllBalancesConvertedAsync("BTC");
 
+            var dustAssets = allBalances.Where(bal => bal.Asset != "BNB" && (bal.Free + bal.Locked) > 0 && (bal.Free + bal.Locked) < 0.0009m).Select(bal => bal.Asset as string).ToList();
+
+            List<string> finalAssets = new List<string>();
+            foreach (var asset in dustAssets)
+            {
+                var sym = asset + "BTC";
+                var info = this.GetSymbolInfo(sym);
+                if (info?.IsTradingEnabled == true)
+                    finalAssets.Add(asset);
+            }
+            if (finalAssets.Count > 0)
+            {
+                var pars = new ConvertDustRequest(finalAssets);
+                var res = await this.Client.ConvertDustToBNB(pars);
+            }
+
+        }
         public ISymbolInfo GetSymbolInfo(string key)
         {
             if (Symbols.ContainsKey(key))
@@ -1260,7 +1338,7 @@ namespace SharpTrader.BrokersApi.Binance
             mapper.RegisterType<ITrade>(
                 serialize: (obj) => defaultMapper.Serialize<ITrade>(obj),
                 deserialize: DeserializeTrade
-                );  
+                );
         }
 
         class Request<T> : IRequest<T>
