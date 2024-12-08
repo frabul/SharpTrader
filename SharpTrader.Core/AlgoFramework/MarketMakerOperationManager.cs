@@ -39,7 +39,7 @@ namespace SharpTrader.AlgoFramework
                     _IsChanged = true;
                 }
             }
-
+            public bool HasExitOrder => CurrentExitOrder != null && CurrentExitOrder.Status < OrderStatus.Cancelled;
             public IOrder CurrentExitOrder
             {
                 get => currentExitOrder;
@@ -306,7 +306,7 @@ namespace SharpTrader.AlgoFramework
             if (op.AmountRemaining > 0)
             {
                 var (_, amount) = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget);
-                remainingAmountSmall = amount <= 0; 
+                remainingAmountSmall = amount <= 0 && !myOpData.HasExitOrder;
             }
 
             //queue operation for close if conditions are met
