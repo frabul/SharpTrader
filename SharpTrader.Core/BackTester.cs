@@ -65,6 +65,14 @@ namespace SharpTrader
             public string Market = "Binance";
 
             public JObject AlgoConfig = new JObject();
+
+            public Configuration Clone()
+            {
+                var clone = this.MemberwiseClone() as Configuration;
+                clone.AlgoConfig = (JObject)AlgoConfig.DeepClone();
+                clone.StartingBalance = new AssetAmount(StartingBalance.Asset, StartingBalance.Amount);
+                return clone;
+            }
         }
 
         private Configuration Config { get; }

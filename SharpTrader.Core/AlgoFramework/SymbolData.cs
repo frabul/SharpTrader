@@ -9,16 +9,16 @@ namespace SharpTrader.AlgoFramework
     public class SymbolData
     {
         private HashSet<Operation> _ActiveOperations { get; } = new HashSet<Operation>();
- 
+
         public ISymbolInfo Symbol { get; set; }
         [BsonId] public string Id => Symbol.Key;
-      
+
         /// <summary>
         /// Feed is automaticly initialized by the algo for the symbols requested by the symbols selector module
         /// </summary>
-        [BsonIgnore] public ISymbolFeed Feed { get; set; } 
+        [BsonIgnore] public ISymbolFeed Feed { get; set; }
         [BsonIgnore] public HashSet<Operation> ActiveOperations => _ActiveOperations;
- 
+
         /// <summary>
         /// This property can be used by sentry module to store its data
         /// </summary>
@@ -43,8 +43,8 @@ namespace SharpTrader.AlgoFramework
             _ActiveOperations.Add(op);
         }
         internal void CloseOperation(Operation op)
-        { 
-            _ActiveOperations.Remove(op);  
+        {
+            _ActiveOperations.Remove(op);
         }
     }
 

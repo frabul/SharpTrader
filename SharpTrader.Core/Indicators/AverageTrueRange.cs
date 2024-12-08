@@ -6,7 +6,7 @@ namespace SharpTrader.Indicators
     {
         private RollingWindow<IndicatorDataPoint> TrueRanges;
 
-        public override bool IsReady => TrueRanges.Count >= Period + 1;
+        public override bool IsReady => TrueRanges.Count >= Period;
         public int Period { get; private set; }
         public TrueRange TrueRange { get; }
 
