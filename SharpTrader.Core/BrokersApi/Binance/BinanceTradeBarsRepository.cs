@@ -23,7 +23,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
         private SemaphoreSlim DownloadCandlesSemaphore;
         public int ConcurrencyCount { get; set; } = 10;
 
-        public BinanceTradeBarsRepository(string dataDir, BinanceClient cli) : base(dataDir)
+        public BinanceTradeBarsRepository(string dataDir, BinanceClient cli, ChunkFileVersion cv = ChunkFileVersion.V3, ChunkSpan chunkSpan = ChunkSpan.OneDay) : base(dataDir,cv, chunkSpan)
         {
             Client = cli;
             DownloadCandlesSemaphore = new SemaphoreSlim(ConcurrencyCount, ConcurrencyCount);
