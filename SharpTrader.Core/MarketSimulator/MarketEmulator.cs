@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -44,9 +44,9 @@ namespace SharpTrader.MarketSimulator
         public IEnumerable<ITrade> Trades => this._Trades;
 
 
-        public MarketEmulator(string name, decimal makerFee, decimal takerFee, string dataDir, Action<MarketEmulator, SymbolFeed> initializeDataSourceCallBack)
+        public MarketEmulator(string name, decimal makerFee, decimal takerFee, string dataDir, Action<MarketEmulator, SymbolFeed> initializeDataSourceCallBack, SymbolHistoryId[] symbolsInDb)
         {
-            this.initializeDataSourceCallBack = initializeDataSourceCallBack; 
+            this.initializeDataSourceCallBack = initializeDataSourceCallBack;
             MarketName = name;
             MakerFee = makerFee;
             TakerFee = takerFee;
@@ -54,6 +54,35 @@ namespace SharpTrader.MarketSimulator
             {
                 var text = System.IO.File.ReadAllText(Path.Combine(dataDir, name + "SymbolsTable.json"));
                 SymbolsTable = JsonConvert.DeserializeObject<SymbolsTable>(text);
+                // integrate symbols table with symbols found in db  
+                var example_symbol = SymbolsTable["BNBBTC"];
+                var regex = new System.Text.RegularExpressions.Regex(@"(.+)(BTC|ETH|USDT)");
+                foreach (var sym in symbolsInDb.Where(s => s.Market == name))
+                {
+                    if (!SymbolsTable.ContainsKey(sym.Symbol))
+                    {
+                        // get asset and quote asset from symbol
+                        // the symbol is in the form "ASSETQUOTE" where quote can be BTC, ETH or USDT
+                        // use regex
+                        var match = regex.Match(sym.Symbol);
+                        var asset = match.Groups[1].Value;
+                        var quote = match.Groups[2].Value;
+                        var sInfo = new BinanceSymbolInfo(sym.Symbol)
+                        {
+                            IsTradingEnabled = true,
+                            IsSpotTadingAllowed = true,
+                            IsMarginTadingAllowed = true,
+                            IsCrossMarginAllowed = true,
+                            MinLotSize = example_symbol.MinLotSize,
+                            LotSizeStep = example_symbol.LotSizeStep,
+                            PricePrecision = example_symbol.PricePrecision,
+                            MinNotional = example_symbol.MinNotional,
+                            Asset = asset,
+                            QuoteAsset = quote,
+                        };
+                        SymbolsTable.Add(sInfo.Key, sInfo);
+                    }
+                }
                 //set all symbols trading
                 foreach (var sym in SymbolsTable.Values)
                     sym.IsTradingEnabled = true;
