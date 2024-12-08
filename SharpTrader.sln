@@ -17,10 +17,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KrakenCore", "KrakenCore\sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backtester", "Backtester\Backtester.csproj", "{86382442-47C1-464D-9D73-FA8E1A01223D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BackTestOptimizer", "BackTestOptimizer\BackTestOptimizer.csproj", "{8AE7F5A9-2FFF-4E39-8508-B996B2D913C1}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestConsole", "Tests\TestConsole\TestConsole.csproj", "{12FB46BA-BAB9-4005-9558-6A8AAE007605}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,11 +58,7 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{8B33A5F2-8FEB-43B4-8DB3-D0FA45C95323} = {5B143371-C50B-4282-B999-43579B6B760A}
-		{12FB46BA-BAB9-4005-9558-6A8AAE007605} = {5B143371-C50B-4282-B999-43579B6B760A}
-	EndGlobalSection
+	EndGlobalSection 
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {1DD8B8D0-E23B-4A4D-9EA0-3E8D0B4591BB}
 	EndGlobalSection
