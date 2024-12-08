@@ -14,7 +14,7 @@ namespace SharpTrader.Storage
         public string Id { get; protected set; }
         public SymbolHistoryId HistoryId { get; protected set; }
         public List<DateRange> GapsConfirmed { get; protected set; }
-        public List<DateRange> GapsUnconfirmed { get; protected set; } 
+        public List<DateRange> GapsUnconfirmed { get; protected set; }
     }
 
     public class SymbolHistoryMetaDataInternal : SymbolHistoryMetaData
@@ -61,7 +61,7 @@ namespace SharpTrader.Storage
         {
 
         }
-  
+
         public void AddBars(IEnumerable<Candlestick> candles)
         {
             lock (this.Locker)
@@ -126,7 +126,7 @@ namespace SharpTrader.Storage
                 foreach (var finfo in this.Chunks)
                 {
                     Debug.Assert(HistoryId.Key == finfo.HistoryId.Key, $"Hist id {HistoryId.Key} - finfo {finfo.HistoryId.Key}");
-                    var dateInRange = missingData.Any(dr => dr.Overlaps(finfo.StartDate, finfo.EndDate));
+                    var dateInRange = missingData.Any(dr => finfo.Overlaps(dr.start, dr.end));
                     if (dateInRange && this.View.LoadedFiles.Add(finfo)) //if is in any range and not already loaded
                     {
                         try
