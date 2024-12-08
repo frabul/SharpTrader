@@ -14,7 +14,7 @@ namespace SharpTrader.AlgoFramework
         protected abstract Task OnInitialize();
         public abstract Task OnSymbolsChanged(SelectedSymbolsChanges changes);
 
-        public abstract void UpdateAsync(TimeSlice slice);
+        public abstract Task UpdateAsync(TimeSlice slice);
         public Task Initialize(TradingAlgo algo)
         {
             Algo = algo;
