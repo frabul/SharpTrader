@@ -160,8 +160,8 @@ namespace SharpTrader
             this.BenchmarkStats = new Statistics();
             this.BotStats = new Statistics();
             Logger.ForContext("Config", Config, true)
-                  .Information("Backtesting {AlgoVersion} from {StartTime} to {EndTime}.",
-                               Algo.Version,
+                  .Information("Stating backtesting {BacktestSession} from {StartTime:yyyy-MM-dd} to {EndTime:yyyy-MM-dd}.",
+                               Config.SessionName,
                                StartTime + Config.WarmUpTime,
                                EndTime);
 
