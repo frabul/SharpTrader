@@ -55,7 +55,7 @@ namespace SharpTrader.BrokersApi.Binance
             Logger = LogManager.GetLogger("Bin" + Symbol + "Feed");
 
             HistoryId = new SymbolHistoryId(this.Market, Symbol.Key, TimeSpan.FromSeconds(60));
-             
+
         }
 
         internal async Task Initialize()
@@ -143,8 +143,8 @@ namespace SharpTrader.BrokersApi.Binance
 
             var bid = messageData.Bids.FirstOrDefault(b => b.Quantity > 0);
             var ask = messageData.Asks.FirstOrDefault(a => a.Quantity > 0);
-             
-            if (ask!= null)
+
+            if (ask != null)
                 Ask = (double)ask.Price;
             else
                 Ask = float.MaxValue;
@@ -166,7 +166,7 @@ namespace SharpTrader.BrokersApi.Binance
             var kline = msg.Kline;
 
             //check if there could be a gap
-            if (FormingCandle != null && kline.StartTime > FormingCandle.StartTime)
+            if (LastFullCandle != null && FormingCandle != null && kline.StartTime > FormingCandle.StartTime)
             {
                 if (FormingCandle.StartTime > LastFullCandle.OpenTime)
                 {
@@ -309,7 +309,7 @@ namespace SharpTrader.BrokersApi.Binance
             return x;
         }
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal amount, decimal price)
-        { 
+        {
             //round price to it's maximum precision
             price = NearestRoundHigher(price, this.Symbol.PricePrecision);
 
@@ -328,7 +328,7 @@ namespace SharpTrader.BrokersApi.Binance
             return (price / 1.00000000000m, amount / 1.000000000000m);
         }
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal amount, decimal price)
-        { 
+        {
             //round price to it's maximum precision
             price = NearestRoundLower(price, this.Symbol.PricePrecision);
             //if amount is lower than min lot size then abort
