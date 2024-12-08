@@ -137,8 +137,8 @@ namespace SharpTrader.BrokersApi.Binance
                 UserDataStreamManager = Task.Run(ServiceUserDataStream);
                 OrdersAndTradesSynchTask = Task.Run(ServiceSynchOrdersAndTrades);
             }
-            
-            while(!ExchangeInfoInitialized)
+
+            while (!ExchangeInfoInitialized)
                 await Task.Delay(100);
             Logger.Information("BinanceMarketApi initialization completed");
         }
@@ -408,7 +408,7 @@ namespace SharpTrader.BrokersApi.Binance
                 {
                     Logger.Error(ex, "Exception in ServiceUpdateOrderBooks.");
                     await Task.Delay(500);
-                }  
+                }
             }
         }
         private async Task ServiceSynchBalance()
@@ -544,17 +544,19 @@ namespace SharpTrader.BrokersApi.Binance
                                         order = null;
                                 }
                                 // put out of lokc to prevent deadlock
-                                if (order == null ) {
-
+                                if (order == null)
+                                {
                                     order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as Order;
                                 }
-                                if(order != null ) {
-
+                                if (order != null)
+                                {
                                     tr.ClientOrderId = order.ClientId;
 
                                     lock (LockOrdersTrades)
                                         TradesUpdateOrInsert(tr);
-                                } else {
+                                }
+                                else
+                                {
                                     Logger.Warning("Unable to find order for thrade {TradeId}", tr.Id);
                                 }
                             }
@@ -579,6 +581,7 @@ namespace SharpTrader.BrokersApi.Binance
                 Logger.Warning(ex, "Error during {Symbol} trades synch", sym);
             }
         }
+
         private async Task ServiceUserDataStream()
         {
             Guid UserDataSocket = Guid.Empty;
@@ -658,11 +661,10 @@ namespace SharpTrader.BrokersApi.Binance
                             nextHandOverTime = DateTime.UtcNow.AddMinutes(120);
                             nextKeepAliveTime = DateTime.UtcNow.AddMinutes(15);
                             //close old socket
-                            if (oldSocket != Guid.Empty)
+                            if (oldSocket != Guid.Empty && oldSocket != UserDataSocket)
                             {
                                 CloseSocket(oldSocket);
                                 oldSocket = Guid.Empty;
-
                             }
                         }
                         catch (Exception ex)
