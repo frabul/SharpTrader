@@ -183,6 +183,7 @@ namespace SharpTrader.BrokersApi.Binance
                         filler.High = filler.Close;
                         filler.Low = filler.Close;
                         CandlesToAdd.Add(filler);
+                        time = time + resolution;
                     }
                     Logger.Warn("{0:HH.mm.ss} - {1} symbol feed - found gap in kline events, {2} missing\n arrived now {3:HH.mm.ss} - forming {4:HH.mm.ss}",
                         time,
