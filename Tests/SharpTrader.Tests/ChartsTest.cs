@@ -31,7 +31,7 @@ namespace SharpTrader.Tests
 
         public void TestSmall()
         {
-            var data = HostoryDb.GetSymbolHistory(DbSymbol, startTime, startTime.AddDays(15));
+            var data = HostoryDb.GetSymbolHistory(DbSymbol, startTime, startTime.AddDays(1));
 
             SharpTrader.Charts.Chart chart = new Charts.Chart(); 
             var mainFigure = chart.NewFigure();
@@ -45,11 +45,11 @@ namespace SharpTrader.Tests
 
             mainFigure.PlotCandlesticks("ETHBTC", data.Ticks);
              
-            var op = new Operation("123", new Signal(), null, OperationType.SellThenBuy);
-            var tick = data.Ticks[35];
-            op.AddTrade(new Trade(data.Market, data.Symbol, tick.Time.AddSeconds(-30), TradeDirection.Buy, (decimal)tick.Low, 10, null));
-            tick = data.Ticks[105];
-            op.AddTrade(new Trade(data.Market, data.Symbol, tick.Time.AddSeconds(-30), TradeDirection.Sell, (decimal)tick.Low, 10, null)); 
+            var op = new Operation("123", new Signal(), null, OperationType.BuyThenSell);
+            var tick = data.Ticks[120];
+            op.AddTrade(new Trade(data.Market, data.Symbol, tick.Time, TradeDirection.Buy, (decimal)tick.Low, 10, null));
+            tick = data.Ticks[180];
+            op.AddTrade(new Trade(data.Market, data.Symbol, tick.Time, TradeDirection.Sell, (decimal)tick.Low, 10, null)); 
             mainFigure.PlotOperation(op);
 
             List<IBaseData> l1 = new List<IBaseData>();
@@ -80,9 +80,9 @@ namespace SharpTrader.Tests
 
             //mainFigure.PlotLine(l3, ARGBColors.CornflowerBlue, axis: "left");
 
-            figure.AddMarker(startTime.AddHours(10), ARGBColors.CadetBlue, Charts.SeriesMarkerPosition.aboveBar);
-            figure.AddMarker(startTime.AddHours(10).AddMinutes(1), ARGBColors.CadetBlue, Charts.SeriesMarkerPosition.belowBar);
-            figure.AddMarker(startTime.AddHours(10).AddMinutes(2.5), ARGBColors.CadetBlue, Charts.SeriesMarkerPosition.aboveBar);
+            mainFigure.AddMarker(startTime.AddHours(10), ARGBColors.CadetBlue, Charts.SeriesMarkerPosition.aboveBar);
+            mainFigure.AddMarker(startTime.AddHours(10).AddMinutes(1), ARGBColors.CadetBlue, Charts.SeriesMarkerPosition.belowBar);
+            mainFigure.AddMarker(startTime.AddHours(10).AddMinutes(2.5), ARGBColors.CadetBlue, Charts.SeriesMarkerPosition.aboveBar);
 
             chart.Serialize(@"D:\ProgettiBck\SharpTraderBots\SharpTrader\SharpTrader.Core\Plotting\dist\chart.json");
             var str = JsonConvert.SerializeObject(chart);

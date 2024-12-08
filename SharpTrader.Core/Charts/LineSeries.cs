@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace SharpTrader.Charts
 {
@@ -11,10 +12,10 @@ namespace SharpTrader.Charts
 
         public LineSeries(IEnumerable<ChartPoint> chartPoints, SeriesOptions options)
         {
-            Points = new List<ChartPoint>(chartPoints);
+            Points = new List<ChartPoint>(chartPoints.OrderBy(p => p.time));
             Options = options;
         }
 
-        
+
     }
 }

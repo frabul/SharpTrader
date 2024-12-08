@@ -74,17 +74,18 @@ namespace SharpTrader.Charts
                 style = style
             };
             var chartLine = new LineSeries(new ChartPoint[] { p1, p2 }, options);
-
+            this.AddSeries(chartLine);
 
             var candles = this.Series.FirstOrDefault(s => s.Type == ChartSeriesType.Candlestick);
-            if(candles!= null)
-            { 
+            if (candles != null)
+            {
                 candles.Markers.Add(GetMarekerForTrade(entry));
                 candles.Markers.Add(GetMarekerForTrade(exit));
+                candles.Markers = candles.Markers.OrderBy(m => m.time).ToList();
             }
-        
 
-            this.AddSeries(chartLine);
+
+
         }
 
         private SeriesMarker GetMarekerForTrade(ITrade entry)
@@ -92,10 +93,10 @@ namespace SharpTrader.Charts
             return new SeriesMarker(
                         entry.Time,
                         entry.Direction == TradeDirection.Buy ? ARGBColors.Green : ARGBColors.Red,
-                        entry.Direction == TradeDirection.Buy ? SeriesMarkerPosition.aboveBar : SeriesMarkerPosition.aboveBar,
+                        entry.Direction == TradeDirection.Buy ? SeriesMarkerPosition.belowBar : SeriesMarkerPosition.aboveBar,
                         entry.Direction == TradeDirection.Buy ? SeriesMarkerShape.arrowUp : SeriesMarkerShape.arrowDown,
                         2,
-                        entry.Id );
+                        entry.Id);
         }
 
         public void PlotCandlesticks(string name, IEnumerable<ITradeBar> candles)
