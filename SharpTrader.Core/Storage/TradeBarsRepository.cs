@@ -9,7 +9,6 @@ using System.Diagnostics;
 using LiteDB;
 using BinanceExchange.API.Models.Response;
 using System.Runtime.InteropServices;
-using NLog;
 
 namespace SharpTrader.Storage
 {
@@ -21,8 +20,8 @@ namespace SharpTrader.Storage
     public enum ChunkSpan { OneMonth, OneDay }
     //TODO make thread safe
     public class TradeBarsRepository
-    {
-        private Logger Logger = LogManager.GetLogger("TradeBarsRepository");
+    { 
+        private Serilog.ILogger Logger = Serilog.Log.ForContext<TradeBarsRepository>();
         private static readonly CandlestickTimeComparer<Candlestick> CandlestickTimeComparer = new CandlestickTimeComparer<Candlestick>();
         private string DataDir;
         private LiteDatabase Db;
@@ -137,7 +136,7 @@ namespace SharpTrader.Storage
                         //check that file size is plausible
                         if (fileInfo.Length > 3e6)
                         {
-                            Logger.Error("Error: history file {0} has anomalous size. It will be deleted", newPath);
+                            Logger.Error("Error: history file {FilePath} has anomalous size. It will be deleted", newPath);
                             ok = false;
                             File.Delete(newPath);
                             canAddChunk = false;
@@ -145,7 +144,7 @@ namespace SharpTrader.Storage
                         //check that id is right
                         if (chunk.HistoryId.Key != symData.HistoryId.Key)
                         {
-                            Logger.Error("Error: history file {0} has wrong history id {1}", newPath, chunk.HistoryId.Key);
+                            Logger.Error("Error: history file {FilePath} has wrong history id {HistoryId}", newPath, chunk.HistoryId.Key);
                             File.Delete(newPath);
                             canAddChunk = false;
                         }
@@ -154,7 +153,7 @@ namespace SharpTrader.Storage
                     {
                         canAddChunk = false;
                         ok = false;
-                        Logger.Error("Error: history file {0} does not exist.", newPath);
+                        Logger.Error("Error: history file {FilePath} does not exist.", newPath);
                     }
                     if (canAddChunk)
                         symData.Chunks.Add(chunk);
@@ -162,7 +161,7 @@ namespace SharpTrader.Storage
                 //rebuild history if needed
                 if (ok == false)
                 {
-                    Logger.Info("Rebuilding corrupted {0} history", symData.Id);
+                    Logger.Warning("Rebuilding corrupted history {@HistoryId}", symData.HistoryId);
                     symData.ClearView();
                     var newSymData = new SymbolHistoryMetaDataInternal(symData.HistoryId);
                     newSymData.SetSaveMode(ChunkFileVersion, ChunkSpan);
@@ -210,11 +209,14 @@ namespace SharpTrader.Storage
             var filesGrouped = chunks.GroupBy(c => c.Value.HistoryId.Key).ToList();
 
             var data = new List<SymbolHistoryMetaDataInternal>();
-            Logger.Info("Found {0} groups", filesGrouped.Count);
+            Logger.Information("Rebuilding history db, found {GroupCnt} chunks grouped by id, {ChunkFileVersion} {ChunkSpan}", 
+                filesGrouped.Count, 
+                ChunkFileVersion, 
+                ChunkSpan);
             int cnt = 0;
             foreach (var group in filesGrouped)
             {
-                Logger.Info("Converting {0}/{1}", cnt++, filesGrouped.Count);
+                Logger.Information("Converting {ConvertedCnt}/{GroupCnt}", cnt, filesGrouped.Count);
                 var histMetadata = new SymbolHistoryMetaDataInternal(group.First().Value.HistoryId);
                 histMetadata.SetSaveMode(ChunkFileVersion, ChunkSpan);
                 foreach (var chunk in group)
@@ -227,6 +229,7 @@ namespace SharpTrader.Storage
                 }
                 histMetadata.Flush(DataDir);
                 data.Add(histMetadata);
+                cnt++;
             }
             //reinsert everything
             DbSymbolsMetaData.DeleteAll();

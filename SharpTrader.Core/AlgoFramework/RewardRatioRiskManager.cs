@@ -55,7 +55,7 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-        private Serilog.ILogger Logger = Serilog.Log.ForContext("SourceContext", nameof(RewardRatioRiskManager));
+        private Serilog.ILogger Logger ;
         public double RiskRewardRatio { get; set; } = 1;
         public TimeSpan BaseLevelTimespan { get; set; } = TimeSpan.Zero;
         public bool TrailingStopLoss { get; set; } = false;
@@ -100,6 +100,7 @@ namespace SharpTrader.AlgoFramework
 
         protected override Task OnInitialize()
         {
+            Logger = Algo.Logger.ForContext<RewardRatioRiskManager>();
             return Task.CompletedTask;
         }
 

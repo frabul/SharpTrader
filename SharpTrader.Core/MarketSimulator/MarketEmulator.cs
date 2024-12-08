@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using SymbolsTable = System.Collections.Generic.Dictionary<string, SharpTrader.Core.BrokersApi.Binance.BinanceSymbolInfo>;
 
 #pragma warning disable CS1998
-using NLog;
 using Newtonsoft.Json.Linq;
 using System.IO;
 using LiteDB;
@@ -26,7 +25,8 @@ namespace SharpTrader.MarketSimulator
         private List<Order> ClosedOrders = new List<Order>();
         private List<ITrade> TradesToSignal = new List<ITrade>();
         private SymbolsTable SymbolsTable;
-        private Logger Logger;
+
+        private Serilog.ILogger Logger = Serilog.Log.ForContext<MarketEmulator>();
 
         public string MarketName { get; private set; }
         public decimal MakerFee { get; set; } = 0.00075m;
@@ -46,9 +46,7 @@ namespace SharpTrader.MarketSimulator
 
         public MarketEmulator(string name, decimal makerFee, decimal takerFee, string dataDir, Action<MarketEmulator, SymbolFeed> initializeDataSourceCallBack)
         {
-            this.initializeDataSourceCallBack = initializeDataSourceCallBack;
-            Logger = LogManager.GetLogger("Market");
-
+            this.initializeDataSourceCallBack = initializeDataSourceCallBack; 
             MarketName = name;
             MakerFee = makerFee;
             TakerFee = takerFee;
@@ -304,7 +302,7 @@ namespace SharpTrader.MarketSimulator
 
         public void AddNewCandle(SymbolFeed feed, Candlestick tick)
         {
-            Logger.Trace("New candle  {0} - {1}", feed.Symbol, tick);
+            Logger.Verbose("New candle  {0} - {1}", feed.Symbol, tick);
             feed.Spread = tick.Close * Spread;
             feed.AddNewData(tick);
         }

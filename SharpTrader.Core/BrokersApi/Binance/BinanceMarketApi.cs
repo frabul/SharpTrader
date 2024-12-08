@@ -7,7 +7,6 @@ using BinanceExchange.API.Models.Response.Error;
 using BinanceExchange.API.Models.WebSocket;
 using BinanceExchange.API.Websockets;
 using LiteDB;
-using NLog;
 using SharpTrader.AlgoFramework;
 using SharpTrader.Core.BrokersApi.Binance;
 using System;
@@ -92,8 +91,8 @@ namespace SharpTrader.BrokersApi.Binance
 
         public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1)
         {
-            Logger = LogManager.GetLogger("BinanceMarketApi");
-            Logger.Info("starting initialization...");
+            Logger = Serilog.Log.ForContext<BinanceMarketApi>();
+            Logger.Information("BinanceMarketApi Starting initialization...");
             OperationsDbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
             OperationsArchivePath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd_archive.db");
             InitializeOperationsDb();
@@ -133,14 +132,14 @@ namespace SharpTrader.BrokersApi.Binance
             await this.ServerTimeSynch();
 
             //initialize db
-            Logger.Info("Archiving old oders...");
+            Logger.Information("Archiving old oders...");
             ArchiveOldOperations();
 
             if (resynchTradesAndOrders)
                 await DownloadAllOrdersAndTrades();
             else
             {
-                Logger.Info("Synching oders and trades....");
+                Logger.Information("Synching oders and trades....");
                 if (!publicOnly)
                 {
                     await SynchOpenOrders();
@@ -197,7 +196,7 @@ namespace SharpTrader.BrokersApi.Binance
                 }
             };
             FastUpdatesTask = Task.Run(SynchTimeAndBalance);
-            Logger.Info("initialization complete");
+            Logger.Information("BinanceMarketApi initialization complete");
         }
 
 
@@ -294,7 +293,7 @@ namespace SharpTrader.BrokersApi.Binance
                     await Task.Delay(100);
                 var task = SynchSymbolOrders(sym);
                 if (cnt % 10 == 0)
-                    task = task.ContinueWith(t => Logger.Info($"Synching orders: {cnt}/{symbols.Length}"));
+                    task = task.ContinueWith(t => Logger.Information("Synching orders: {CntDone}/{CntTotal}", cnt, symbols.Length));
                 tasks.Add(task);
             }
             await Task.WhenAll(tasks);
@@ -370,7 +369,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Error during server time synch: " + GetExceptionErrorInfo(ex));
+                Logger.Error(ex, "Error during server time synch: {Message}", GetExceptionErrorInfo(ex));
             }
 
         }
@@ -396,7 +395,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Error while trying to update account info: " + GetExceptionErrorInfo(ex));
+                Logger.Error(ex, "Error while trying to update account info: {Message} ", GetExceptionErrorInfo(ex));
             }
 
 
@@ -442,13 +441,13 @@ namespace SharpTrader.BrokersApi.Binance
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error($"Error during order synchronization, {ord.ToString()}, binance id: {ord.OrderId}, error: " + GetExceptionErrorInfo(ex));
+                        Logger.Error(ex, "Exception during order synchronization, {@Order}", ord);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Logger.Error("Error during orders synchronization: " + GetExceptionErrorInfo(ex));
+                Logger.Error(ex, "Exception during orders synchronization: {Message}", GetExceptionErrorInfo(ex));
             }
         }
         private async Task SynchLastTrades()
@@ -522,7 +521,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Warn($"Error during {sym} trades synch: {GetExceptionErrorInfo(ex)}");
+                Logger.Warning(ex, "Error during {Symbol} trades synch", sym);
             }
         }
         private async Task ListenUserData()
@@ -537,7 +536,7 @@ namespace SharpTrader.BrokersApi.Binance
                         if (!WSClient.PingWebSocketInstance(UserDataSocket))
                         {
                             CloseUserDataSocket();
-                            Logger.Info("Closing user data socket because ping returned false.");
+                            Logger.Information("Closing user data socket because ping returned false.");
                         }
                     }
                     catch { UserDataSocket = default; }
@@ -565,7 +564,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Failed to listen for user data stream because: " + GetExceptionErrorInfo(ex));
+                Logger.Error(ex, "Failed to listen for user data stream because: {Message}", GetExceptionErrorInfo(ex));
             }
 
         }
@@ -583,7 +582,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Failed closing user data stream because: " + GetExceptionErrorInfo(ex));
+                Logger.Error(ex, "Failed closing user data stream because: {Message} ", GetExceptionErrorInfo(ex));
             }
             UserDataSocket = default;
         }
@@ -708,8 +707,8 @@ namespace SharpTrader.BrokersApi.Binance
                 else
                 {
                     Trades.Insert(newTrade);
+                    Logger.Debug("New trade {@Trade}", newTrade);
                     OnNewTrade?.Invoke(this, newTrade);
-                    Logger.Debug($"New trade {newTrade}");
                 }
             }
 
@@ -924,7 +923,7 @@ namespace SharpTrader.BrokersApi.Binance
             allPrices = allPrices.Where(p => p.symbol != null);
 
             if (badSymbols.Any())
-                Logger.Warn("It was not possible to find symbol info for {0}.", string.Join(", ", badSymbols));
+                Logger.Warning("It was not possible to find symbol info for {BadSymbols}.", badSymbols);
 
 
 
@@ -960,7 +959,7 @@ namespace SharpTrader.BrokersApi.Binance
                     if (q != null)
                         convert = q.price;
                     else
-                        Logger.Error("Unable to find price for symbol {0}", symInfo_asset_to_target);
+                        Logger.Error("Unable to find price for symbol {Symbol}", symInfo_asset_to_target);
                 }
                 else if (symInfo_target_to_asset != null && symInfo_target_to_asset.IsTradingEnabled)
                 {
@@ -968,7 +967,7 @@ namespace SharpTrader.BrokersApi.Binance
                     if (q != null)
                         convert = 1 / q.price;
                     else
-                        Logger.Error("Unable to find price for symbol {0}", symInfo_target_to_asset);
+                        Logger.Error("Unable to find price for symbol {Symbol}", symInfo_target_to_asset);
                 }
                 else if (symInfo_asset_to_mid != null && symInfo_asset_to_mid.IsTradingEnabled)
                 {
@@ -976,7 +975,7 @@ namespace SharpTrader.BrokersApi.Binance
                     if (q != null)
                         convert = midToFinal * q.price;
                     else
-                        Logger.Error("Unable to find price for symbol {0}", symInfo_asset_to_mid);
+                        Logger.Error("Unable to find price for symbol {Symbol}", symInfo_asset_to_mid);
                 }
                 else if (symInfo_mid_to_asset != null && symInfo_mid_to_asset.IsTradingEnabled)
                 {
@@ -984,7 +983,7 @@ namespace SharpTrader.BrokersApi.Binance
                     if (q != null)
                         convert = midToFinal / q.price;
                     else
-                        Logger.Error("Unable to find price for symbol {0}", symInfo_mid_to_asset);
+                        Logger.Error("Unable to find price for symbol {Symbol}", symInfo_mid_to_asset);
 
                 }
                 else
@@ -1004,7 +1003,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             catch (Exception ex)
             {
-                Logger.Error("Error during GetEquity\n   Message: {0}\n\t   Stack:{1}", ex.Message, ex.StackTrace);
+                Logger.Error(ex, "Exception during GetEquity");
                 return new Request<decimal>(RequestStatus.Failed);
             }
 
@@ -1318,7 +1317,7 @@ namespace SharpTrader.BrokersApi.Binance
                     if (order == null)
                         order = Orders.FindById(value["_id"].AsString);
                     bool notFoundIndOrders = order == null;
-                    Logger.Debug("Order not found in orders");
+                    Logger.Warning("Order not found in orders");
                     if (order == null)
                         order = defaultMapper.Deserialize<Order>(value);
                     //if the order was not found in the oders db we add it to openOrders so it will be checked during orders synchronization

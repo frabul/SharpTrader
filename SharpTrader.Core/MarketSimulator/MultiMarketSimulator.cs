@@ -16,7 +16,7 @@ namespace SharpTrader.MarketSimulator
         private TradeBarsRepository HistoryDb;
         private Configuration Config;
         private TimeSpan Resolution = TimeSpan.FromSeconds(60);
-        private Serilog.ILogger Logger = Serilog.Log.ForContext("SourceContext",nameof(MultiMarketSimulator));
+        private Serilog.ILogger Logger = Serilog.Log.ForContext<MultiMarketSimulator>();
         public IEnumerable<IMarketApi> Markets => _Markets;
         public DateTime StartTime { get; private set; }
         public DateTime EndTime { get; private set; }
@@ -153,7 +153,7 @@ namespace SharpTrader.MarketSimulator
                     }
                 }
                 market.NextDataLoadTime = chunkEndTime.AddMinutes(0.5); //the first candle of new month is output at minute 1
-                Logger.Debug($"Loaded {loadedSymbols} symbols for a total of {totalLoaded} ticks.");
+                Logger.Debug("Loaded {LoadedSymbols} symbols for a total of {TotalLoaded} ticks.", loadedSymbols, totalLoaded);
             }
         }
 

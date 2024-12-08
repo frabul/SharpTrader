@@ -84,6 +84,7 @@ namespace SharpTrader.AlgoFramework
         private BsonMapperCustom NaiveMapper = new BsonMapperCustom();
         private BsonMapperCustom defaultMapper;
         private EntityMapper signalMapper;
+
         public void ConfigureSerialization()
         {
             defaultMapper = new BsonMapperCustom();
@@ -167,7 +168,7 @@ namespace SharpTrader.AlgoFramework
             Db.Checkpoint();
 
             //purge old operations that never got to active state
-            Logger.Info("Purging old operations and rebuilding database.");
+            Logger.Information("Purging old operations and rebuilding database.");
             var purgeLimit = this.Time - TimeSpan.FromDays(2);
             List<string> operationsToRemove = new List<string>();
 
@@ -191,7 +192,7 @@ namespace SharpTrader.AlgoFramework
             Db.Commit();
             Db.Checkpoint();
             Db.Rebuild();
-            Logger.Info("Rebuild completed.");
+            Logger.Information("Rebuild completed.");
         }
         /// <summary>
         /// This function should provide and object that is going to be saved for reload after reset

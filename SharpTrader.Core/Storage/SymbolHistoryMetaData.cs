@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using LiteDB;
-using NLog;
 
 namespace SharpTrader.Storage
 {
@@ -24,7 +23,7 @@ namespace SharpTrader.Storage
 
         private HistoryView _View;
         [BsonIgnore]
-        private Logger Logger = LogManager.GetLogger("SymbolHistoryMetaDataInternal");
+        private Serilog.ILogger Logger = Serilog.Log.ForContext<SymbolHistoryMetaDataInternal>();
 
         [BsonIgnore]
         internal HistoryView View

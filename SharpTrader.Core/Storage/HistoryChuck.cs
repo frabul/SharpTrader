@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using MessagePack;
-using NLog.LayoutRenderers;
+using MessagePack; 
 using ProtoBuf;
 
 namespace SharpTrader.Storage

@@ -105,9 +105,11 @@ namespace SharpTrader
         public BackTester(Configuration config, TradeBarsRepository db)
         {
             Config = config;
-
             if (Logger == null)
-                Logger = Serilog.Log.ForContext("SourceContext","BackTester_" + Config.SessionName);
+                Logger = Serilog.Log
+                    .ForContext<BackTester>()
+                    .ForContext("BacktestSession", config.SessionName);
+
 
             var HistoryDB = db;
             this.MarketSimulator = new MultiMarketSimulator(Config.DataDir, HistoryDB, Config.StartTime, Config.EndTime);
@@ -122,11 +124,11 @@ namespace SharpTrader
             var myctor = ctors.FirstOrDefault(ct =>
             {
                 var pars = ct.GetParameters();
-                return pars.Length == 2 && pars[0].ParameterType == typeof(IMarketApi);
+                return pars.Length == 3 && pars[0].ParameterType == typeof(IMarketApi);
             });
             if (myctor == null)
-                throw new Exception("Unable to find a constructor with 2 parameters (ImarketApi, config)");
-            var configClass = myctor.GetParameters()[1].ParameterType;
+                throw new Exception("Unable to find a constructor with 3 parameters (ImarketApi, config)");
+            var configClass = myctor.GetParameters()[2].ParameterType;
             algoConfig = null;
             try
             {
@@ -137,7 +139,7 @@ namespace SharpTrader
                 throw new Exception($"Unable to translate from provided algo config to ${configClass.FullName }: ${ex.Message}");
             }
 
-            this.Algo = myctor.Invoke(new[] { MarketSimulator.GetMarketApi(config.Market), algoConfig }) as TradingAlgo;
+            this.Algo = myctor.Invoke(new[] { MarketSimulator.GetMarketApi(config.Market), Logger, algoConfig }) as TradingAlgo;
             this.Algo.IsPlottingEnabled = Config.PlottingEnabled;
             this.Algo.ShowPlotCallback = (pl) => this?.ShowPlotCallback(pl);
             if (this.Algo == null)
@@ -150,7 +152,11 @@ namespace SharpTrader
                 return;
             this.BenchmarkStats = new Statistics();
             this.BotStats = new Statistics();
-            Logger.Info($"Backtesting {Algo.Version} from  {StartTime + Config.WarmUpTime} to {EndTime} (warmup {Config.WarmUpTime}) with configuration:\n" + JObject.FromObject(algoConfig).ToString());
+            Logger.ForContext("Config", Config, true)
+                  .Information("Backtesting {AlgoVersion} from {StartTime} to {EndTime}.",
+                               Algo.Version,
+                               StartTime + Config.WarmUpTime,
+                               EndTime);
 
             Stopwatch sw = new Stopwatch();
             sw.Start();
@@ -195,7 +201,12 @@ namespace SharpTrader
                                 changeCount++;
                                 var inc = (symData.Feed.Bid - LastPrices[sk]) / LastPrices[sk];
                                 if (inc > 5)
-                                    Logger.Info($"Anomalous increase {inc} for symbol {symData.Feed.Symbol.Key}");
+                                {
+                                    Logger.Warning("Anomalous increase {Inc} for symbol {Symbol} at {Time}",
+                                                   inc,
+                                                   symData.Feed.Symbol.Key,
+                                                   symData.Feed.Time);
+                                }
                                 changeSum += inc;
 
                             }
@@ -228,10 +239,9 @@ namespace SharpTrader
             }
 
 
-            //get profit
-
+            //get profit 
             sw.Stop();
-            Logger.Info($"Test terminated in {sw.ElapsedMilliseconds} ms.");
+            Logger.Information("Test terminated in {Duration} ms.", sw.ElapsedMilliseconds);
 
             PrintStats(false);
 
@@ -277,9 +287,6 @@ namespace SharpTrader
 
         private void PrintStats(bool consoleOnly)
         {
-            Action<string> printAction = s => Logger.Info(s);
-            if (consoleOnly)
-                printAction = s => Console.WriteLine(s);
             var totalBal = MarketSimulator.GetEquity(BaseAsset);
 
             //get the total fee paid calculated on commission asset
@@ -293,32 +300,28 @@ namespace SharpTrader
                                                 });
             var lostInFee = feeList.Sum();
             var operations = Algo.ActiveOperations.Concat(Algo.ClosedOperations).Where(o => o.AmountInvested > 0).ToList();
-            printAction(
-                $"Time: {MarketSimulator.Time:yyyy/MM/dd hh:mm}\n" +
-                $"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
-            if (operations.Count > 0)
+            
+         
+                Console.WriteLine(
+                    $"Time: {MarketSimulator.Time:yyyy/MM/dd hh:mm}\n" +
+                    $"Balance: {totalBal:F4} - Operations:{operations.Count} - Lost in fee:{lostInFee:F4}");
+                if (operations.Count > 0)
+                {
+                    Console.WriteLine($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
+                    Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+                }
+                else
+                {
+
+                    Console.WriteLine($"Algorithm => No data");
+                    Console.WriteLine($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+                }
+  
+            if (!consoleOnly)
             {
-                printAction($"Algorithm => Profit: {BotStats.Profit:F4} - Profit/MDD: {BotStats.ProfitOverMaxDrowDown:F3} - Profit/oper: {BotStats.Profit / operations.Count:F8} ");
-                printAction($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
+                Logger.Information("Backtest results {@Results} \n",
+                    new { MarketSimulator.Time, Balance = totalBal, OperationsCount = operations.Count, BotStats, BenchmarkStats });
             }
-            else
-            {
-
-                printAction($"Algorithm => No data");
-                printAction($"BenchMark => Profit: {BenchmarkStats.Profit:F4} - Profit/MDD: {BenchmarkStats.ProfitOverMaxDrowDown:F3}  ");
-            }
-
-            //print final balances
-            //if (!consoleOnly)
-            //{
-            //    var balances = from el in (MarketSimulator.Markets.First() as MarketEmulator).Balances
-            //                   let am = new AssetAmount(el.Symbol, el.bal.Total)
-            //                   where am.Amount != 0
-            //                   select am;
-            //    var balStr = string.Join(Environment.NewLine, balances);
-            //    Logger.Info("Balances: " + Environment.NewLine + balStr);
-            //}
-
         }
     }
 

@@ -14,7 +14,7 @@ namespace SharpTrader.AlgoFramework
     public class MarketMakerOperationManager : OperationManager
     {
         //todo after each action we should give 10 seconds delay before perfoming a new order so we get updates
-        
+
         Serilog.ILogger Logger;
         public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(15);
         public TimeSpan DelayAfterCloseFailed = TimeSpan.FromSeconds(60);
@@ -81,7 +81,6 @@ namespace SharpTrader.AlgoFramework
         private Random rand = new Random();
         public MarketMakerOperationManager(decimal entryDistantThreshold, decimal entryNearThreshold)
         {
-            Logger = Serilog.Log.ForContext("SourceContext", nameof(MarketMakerOperationManager));
             EntryDistantThreshold = entryDistantThreshold;
             EntryNearThreshold = entryNearThreshold;
         }
@@ -117,6 +116,7 @@ namespace SharpTrader.AlgoFramework
 
         protected override Task OnInitialize()
         {
+            Logger = Algo.Logger.ForContext<MarketMakerOperationManager>();
             if (Algo.BackTesting)
                 this.rand = new Random(123);
             return Task.CompletedTask;
@@ -270,7 +270,7 @@ namespace SharpTrader.AlgoFramework
             if (op.AmountRemaining > 0)
             {
                 //immediatly liquidate everything with a market order 
-                self.Logger.Information("Try liquidate operation with market order because {Reason}", self.LiquidateReason);
+                //self.Logger.Information("Try liquidate operation with market order because {Reason}", self.LiquidateReason);
                 var liquidationResult = await Algo.TryLiquidateOperation(op, self.LiquidateReason);
                 self.Time = Algo.Time + TimeSpan.FromSeconds(30);
                 if (liquidationResult.order != null)
@@ -335,10 +335,12 @@ namespace SharpTrader.AlgoFramework
 
                     var conditions = new { isEntryExpired, noActiveExit, remainingAmountSmall };
                     //put in close queue
-                    if (op.AmountRemaining > 0)
-                        self.Logger.Warning("Schedule op for close {Conditions}", conditions);
+                    if (op.AmountInvested == 0)
+                        self.Logger.Verbose("Schedulin op {OperationId} for close.", op.Id);
+                    if (op.AmountRemaining == 0)
+                        self.Logger.Information("Scheduling {OperationId} for close.", op.Id);
                     else
-                        self.Logger.Debug("Schedule op for close but amount remaining > 0, {Conditions}", conditions);
+                        self.Logger.Warning("Schedule op for close but amount remaining > 0, {RemainingAmountSmall}", remainingAmountSmall);
                     await CloseQueueAsync(self.Op, CloseQueueTime);
                 }
                 else
@@ -413,7 +415,8 @@ namespace SharpTrader.AlgoFramework
                                     ClientOrderId = op.GetNewOrderId(),
                                     Direction = op.ExitTradeDirection
                                 };
-                                self.Logger.Information("Setting EXIT order {@OrderInfo}", orderInfo);
+                                self.Logger.Information("Setting exit order {OpertionId}: {OrderDirection} {OrderAmount}@{OrderPrice}",
+                                              op.Id, orderInfo.Direction, orderInfo.Amount, orderInfo.Price);
                                 var request = await Algo.Market.PostNewOrder(orderInfo);
 
                                 if (request.IsSuccessful)
@@ -547,7 +550,10 @@ namespace SharpTrader.AlgoFramework
                                 ClientOrderId = op.GetNewOrderId(),
                                 Direction = op.EntryTradeDirection
                             };
-                            self.Logger.Information("Setting Entry, {OrderInfo}", orderInfo);
+                            self.Logger
+                                .ForContext("Operation", new { op.Id, op.Signal })
+                                .Information("Setting Entry for {OpertionId}: {OrderDirection} {OrderAmount}@{OrderPrice}",
+                                              op.Id, orderInfo.Direction, orderInfo.Amount, orderInfo.Price);
 
                             var req = await Algo.Market.PostNewOrder(orderInfo);
 
@@ -625,7 +631,7 @@ namespace SharpTrader.AlgoFramework
         private async Task<bool> CloseOrder(IOrder order, Operation op)
         {
             var logger = Logger
-                .ForContext("Order", order, destructureObjects:true )
+                .ForContext("Order", order, destructureObjects: true)
                 .ForContext("Operation", op, destructureObjects: true);
             bool ok = true;
             if (!order.IsClosed)
@@ -647,7 +653,7 @@ namespace SharpTrader.AlgoFramework
                     if (!order.IsClosed)
                     {
                         ok = false;
-                        logger.Error("Order {OrderId} still open after sync.", order.ClientId );
+                        logger.Error("Order {OrderId} still open after sync.", order.ClientId);
                     }
                 }
 

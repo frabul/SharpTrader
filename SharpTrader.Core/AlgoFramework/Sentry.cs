@@ -10,6 +10,7 @@ namespace SharpTrader.AlgoFramework
     /// </summary>
     public abstract class Sentry : IObjectSerializationProvider
     {
+       
         public TradingAlgo Algo { get; private set; }
         protected abstract Task OnInitialize();
         public abstract Task OnSymbolsChanged(SelectedSymbolsChanges changes);

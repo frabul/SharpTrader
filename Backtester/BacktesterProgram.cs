@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
+using Serilog;
 using SharpTrader;
 using SharpTrader.Indicators;
 using System;
@@ -12,6 +14,7 @@ namespace BacktesterProgram
 {
     class BacktesterProgram
     {
+       
         static void ShowPlot(PlotHelper plot)
         {
             //todo implement html plots
@@ -19,6 +22,15 @@ namespace BacktesterProgram
         static Type dummy;
         static void Main(string[] args)
         {
+            var configuration = new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json")
+                .Build();
+
+            var logger = new Serilog.LoggerConfiguration()
+                .ReadFrom.Configuration(configuration) 
+                .Destructure.ToMaximumDepth(1)
+                .CreateLogger();
+
             if (args.Length < 1)
             {
                 dummy = typeof(SharpTrader.Algos.HighPassMeanReversionAlgo2);
