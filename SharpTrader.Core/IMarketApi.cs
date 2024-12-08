@@ -25,6 +25,7 @@ namespace SharpTrader
         event Action<IMarketApi, ITrade> OnNewTrade;
 
         string MarketName { get; }
+        bool IsServiceAvailable { get; }
         /// <summary>
         /// Current date and time
         /// </summary>
@@ -69,7 +70,7 @@ namespace SharpTrader
         void DisposeFeed(ISymbolFeed feed);
         ITrade GetTradeById(string tradeId);
         IOrder GetOrderById(string asString);
-    
+       
     }
 
     public enum TimeInForce
