@@ -70,7 +70,7 @@ namespace SharpTrader.BrokersApi.Binance
         internal Task Initialize()
         {
             KlineListen();
-            PartialDepthListen();
+            //PartialDepthListen();
             DepthWatchdog.Restart();
             KlineWatchdog.Restart();
             HearthBeatTask = HearthBeat();
@@ -229,6 +229,14 @@ namespace SharpTrader.BrokersApi.Binance
         }
 
 
+        internal void BookUpdate(BinanceExchange.API.Models.Response.SymbolOrderBookResponse book)
+        {
+            Ask = (double)book.AskPrice;
+            Bid = (double)book.BidPrice;
+            Spread = Ask - Bid;
+            this.LastUpdate = DateTime.UtcNow;
+            DepthWatchdog.Restart();
+        }
 
         private static Candlestick KlineToCandlestick(BinanceKline kline)
         {
@@ -302,7 +310,6 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
-
         private SemaphoreSlim GetSemaphore()
         {
             lock (Semaphores)
@@ -368,5 +375,6 @@ namespace SharpTrader.BrokersApi.Binance
                 amount = 0;
             return (price / 1.00000000000m, amount / 1.000000000000m);
         }
+
     }
 }
