@@ -318,20 +318,33 @@ namespace SharpTrader.AlgoFramework
         {
             if (_Entries.Count > 0 && _Exits.Count > 0)
             {
-                if (Exits.First().CommissionAsset == Symbol.QuoteAsset && Entries.First().CommissionAsset == Symbol.QuoteAsset)
-                {
-                    var amout = from e in _Entries.Concat(_Exits)
-                                let dir = e.Direction == TradeDirection.Buy ? -1 : 1 //if we buy then amount is spent, if we sell it's gained
-                                select dir * e.Amount * e.Price - e.Commission;
-                    var total = amout.Sum();
-                    return total;
-                }
-                else
+                decimal commissionConversion = 1;
+                if (Exits.First().CommissionAsset != Symbol.QuoteAsset)
                     throw new NotImplementedException();
+                  
+                var amout = from e in _Entries.Concat(_Exits)
+                            let dir = e.Direction == TradeDirection.Buy ? -1 : 1 //if we buy then amount is spent, if we sell it's gained
+                            select dir * e.Amount * e.Price - e.Commission * commissionConversion;
+                var total = amout.Sum();
+                return total; 
             }
             return 0;
         }
-
+        public decimal CalculateGainAsQuteAsset(decimal fee_ratio)
+        {
+            if (_Entries.Count > 0 && _Exits.Count > 0)
+            { 
+                if (Exits.First().CommissionAsset != Symbol.QuoteAsset)
+                    throw new NotImplementedException();
+                  
+                var amout = from e in _Entries.Concat(_Exits)
+                            let dir = e.Direction == TradeDirection.Buy ? -1 : 1 //if we buy then amount is spent, if we sell it's gained
+                            select dir * e.Amount * e.Price - (e.Amount * e.Price) * fee_ratio;
+                var total = amout.Sum();
+                return total; 
+            }
+            return 0;
+        }
         public void ScheduleClose(DateTime deadTime)
         {
             if (!IsClosing)
