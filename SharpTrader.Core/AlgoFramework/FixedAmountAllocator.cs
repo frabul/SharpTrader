@@ -76,7 +76,11 @@ namespace SharpTrader.AlgoFramework
                                 //create operations
                                 var operType = signal.Kind == SignalKind.Buy ? OperationType.BuyThenSell : OperationType.SellThenBuy;
                                 var newOper = new Operation(Algo.GetNewOperationId(), signal, new AssetAmount(BudgetPerOperation.Asset, budget), operType);
-                                newOper.OnNewTrade += (o, t) => { (symData.AllocatorData as MySymbolData).LastInvestmentTime = t.Time; };
+                                newOper.OnNewTrade += (o, t) =>
+                                {
+                                    if (t.Direction == o.EntryTradeDirection)
+                                        (symData.AllocatorData as MySymbolData).LastInvestmentTime = t.Time;
+                                };
                                 slice.Add(newOper);
                             }
                         }
