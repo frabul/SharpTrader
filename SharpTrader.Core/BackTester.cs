@@ -169,11 +169,11 @@ namespace SharpTrader
             {
                 if (startingBal < 0)
                     startingBal = MarketSimulator.GetEquity(BaseAsset);
-                bool warmUpCompleted = MarketSimulator.Time < StartTime + Config.WarmUpTime;
+                bool warmUpCompleted = MarketSimulator.Time >= StartTime + Config.WarmUpTime;
                 if (!warmUpCompleted)
-                    Algo.StopEntries();
+                    Algo.RequestStopEntries().Wait();
                 else
-                    Algo.ResumeEntries();
+                    Algo.RequestResumeEntries();
 
                 Algo.OnTickAsync().Wait();
                 steps++;
