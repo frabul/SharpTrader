@@ -90,10 +90,10 @@ namespace SharpTrader.BrokersApi.Binance
         public bool PublicAccessOnly { get; }
         public bool IsDisposed { get; private set; }
         public bool IsDisposing { get; private set; }
-        public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1, bool publicOnly = false)
+        public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1, bool publicOnly = false, Serilog.ILogger logger = null)
         {
             PublicAccessOnly = publicOnly;
-            Logger = Serilog.Log.Logger.ForContext<BinanceMarketApi>();
+            Logger = logger ?? Serilog.Log.Logger.ForContext<BinanceMarketApi>();
             Logger.Information("BinanceMarketApi Starting initialization...");
             OperationsDbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
             OperationsArchivePath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd_archive.db");
@@ -589,7 +589,7 @@ namespace SharpTrader.BrokersApi.Binance
                         Logger.Error(ex, "Exception while keep alive listen key.");
                         if (ex is BinanceException binex && binex.ErrorDetails.Code == -1125)
                         {
-                            Logger.Warning(ex, "Invalidating UserDataSocket because of exception."); 
+                            Logger.Warning(ex, "Invalidating UserDataSocket because of exception.");
                             nextHandOverTime = DateTime.UtcNow;
                         }
                     }
@@ -623,9 +623,9 @@ namespace SharpTrader.BrokersApi.Binance
                             if (oldSocket != Guid.Empty)
                             {
                                 CloseSocket(oldSocket);
-                                oldSocket = Guid.Empty;  
+                                oldSocket = Guid.Empty;
 
-                            } 
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -1137,7 +1137,7 @@ namespace SharpTrader.BrokersApi.Binance
                 if (Symbols.ContainsKey(symbol))
                 {
                     var symInfo = Symbols[symbol];
-                    feed = new SymbolFeed(Client, CombinedWebSocketClient, HistoryDb, MarketName, symInfo, this.Time);
+                    feed = new SymbolFeed(this, Logger, CombinedWebSocketClient, HistoryDb, symInfo);
                     await feed.Initialize();
                     lock (LockBalances)
                     {
