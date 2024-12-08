@@ -55,6 +55,10 @@ namespace SharpTrader
             public bool PlotResults { get; set; } = false;
             public string AlgoClass;
             public DateTime StartTime { get; set; }
+            /// <summary>
+            /// During this period ( from start to start + WarmUpTime) the algorithm will be interdicted from trading
+            /// </summary>
+            public TimeSpan WarmUpTime { get; set; }
             public DateTime EndTime { get; set; }
             public bool IncrementalHistoryLoading { get; set; } = false;
             public AssetAmount StartingBalance { get; set; } = new AssetAmount("BTC", 100);
@@ -104,7 +108,7 @@ namespace SharpTrader
 
             var algoClass = Type.GetType(Config.AlgoClass);
             if (algoClass == null)
-                throw new Exception($"Algorith class {Config.AlgoClass} not found.");
+                throw new Exception($"Algorithm class {Config.AlgoClass} not found.");
 
             var ctors = algoClass.GetConstructors();
             var myctor = ctors.FirstOrDefault(ct =>
@@ -157,7 +161,10 @@ namespace SharpTrader
             {
                 if (startingBal < 0)
                     startingBal = MarketSimulator.GetEquity(BaseAsset);
-
+                if (MarketSimulator.Time < StartTime + Config.WarmUpTime)
+                    Algo.StopEntries();
+                else
+                    Algo.ResumeEntries();
                 Algo.OnTickAsync().Wait();
                 steps++;
                 //---- update equity and benchmark ---------- 
