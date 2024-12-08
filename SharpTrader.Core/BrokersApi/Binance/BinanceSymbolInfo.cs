@@ -8,17 +8,17 @@ namespace SharpTrader.Core.BrokersApi.Binance
 {
     public class BinanceSymbolInfo : ISymbolInfo
     {
-        public string Key { get; private set; }
-        public string Asset { get; private set; }
-        public string QuoteAsset { get; private set; }
-        public bool IsMarginTadingAllowed { get; private set; }
+        public string Key { get; set; }
+        public string Asset { get; set; }
+        public string QuoteAsset { get; set; }
+        public bool IsMarginTadingAllowed { get; set; }
         public bool IsCrossMarginAllowed { get; set; }
         public bool IsIsolatedMarginAllowed => IsMarginTadingAllowed;
-        public bool IsSpotTadingAllowed { get; private set; }
-        public decimal MinLotSize { get; private set; }
-        public decimal LotSizeStep { get; private set; }
-        public decimal MinNotional { get; private set; }
-        public decimal PricePrecision { get; private set; }
+        public bool IsSpotTadingAllowed { get; set; }
+        public decimal MinLotSize { get; set; }
+        public decimal LotSizeStep { get; set; }
+        public decimal MinNotional { get; set; }
+        public decimal PricePrecision { get; set; }
         public bool IsTradingEnabled { get; set; }
         public BinanceSymbolInfo() { }
         public BinanceSymbolInfo(string key)
