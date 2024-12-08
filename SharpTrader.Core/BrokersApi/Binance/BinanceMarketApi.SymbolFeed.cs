@@ -48,8 +48,7 @@ namespace SharpTrader.BrokersApi.Binance
         public double Spread { get; set; }
         public double Volume24H { get; private set; }
         public bool Disposed { get; private set; }
-
-
+        internal volatile int Users = 0;
 
         public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, BinanceTradeBarsRepository hist, string market, BinanceSymbolInfo symbol, DateTime timeNow)
         {
