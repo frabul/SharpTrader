@@ -110,7 +110,7 @@ namespace SharpTrader.AlgoFramework
                 if (op.AmountRemaining <= 0)
                     op.ScheduleClose(Algo.Time + TimeSpan.FromMinutes(2));
 
-                var mySymData = GetData(Algo.SymbolsData[op.Symbol]);
+                var mySymData = GetData(Algo.SymbolsData[op.Symbol.Key]);
                 var opData = GetData(op);
 
                 //---

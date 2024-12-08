@@ -35,7 +35,7 @@ namespace SharpTrader.BrokersApi.Binance
         private Candlestick LastFullCandle;
 
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
-        public SymbolInfo Symbol { get; private set; }
+        public BinanceSymbolInfo Symbol { get; private set; }
         public DateTime Time { get; private set; }
         public double Ask { get; private set; }
         public double Bid { get; private set; }
@@ -44,7 +44,7 @@ namespace SharpTrader.BrokersApi.Binance
         public double Volume24H { get; private set; }
         public bool Disposed { get; private set; }
 
-        public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, BinanceTradeBarsRepository hist, string market, SymbolInfo symbol, DateTime timeNow)
+        public SymbolFeed(BinanceClient client, CombinedWebSocketClient websocket, BinanceTradeBarsRepository hist, string market, BinanceSymbolInfo symbol, DateTime timeNow)
         {
             HistoryDb = hist;
             this.Client = client;

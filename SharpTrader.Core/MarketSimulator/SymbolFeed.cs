@@ -1,4 +1,5 @@
-﻿using SharpTrader.Storage;
+﻿using SharpTrader.Core.BrokersApi.Binance;
+using SharpTrader.Storage;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,7 +16,7 @@ namespace SharpTrader.MarketSimulator
         private List<IBaseData> NewData = new List<IBaseData>(10);
 
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
-        public SymbolInfo Symbol { get; private set; }
+        public BinanceSymbolInfo Symbol { get; private set; }
         public double Ask { get; private set; }
         public DateTime Time { get; internal set; }
         public double Bid { get; private set; }
@@ -24,7 +25,7 @@ namespace SharpTrader.MarketSimulator
         public ISymbolHistory DataSource { get; set; }
         public IBaseData LastTick { get; private set; }
 
-        public SymbolFeed(string market, SymbolInfo symbol)
+        public SymbolFeed(string market, BinanceSymbolInfo symbol)
         {
             this.Symbol = symbol;
             this.Market = market;
