@@ -141,9 +141,10 @@ namespace SharpTrader.Storage
                 {
                     Debug.Assert(HistoryId.Key == finfo.HistoryId.Key, $"Hist id {HistoryId.Key} - finfo {finfo.HistoryId.Key}");
                     var dateInRange = missingData.Any(dr =>
-                        (finfo.StartDate >= dr.start && finfo.StartDate < dr.end) ||
-                        (finfo.EndDate >= dr.start && finfo.EndDate < dr.end)
-                        );
+                        (dr.start <= finfo.StartDate && dr.end >= finfo.StartDate) ||
+                        (dr.start >= finfo.StartDate && dr.end <= finfo.EndDate) ||
+                        (dr.start <= finfo.EndDate && dr.end >= finfo.EndDate) 
+                        );  
                     if (dateInRange && this.View.LoadedFiles.Add(finfo)) //if is in any range and not already loaded
                     {
                         try
