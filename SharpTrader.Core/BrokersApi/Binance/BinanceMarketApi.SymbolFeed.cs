@@ -27,8 +27,8 @@ namespace SharpTrader.BrokersApi.Binance
         private Task HearthBeatTask;
         private Stopwatch KlineWatchdog = new Stopwatch();
         private Stopwatch DepthWatchdog = new Stopwatch();
-        private DateTime LastKlineWarn = DateTime.Now;
-        private DateTime LastDepthWarn = DateTime.Now;
+        private DateTime LastKlineWarn = DateTime.UtcNow;
+        private DateTime LastDepthWarn = DateTime.UtcNow;
 
         private static Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private SymbolHistoryId HistoryId;
@@ -89,33 +89,24 @@ namespace SharpTrader.BrokersApi.Binance
         {
             while (!Disposed)
             {
-                try
-                {
-                    if (KlineWatchdog.Elapsed > TimeSpan.FromSeconds(120))
+                
+                if (KlineWatchdog.Elapsed > TimeSpan.FromSeconds(120))
+                { 
+                    if (DateTime.UtcNow > LastKlineWarn.AddSeconds(900))
                     {
-                        KlineWatchdog.Restart();
-                        if (DateTime.Now > LastKlineWarn.AddSeconds(900))
-                        {
-                            Logger.Warning("{Symbol} Kline websock looked like frozen", Symbol);
-                            LastKlineWarn = DateTime.Now;
-                        }
-                        KlineListen();
-                    }
-                    if (DepthWatchdog.Elapsed > TimeSpan.FromSeconds(240))
-                    {
-                        DepthWatchdog.Restart();
-                        if (DateTime.Now > LastDepthWarn.AddSeconds(90))
-                        {
-                            Logger.Warning("{Symbol} Depth websock looked like frozen", Symbol);
-                            LastDepthWarn = DateTime.Now;
-                        }
-                        PartialDepthListen();
-                    }
+                        Logger.Warning("{Symbol} - Kline websock looked like frozen", Symbol);
+                        LastKlineWarn = DateTime.UtcNow;
+                    } 
                 }
-                catch
+                if (DepthWatchdog.Elapsed > TimeSpan.FromSeconds(240))
                 {
-
-                }
+                    DepthWatchdog.Restart();
+                    if (DateTime.UtcNow > LastDepthWarn.AddSeconds(90))
+                    {
+                        Logger.Warning("{Symbol} - Depth websock looked like frozen", Symbol);
+                        LastDepthWarn = DateTime.UtcNow;
+                    } 
+                } 
 
                 DigestPartialDepthMessageQueue();
                 DigestKlineMessageQueue();
