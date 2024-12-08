@@ -914,7 +914,6 @@ namespace SharpTrader.BrokersApi.Binance
         {
             var midAsset = "BTC";
 
-
             //get all prices 
             List<AssetBalance> list = new List<AssetBalance>();
             var allPrices = from p in (await this.GetAllPrices())
@@ -929,41 +928,68 @@ namespace SharpTrader.BrokersApi.Binance
 
 
 
-            //calculate the value of target asset compared to BTC
-            decimal btcToFinal = 1;
+            //calculate the value of target asset compared to mid asset (btc)
+            decimal midToFinal = 1;
             if (conversionTargetAsset != midAsset)
             {
                 var case1 = allPrices.FirstOrDefault(p => p.symbol.Asset == midAsset && p.symbol.QuoteAsset == conversionTargetAsset);
                 if (case1 != null)
-                    btcToFinal = case1.price;
+                    midToFinal = case1.price;
                 else
                 {
                     var case2 = allPrices.FirstOrDefault(p => p.symbol.QuoteAsset == midAsset && p.symbol.Asset == conversionTargetAsset);
                     if (case2 == null)
                         throw new Exception($"It is not possible to determine the value of {conversionTargetAsset}");
-                    btcToFinal = 1 / case2.price;
+                    midToFinal = 1 / case2.price;
                 }
             }
 
             //
             foreach (var bal in this.GetAllBalances())
             {
-                var convert = btcToFinal;
+                decimal convert = 0m;
+                var symInfo_asset_to_target = GetSymbolInfo(bal.Asset + conversionTargetAsset);
+                var symInfo_target_to_asset = GetSymbolInfo(conversionTargetAsset + bal.Asset);
+                var symInfo_asset_to_mid = GetSymbolInfo(bal.Asset + midAsset);
+                var symInfo_mid_to_asset = GetSymbolInfo(midAsset + bal.Asset);
 
-                if (bal.Asset != "BTC")
+                if (symInfo_asset_to_target != null && symInfo_asset_to_target.IsTradingEnabled)
                 {
-                    var toBtc = allPrices.FirstOrDefault(p => p.symbol.Asset == bal.Asset && p.symbol.QuoteAsset == midAsset);
-                    if (toBtc != null)
-                        convert = convert * toBtc.price;
+                    //direct conversion!
+                    var q = allPrices.FirstOrDefault(p => p.symbol.Key == symInfo_asset_to_target.Key);
+                    if (q != null)
+                        convert = q.price;
                     else
-                    {
-                        var fromBtc = allPrices.FirstOrDefault(p => p.symbol.QuoteAsset == bal.Asset && p.symbol.Asset == midAsset);
-                        if (fromBtc != null)
-                            convert = convert / fromBtc.price;
-                        else
-                            convert = 0;
-                    }
+                        Logger.Error("Unable to find price for symbol {0}", symInfo_asset_to_target);
                 }
+                else if (symInfo_target_to_asset != null && symInfo_target_to_asset.IsTradingEnabled)
+                {
+                    var q = allPrices.FirstOrDefault(p => p.symbol.Key == symInfo_target_to_asset.Key);
+                    if (q != null)
+                        convert = 1 / q.price;
+                    else
+                        Logger.Error("Unable to find price for symbol {0}", symInfo_target_to_asset);
+                }
+                else if (symInfo_asset_to_mid != null && symInfo_asset_to_mid.IsTradingEnabled)
+                {
+                    var q = allPrices.FirstOrDefault(p => p.symbol.Key == symInfo_asset_to_mid.Key);
+                    if (q != null)
+                        convert = midToFinal * q.price;
+                    else
+                        Logger.Error("Unable to find price for symbol {0}", symInfo_asset_to_mid);
+                }
+                else if (symInfo_mid_to_asset != null && symInfo_mid_to_asset.IsTradingEnabled)
+                {
+                    var q = allPrices.FirstOrDefault(p => p.symbol.Key == symInfo_mid_to_asset.Key);
+                    if (q != null)
+                        convert = midToFinal / q.price;
+                    else
+                        Logger.Error("Unable to find price for symbol {0}", symInfo_mid_to_asset);
+
+                }
+                else
+                { }
+
                 var bb = new AssetBalance { Asset = bal.Asset, Free = bal.Free * convert, Locked = bal.Locked * convert };
                 list.Add(bb);
             }
