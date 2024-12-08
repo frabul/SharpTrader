@@ -206,7 +206,19 @@ namespace SharpTrader.AlgoFramework
         public void SaveNonVolatileVars()
         {
             if (!Config.SaveData)
+            {
+                foreach (var op in ActiveOperations.Where(op => op.IsChanged))
+                {
+                    Logger.ForContext("Operation", op, true).Information("{OperationId} - Operation changed"); 
+                    op.AcceptChanges();
+                } 
+                foreach (var op in ClosedOperations.Where(op => op.IsChanged))
+                {
+                    Logger.ForContext("Operation", op, true).Information("{OperationId} - Operation changed"); 
+                    op.AcceptChanges();
+                }
                 return;
+            }
             lock (DbLock)
             {
                 //save my internal state
@@ -231,12 +243,14 @@ namespace SharpTrader.AlgoFramework
                 Db.BeginTrans();
                 foreach (var op in ActiveOperations.Where(op => op.IsChanged))
                 {
+                    Logger.ForContext("Operation", op, true).Information("{OperationId} - Operation changed");
                     DbActiveOperations.Upsert(op);
                     op.AcceptChanges();
                 }
 
                 foreach (var op in ClosedOperations.Where(op => op.IsChanged))
                 {
+                    Logger.ForContext("Operation", op, true).Information("{OperationId} - Operation changed");
                     DbClosedOperations.Upsert(op);
                     op.AcceptChanges();
                 }

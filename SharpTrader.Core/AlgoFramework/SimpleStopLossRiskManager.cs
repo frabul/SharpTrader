@@ -63,7 +63,6 @@ namespace SharpTrader.AlgoFramework
 
         private async Task ManageOperation(Operation op)
         {
-            var logger = Logger.ForContext("Operation", op, true);
             var symData = Algo.SymbolsData[op.Symbol.Key];
             //---
             if (op.AmountRemaining > 0 && !op.RiskManaged)
@@ -95,7 +94,7 @@ namespace SharpTrader.AlgoFramework
                         bool remainingAmountSmall = (op.AmountInvested == 0 || amount <= 0);
                         if (remainingAmountSmall)
                         {
-                            logger.Information("Schedule operation for close as amount remaining is low.");
+                            Logger.Information("{OperationId} - Schedule operation for close as amount remaining is low.", op.Id);
                             op.ScheduleClose(Algo.Time.AddMinutes(1));
                         }
                         else
@@ -107,11 +106,11 @@ namespace SharpTrader.AlgoFramework
                             myData.NextTry = Algo.Time.AddSeconds(delaySeconds);
                             if (lr.amountRemainingLow || lr.OrderError)
                             {
-                                logger.Information("Liquidation failed, tries count: {LiquidationTries}, retrying in {RetryDelay}s ", myData.LiquidationTries, delaySeconds);
+                                Logger.Information("{OperationId} - Liquidation failed, tries count: {LiquidationTries}, retrying in {RetryDelay}s ", op.Id, myData.LiquidationTries, delaySeconds);
                             }
                             if (myData.LiquidationTries > 50)
                             {
-                                logger.Information("Scheduling operation for close as it reached maximum number of liquidation tries.");
+                                Logger.Information("{OperationId} - Scheduling operation for close as it reached maximum number of liquidation tries.", op.Id);
                                 op.ScheduleClose(Algo.Time.AddMinutes(1));
                             }
                         }
@@ -119,7 +118,7 @@ namespace SharpTrader.AlgoFramework
                 }
                 else
                 {
-                    logger.Information("Scheduling operation for close.");
+                    Logger.Information("{OperationId} - Scheduling operation for close.", op.Id);
                     op.ScheduleClose(Algo.Time.AddMinutes(3));
                 }
             }

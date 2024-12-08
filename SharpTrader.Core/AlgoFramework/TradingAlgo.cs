@@ -206,9 +206,7 @@ namespace SharpTrader.AlgoFramework
                 if (activeOp != null)
                 {
                     if (activeOp.AddTrade(trade))
-                        Logger.ForContext("Operation", activeOp, true)
-                              .ForContext("Trade", trade, true)
-                              .Information("New trade for operation.");
+                        Logger.Information("New trade {TradeId} for operation {OperationId}.", trade.Id, activeOp.Id);
                 }
                 else
                 {
@@ -219,9 +217,7 @@ namespace SharpTrader.AlgoFramework
                     {
                         if (oldOp.AddTrade(trade))
                         {
-                            Logger.ForContext("Operation", oldOp, true)
-                                  .ForContext("Trade", trade, true)
-                                  .Warning("New trade for 'old' operation.");
+                            Logger.Warning("New trade {TradeId} for 'old' operation {OperationId}.", trade.Id, oldOp.Id);
                             DbClosedOperations.Upsert(oldOp);
                         }
                         //check if it got resumed by this new trade
@@ -235,7 +231,7 @@ namespace SharpTrader.AlgoFramework
                     }
                     else
                         Logger.ForContext("Trade", trade, true)
-                            .Warning("Trade without any associated operation.");
+                            .Warning("The trade {TradeId} was not associated to any operation.", trade.Id);
                 }
             }
 
@@ -257,15 +253,14 @@ namespace SharpTrader.AlgoFramework
                 List<Operation> operationsToClose = _ActiveOperations.Where(op => this.Time >= op.CloseDeadTime).ToList();
                 foreach (var op in operationsToClose)
                 {
-                    var logger = Logger.ForContext("Operation", new { op.Id, Gain = op.CalculateGainAsQuteAsset() }, true);
                     if (op.AmountInvested != 0)
                     {
                         var gain = op.CalculateGainAsQuteAsset(0.001m);
                         var gainPrc = gain * 100 / op.QuoteAmountInvested;
-                        logger.Information("Closing operation {OperationId} - Gain: {gain:f6}, Gain%: {gainPrc:f2} ", op.Id, gain, gainPrc);
+                        Logger.Information("Closing operation {OperationId} - Gain: {gain:f6}, Gain%: {gainPrc:f2} ", op.Id, gain, gainPrc);
                     }
                     else
-                        logger.Debug("Closing operation.");
+                        Logger.Debug("Closing operation {OperationId}.", op.Id);
 
                     op.Close();
 
@@ -330,7 +325,7 @@ namespace SharpTrader.AlgoFramework
 
         private void ResumeOperation(Operation op)
         {
-            Logger.ForContext("Operation", op, true).Information("Resuming operation.");
+            Logger.Information("Resuming operation {OperationId}.", op.Id);
             op.Resume();
             AddActiveOperation(op);
             var removed = this._ClosedOperations.Remove(op);
