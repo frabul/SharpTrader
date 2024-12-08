@@ -79,9 +79,9 @@ namespace SharpTrader
             this.CloseTime = openTime + duration;
 
             this.Open = toCopy.Open;
-            this.Close = toCopy.Close;
             this.High = toCopy.High;
             this.Low = toCopy.Low;
+            this.Close = toCopy.Close; 
             this.QuoteAssetVolume = toCopy.QuoteAssetVolume;
 
         }
@@ -128,12 +128,12 @@ namespace SharpTrader
             if (c == null)
                 return false;
             var equal =
-                c.Close == this.Close &&
                 c.CloseTime == this.CloseTime &&
+                c.OpenTime == this.OpenTime && 
+                c.Open == this.Open &&
                 c.High == this.High &&
                 c.Low == this.Low &&
-                c.Open == this.Open &&
-                c.OpenTime == this.OpenTime &&
+                c.Close == this.Close && 
                 c.Time == this.Time &&
                 c.Timeframe == this.Timeframe &&
                 c.QuoteAssetVolume == this.QuoteAssetVolume;

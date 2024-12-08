@@ -34,10 +34,10 @@ namespace SharpTrader
             }
         }
 
-        private void EmitCandle(ref Candlestick candle)
+        private void EmitCandle()
         {
-            OnConsolidated?.Invoke(candle);
-            LastEmittedCandle = candle;
+            OnConsolidated?.Invoke(FormingCandle);
+            LastEmittedCandle = FormingCandle;
             FormingCandle = new Candlestick();
         }
 
@@ -57,10 +57,14 @@ namespace SharpTrader
             //check if we need to emit last forming candle ( or some fillers )
             Scan(newCandle.Time);
 
+            // emit the forming candle immediatly if the new one does not belong to it
+            if (!FormingCandle.IsDefault() && newCandle.OpenTime >= FormingCandle.CloseTime)
+                EmitCandle();
+
             if (FormingCandle.IsDefault())
             {
                 //there isn't any currently forming candle, create one using new candle as generator
-                var opeTime = CalculateFirstOpenTime(newCandle.CloseTime, Resolution);
+                var opeTime = CalculateFirstOpenTime(newCandle.OpenTime, Resolution);
                 FormingCandle.SetData(opeTime, Resolution, newCandle);
             }
             else
@@ -68,20 +72,21 @@ namespace SharpTrader
                 //the new candle is part of the forming candle
                 FormingCandle.Merge(newCandle);
             }
+
             Debug.Assert(newCandle.OpenTime <= FormingCandle.CloseTime);
             Debug.Assert(newCandle.Time <= FormingCandle.CloseTime);
 
 
             //check if candle is last
             if (newCandle.Time == FormingCandle.Time)
-            {
-                EmitCandle(ref FormingCandle);
-            }
+                EmitCandle();
+
 
         }
         public void Scan(DateTime timeNow)
         {
-            //emit all missing candlesticks 
+            // emit all missing candlesticks 
+            // that happens only if FinalCandleUpdateTimeout has already passed from the time when the candle should have been emitted
             if (!LastEmittedCandle.IsDefault())
             {
                 var timeIter = LastEmittedCandle.Time + Resolution + FinalCandleUpdateTimeout;
@@ -90,7 +95,7 @@ namespace SharpTrader
                     //if we have no data about forming candle then create a filler
                     if (FormingCandle.IsDefault() || FormingCandle.Time < LastEmittedCandle.Time + Resolution)
                         FormingCandle = Candlestick.GetFiller(LastEmittedCandle);
-                    EmitCandle(ref FormingCandle);
+                    EmitCandle();
 
                     timeIter += Resolution;
                 }
