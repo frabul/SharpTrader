@@ -56,9 +56,9 @@ namespace SharpTrader.Storage
         public bool Overlaps(DateTime startDate, DateTime endDate)
         {
             return
-                (this.StartDate >= startDate && this.StartDate <= endDate) ||
-                (this.EndDate >= startDate && this.EndDate <= endDate) ||
-                (startDate >= this.StartDate && startDate <= this.EndDate);
+                (this.StartDate >= startDate && this.StartDate < endDate) ||
+                (this.EndDate > startDate && this.EndDate <= endDate) ||
+                (startDate >= this.StartDate && startDate < this.EndDate);
         }
     }
     [ProtoContract]
@@ -184,8 +184,8 @@ namespace SharpTrader.Storage
                 if (match.Success)
                 {
                     var symId = SymbolHistoryId.Parse(match.Groups[1].Value);
-                    var startDate = DateTime.ParseExact(match.Groups[2].Value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
-                    var endDate = DateTime.ParseExact(match.Groups[3].Value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+                    var startDate = DateTime.ParseExact(match.Groups[2].Value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal).ToUniversalTime();
+                    var endDate = DateTime.ParseExact(match.Groups[3].Value, "yyyyMMddHHmmss", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal).ToUniversalTime();
                     retVal = new HistoryChunkIdV3(symId, startDate, endDate);
                     return true;
                 }

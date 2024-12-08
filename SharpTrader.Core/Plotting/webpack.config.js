@@ -12,7 +12,7 @@ module.exports = {
       },
     ],
   },
-  devtool: 'inline-source-map',
+  devtool: 'inline-source-map',//'inline-source-map',
   resolve: {
     extensions: ['.tsx', '.ts', '.js'],
   },
