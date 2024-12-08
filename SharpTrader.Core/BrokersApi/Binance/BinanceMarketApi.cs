@@ -31,10 +31,7 @@ namespace SharpTrader.BrokersApi.Binance
             public long LastOrderAtTradesSynch { get; set; }
         }
 
-
-
         public event Action<IMarketApi, ITrade> OnNewTrade;
-
         private readonly object LockOrdersTrades = new object();
         private readonly object LockBalances = new object();
         private readonly Stopwatch StopwatchSocketClose = new Stopwatch();
@@ -50,7 +47,7 @@ namespace SharpTrader.BrokersApi.Binance
         private BinanceTradeBarsRepository HistoryDb;
         private BinanceWebSocketClient WSClient;
         private CombinedWebSocketClient CombinedWebSocketClient;
-        private ExchangeInfoResponse ExchangeInfo;
+
         private NLog.Logger Logger;
         private Dictionary<string, AssetBalance> _Balances = new Dictionary<string, AssetBalance>();
         private System.Timers.Timer TimerListenUserData;
@@ -66,13 +63,20 @@ namespace SharpTrader.BrokersApi.Binance
         private MemoryCache Cache = new MemoryCache();
         private Task FastUpdatesTask;
         private Task OrdersAndTradesSynchTask;
+
+        private Dictionary<string, SymbolInfo> Symbols;
+        private Dictionary<string, List<SymbolInfo>> SymbolsByAsset;
+        private Dictionary<string, List<SymbolInfo>> SymbolsByQuoteAsset;
+
         public DateTime StartOperationDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         public BinanceClient Client { get; private set; }
 
         public string MarketName => "Binance";
 
         public DateTime Time => DateTime.UtcNow.Add(Client.TimestampOffset);
-
+        public TimeSpan OperationsKeepAliveTime { get; set; } = TimeSpan.FromDays(15);
+        public TimeSpan BalanceAndTimeSynchPeriod { get; set; } = TimeSpan.FromSeconds(30);
+        public TimeSpan TradesAndOrdersSynchPeriod { get; set; } = TimeSpan.FromSeconds(120);
         IEnumerable<ITrade> IMarketApi.Trades => Trades.FindAll().ToArray();
 
         IEnumerable<IOrder> IMarketApi.OpenOrders { get { lock (LockOrdersTrades) return OpenOrders.ToArray(); } }
@@ -85,6 +89,7 @@ namespace SharpTrader.BrokersApi.Binance
                     return _Balances.Select(kv => (kv.Key, kv.Value.Free)).ToArray();
             }
         }
+
 
         public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1)
         {
@@ -102,12 +107,47 @@ namespace SharpTrader.BrokersApi.Binance
             this.HistoryDb = new BinanceTradeBarsRepository(dataDir, Client);
         }
 
+
+
+
         public async Task Initialize(bool resynchTradesAndOrders = false, bool publicOnly = false)
         {
-            ExchangeInfo = await Client.GetExchangeInfo();
+            var exchangeInfo = await Client.GetExchangeInfo();
+            //---- initialize symbols dictionary ---
+            foreach (var binanceSymbol in exchangeInfo.Symbols)
+            {
+                var lotSize = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterLotSize) as ExchangeInfoSymbolFilterLotSize;
+                var minNotional = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterMinNotional) as ExchangeInfoSymbolFilterMinNotional;
+                var pricePrecision = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterPrice) as ExchangeInfoSymbolFilterPrice;
+                var symInfo = new SymbolInfo()
+                {
+                    Asset = binanceSymbol.baseAsset,
+                    QuoteAsset = binanceSymbol.quoteAsset,
+                    Key = binanceSymbol.symbol,
+                    IsMarginTadingAllowed = binanceSymbol.isMarginTradingAllowed,
+                    IsSpotTadingAllowed = binanceSymbol.isSpotTradingAllowed,
+                    LotSizeStep = lotSize.StepSize,
+                    MinLotSize = lotSize.MinQty,
+                    MinNotional = minNotional.MinNotional,
+                    PricePrecision = pricePrecision.TickSize
+                };
+
+                if (!SymbolsByAsset.ContainsKey(symInfo.Asset))
+                    SymbolsByAsset.Add(symInfo.Asset, new List<SymbolInfo>());
+
+                if (!SymbolsByQuoteAsset.ContainsKey(symInfo.QuoteAsset))
+                    SymbolsByQuoteAsset.Add(symInfo.QuoteAsset, new List<SymbolInfo>());
+
+                Symbols.Add(symInfo.Key, symInfo);
+                SymbolsByAsset[symInfo.Asset].Add(symInfo);
+                SymbolsByQuoteAsset[symInfo.Asset].Add(symInfo);
+            }
+            //initialize websocket
             WSClient = new BinanceWebSocketClient(Client);
             CombinedWebSocketClient = new CombinedWebSocketClient();
             await this.ServerTimeSynch();
+
+            //initialize db
             Logger.Info("Archiving old oders...");
             ArchiveOldOperations();
 
@@ -151,30 +191,28 @@ namespace SharpTrader.BrokersApi.Binance
                             ArchiveOldOperations();
                         }
                         catch { }
-                        await Task.Delay(TimeSpan.FromSeconds(60));
+                        await Task.Delay(TradesAndOrdersSynchPeriod);
 
                     }
                 };
-                OrdersAndTradesSynchTask = Task.Run(SynchOrdersAndTrades);
+                OrdersAndTradesSynchTask = Task.Factory.StartNew(SynchOrdersAndTrades, TaskCreationOptions.LongRunning);
             }
-
-            FastUpdatesTask =
-                Task.Run(
-                    async () =>
+            async Task SynchTimeAndBalance()
+            {
+                while (true)
+                {
+                    try
                     {
-                        while (true)
-                        {
-                            try
-                            {
-                                //first synch server time then balance then restart timer
-                                if (!publicOnly)
-                                    await SynchBalance();
-                                await ServerTimeSynch();
-                            }
-                            catch { }
-                            await Task.Delay(15000);
-                        }
-                    });
+                        //first synch server time then balance then restart timer
+                        if (!publicOnly)
+                            await SynchBalance();
+                        await ServerTimeSynch();
+                    }
+                    catch { }
+                    await Task.Delay(BalanceAndTimeSynchPeriod);
+                }
+            };
+            FastUpdatesTask = Task.Factory.StartNew(SynchTimeAndBalance, TaskCreationOptions.LongRunning);
             Logger.Info("initialization complete");
         }
 
@@ -184,7 +222,7 @@ namespace SharpTrader.BrokersApi.Binance
             if (LastOperationsArchivingTime + TimeSpan.FromHours(24) < DateTime.Now)
                 lock (LockOrdersTrades)
                 {
-                    TimeToArchive = Time - TimeSpan.FromDays(30);
+                    TimeToArchive = Time - OperationsKeepAliveTime;
                     List<Order> ordersToMove = Orders.Find(o => o.Time < TimeToArchive).ToList();
                     List<Trade> tradesToMove = new List<Trade>();
                     foreach (var order in ordersToMove)
@@ -261,7 +299,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         private async Task DownloadAllOrdersAndTrades()
         {
-            var symbols = ExchangeInfo.Symbols.Select(s => s.symbol).ToArray();
+            var symbols = Symbols.Keys.ToArray();
             List<Task> tasks = new List<Task>();
             int cnt = 0;
             foreach (var sym in symbols)
@@ -430,7 +468,7 @@ namespace SharpTrader.BrokersApi.Binance
         }
         private async Task SynchLastTrades()
         {
-            foreach (var sym in ExchangeInfo.Symbols.Select(s => s.symbol))
+            foreach (var sym in Symbols.Keys)
                 await SynchLastTrades(sym);
         }
         public async Task SynchLastTrades(string sym, bool force = false, int tradesCountLimit = 100)
@@ -938,29 +976,21 @@ namespace SharpTrader.BrokersApi.Binance
 
             if (feed == null)
             {
-                var binanceSymbol = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == symbol);
-                var lotSize = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterLotSize) as ExchangeInfoSymbolFilterLotSize;
-                var minNotional = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterMinNotional) as ExchangeInfoSymbolFilterMinNotional;
-                var pricePrecision = binanceSymbol.filters.First(f => f is ExchangeInfoSymbolFilterPrice) as ExchangeInfoSymbolFilterPrice;
-                var symInfo = new SymbolInfo()
+                if (Symbols.ContainsKey(symbol))
                 {
-                    Asset = binanceSymbol.baseAsset,
-                    QuoteAsset = binanceSymbol.quoteAsset,
-                    Key = binanceSymbol.symbol,
-                    IsMarginTadingAllowed = binanceSymbol.isMarginTradingAllowed,
-                    IsSpotTadingAllowed = binanceSymbol.isSpotTradingAllowed,
-                    LotSizeStep = lotSize.StepSize,
-                    MinLotSize = lotSize.MinQty,
-                    MinNotional = minNotional.MinNotional,
-                    PricePrecision = pricePrecision.TickSize
-                };
-
-                feed = new SymbolFeed(Client, CombinedWebSocketClient, HistoryDb, MarketName, symInfo, this.Time);
-                await feed.Initialize();
-                lock (LockBalances)
-                {
-                    Feeds.Add(feed);
+                    var symInfo = Symbols[symbol];
+                    feed = new SymbolFeed(Client, CombinedWebSocketClient, HistoryDb, MarketName, symInfo, this.Time);
+                    await feed.Initialize();
+                    lock (LockBalances)
+                    {
+                        Feeds.Add(feed);
+                    }
                 }
+                else
+                {
+                    throw new InvalidOperationException("Symbol not found.");
+                }
+
             }
             return feed;
         }
@@ -976,6 +1006,7 @@ namespace SharpTrader.BrokersApi.Binance
                 }
             }
         }
+
         public async Task<IRequest<IOrder>> PostNewOrder(OrderInfo orderInfo)
         {
             Order newApiOrder = null;
@@ -1023,14 +1054,33 @@ namespace SharpTrader.BrokersApi.Binance
                 }
                 newApiOrder = OrdersActiveInsertOrUpdate(newApiOrder);
                 OrdersUpdateOrInsert(newApiOrder);
+
+                // lock the balance in advance
+                lock (LockBalances)
+                {
+                    var symbol = Symbols[newApiOrder.Symbol];
+                    //amount to lock =
+                    if (newApiOrder.TradeType == TradeDirection.Buy)
+                    {
+                        var amountToLock = newApiOrder.Amount * newApiOrder.Price;
+                        var quoteBal = this._Balances[symbol.QuoteAsset];
+                        quoteBal.Free -= amountToLock;
+                        quoteBal.Locked += amountToLock;
+                    }
+                    else
+                    {
+                        var amountToLock = newApiOrder.Amount ;
+                        var assetBal = this._Balances[symbol.Asset];
+                        assetBal.Free -= amountToLock;
+                        assetBal.Locked += amountToLock;
+                    } 
+                }
                 return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
             }
             catch (Exception ex)
             {
                 return new Request<IOrder>(GetExceptionErrorInfo(ex));
-            }
-
-
+            } 
         }
 
         private be.Enums.TimeInForce? GetTimeInForce(TimeInForce? tif)
@@ -1084,18 +1134,18 @@ namespace SharpTrader.BrokersApi.Binance
                     });
                     lock (LockBalances)
                     {
-                        var symbolInfo = ExchangeInfo.Symbols.FirstOrDefault(s => s.symbol == order.Symbol);
-                        var quoteBal = _Balances[symbolInfo.quoteAsset];
-                        var assetBal = _Balances[symbolInfo.baseAsset];
+                        var symbolInfo = Symbols[order.Symbol];
+                        var quoteBal = _Balances[symbolInfo.QuoteAsset];
+                        var assetBal = _Balances[symbolInfo.Asset];
 
-                        if (order.TradeType == TradeDirection.Buy)
-                        {
-                            quoteBal.Free += (order.Amount - order.Filled) * (decimal)order.Price;
-                        }
-                        else if (order.TradeType == TradeDirection.Sell)
-                        {
-                            assetBal.Free += order.Amount - order.Filled;
-                        }
+                        //if (order.TradeType == TradeDirection.Buy)
+                        //{
+                        //    quoteBal.Free += (order.Amount - order.Filled) * (decimal)order.Price;
+                        //}
+                        //else if (order.TradeType == TradeDirection.Sell)
+                        //{
+                        //    assetBal.Free += order.Amount - order.Filled;
+                        //}
                         return new Request<object>(RequestStatus.Completed, order);
                     }
                 }
@@ -1108,53 +1158,12 @@ namespace SharpTrader.BrokersApi.Binance
                 return new Request<object>(GetExceptionErrorInfo(ex));
             }
         }
-
-        public (decimal min, decimal step) GetMinTradable(string symbol)
-        {
-            var info = ExchangeInfo.Symbols.Where(s => s.symbol == symbol).FirstOrDefault();
-            if (info != null)
-            {
-                var filt = info.filters.Where(f => f.FilterType == ExchangeInfoSymbolFilterType.LotSize).FirstOrDefault();
-                if (filt is ExchangeInfoSymbolFilterLotSize lotsize)
-                    return (lotsize.MinQty, lotsize.StepSize);
-            }
-            throw new Exception($"Lotsize info not found for symbol {symbol}");
-        }
-
-        public decimal GetSymbolPrecision(string symbol)
-        {
-            var info = ExchangeInfo.Symbols.Where(s => s.symbol == symbol).FirstOrDefault();
-            if (info != null)
-            {
-                var filt = info.filters.Where(f => f.FilterType == ExchangeInfoSymbolFilterType.PriceFilter).FirstOrDefault();
-                if (filt is ExchangeInfoSymbolFilterPrice pf)
-                    return pf.TickSize;
-            }
-            throw new Exception($"Precision info not found for symbol {symbol}");
-        }
-
+         
         public IEnumerable<SymbolInfo> GetSymbols()
         {
-            return ExchangeInfo.Symbols.Where(sym => sym.status == "TRADING").Select(sym => new SymbolInfo
-            {
-                Asset = sym.baseAsset,
-                QuoteAsset = sym.quoteAsset,
-                Key = sym.symbol,
-            });
+            return Symbols.Values.Where(sym => sym.IsSpotTadingAllowed).ToArray();
         }
-
-        public decimal GetMinNotional(string symbol)
-        {
-            var info = ExchangeInfo.Symbols.Where(s => s.symbol == symbol).FirstOrDefault();
-            if (info != null)
-            {
-                var filt = info.filters.Where(f => f.FilterType == ExchangeInfoSymbolFilterType.MinNotional).FirstOrDefault();
-                if (filt is ExchangeInfoSymbolFilterMinNotional mn)
-                    return mn.MinNotional;
-            }
-            return 0;
-        }
-
+         
         public void Dispose()
         {
             Trades = null;
