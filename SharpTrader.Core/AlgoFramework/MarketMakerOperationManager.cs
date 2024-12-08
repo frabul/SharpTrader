@@ -303,9 +303,16 @@ namespace SharpTrader.AlgoFramework
             //      queue the operation for close 
             bool isEntryExpired = op.IsEntryExpired(Algo.Time);
             bool noActiveExit = self.myOpData.NoActiveExit();
-            var (_, amount) = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget);
-            bool remainingAmountSmall = (op.AmountInvested == 0 || amount <= 0);
 
+            //chek if the amout remaining is small ( so need to close the operation )
+            bool remainingAmountSmall = true;
+            if (op.AmountRemaining > 0)
+            {
+                var (_, amount) = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, op.Signal.PriceTarget);
+                remainingAmountSmall = amount <= 0; 
+            }
+
+            //queue operation for close if conditions are met
             if (isEntryExpired && noActiveExit && remainingAmountSmall)
             {
                 var entryClosed = await CloseEntryOrder(self.Op, self.myOpData);

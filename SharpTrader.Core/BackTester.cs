@@ -185,7 +185,7 @@ namespace SharpTrader
 
 
             var startingBal = -1m;
-            var currentBenchmarkVal = 0.0;
+            double currentBenchmarkVal = (double)Config.StartingBalance.Amount;
             while (MarketSimulator.NextTick() && MarketSimulator.Time < EndTime)
             {
                 if (startingBal < 0)
@@ -209,14 +209,18 @@ namespace SharpTrader
                             if (symData.Feed != null && LastPrices.ContainsKey(sk))
                             {
                                 changeCount++;
-                                changeSum += (symData.Feed.Bid - LastPrices[sk]) / LastPrices[sk];
+                                var inc = (symData.Feed.Bid - LastPrices[sk]) / LastPrices[sk];
+                                if (inc > 5)
+                                    Logger.Info($"Anomalous increase {inc} for symbol {symData.Feed.Symbol.Key}");
+                                changeSum += inc;
+                         
                             }
                             LastPrices[sk] = symData.Feed.Ask;
                         }
                     }
                     if (changeCount > 0)
                     {
-                        currentBenchmarkVal += changeSum * 100 / changeCount;
+                        currentBenchmarkVal += changeSum * (double)currentBenchmarkVal / changeCount;
                         BenchmarkStats.Update(MarketSimulator.Time, currentBenchmarkVal);
                     }
 
