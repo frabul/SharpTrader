@@ -907,8 +907,16 @@ namespace SharpTrader.BrokersApi.Binance
             //get all prices 
             List<AssetBalance> list = new List<AssetBalance>();
             var allPrices = from p in (await this.GetAllPrices())
+                            let symInfo = this.GetSymbolInfo(p.Symbol)
                             select
-                                new { symbol = this.GetSymbolInfo(p.Symbol), price = p.Price };
+                                new { symKey = p.Symbol, symbol = symInfo, price = p.Price };
+            var badSymbols = allPrices.Where(p => p.symbol == null).Select(p=>p.symKey);
+            allPrices = allPrices.Where(p => p.symbol != null);
+
+            if(badSymbols.Any()) 
+                Logger.Warn("It was not possible to find symbol info for {0}.", string.Join(", ", badSymbols));
+            
+             
 
             //calculate the value of target asset compared to BTC
             decimal btcToFinal = 1;
@@ -953,13 +961,13 @@ namespace SharpTrader.BrokersApi.Binance
         public async Task<IRequest<decimal>> GetEquity(string asset)
         {
             try
-            { 
+            {
                 var balancesConverted = await GetAllBalancesConvertedAsync(asset);
                 return new Request<decimal>(RequestStatus.Completed, balancesConverted.Sum(b => b.Total));
             }
             catch (Exception ex)
             {
-                Debug.Assert(ex != null);
+                Logger.Error("Error during GetEquity\n   Message: {0}\n\t   Stack:{1}", ex.Message, ex.StackTrace);
                 return new Request<decimal>(RequestStatus.Failed);
             }
 
