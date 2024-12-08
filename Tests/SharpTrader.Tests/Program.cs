@@ -36,8 +36,17 @@ namespace TestConsole
 
         public static async Task Main(string[] args)
         {
+            await TestHistoryDB.TestFillGaps("ETHBTC");
+
+            Console.WriteLine("Enter to continue.");
+            Console.ReadLine();
+
             new TestTradeBarConsolidator().SimpleTest();
             LiteDB.LiteDatabase db = new LiteDB.LiteDatabase("test.db");
+
+
+            Console.WriteLine("Enter to continue.");
+            Console.ReadLine();
 
             var dummyMapper = new LiteDB.BsonMapper();
             var mapper2 = new LiteDB.BsonMapper();
