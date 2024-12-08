@@ -1,55 +1,46 @@
 
-import { createChart, IChartApi, TimeRange, MouseEventParams, Point, Coordinate, BarPrice, BarData, BarPrices } from 'lightweight-charts';
+import { createChart, IChartApi, TimeRange, MouseEventParams, Point, Coordinate, BarPrice, BarData, BarPrices, ISeriesApi } from 'lightweight-charts';
 
 
 class Figure {
     Chart: IChartApi;
     LastCrosshairForcedPoint: Point;
     Container: HTMLElement;
-    LegendFirstRow: HTMLDivElement;
+    Legend: HTMLDivElement;
+    SeriesMap: Map<any, any>;
     constructor(chart: IChartApi, container: HTMLElement) {
         this.Chart = chart;
         this.Container = container;
         this.LastCrosshairForcedPoint = { x: 0 as Coordinate, y: 0 as Coordinate };
+        this.SeriesMap = new Map();
     }
 }
 
-var charts: Figure[] = [];
+var figures: Figure[] = [];
 var lastVisibleRangeSet: TimeRange = { from: "", to: "" };
 
 function AddCandlesSerie(figure: Figure, seriesData: any) {
-    var lineSeries = figure.Chart.addCandlestickSeries({
+    var series = figure.Chart.addCandlestickSeries({
         priceLineVisible: false,
         lastValueVisible: true,
         baseLineVisible: false
     });
-    lineSeries.setData(seriesData.Points);
-    lineSeries.setMarkers(seriesData.Markers);
-
-
-
-
-    figure.Chart.subscribeCrosshairMove((param) => {
-        if (param.time) {
-            var pointedElem: BarPrices = param.seriesPrices.get(lineSeries) as BarPrices;
-            if (pointedElem != undefined)
-                figure.LegendFirstRow.innerText = `${seriesData.Name} - O:${pointedElem.open.toFixed(7)} - H:${pointedElem.high.toFixed(7)}`;
-        }
-        else {
-            figure.LegendFirstRow.innerText = seriesData.Name;
-        }
-    });
+    series.setData(seriesData.Points);
+    series.setMarkers(seriesData.Markers);
+    figure.SeriesMap.set(series, seriesData);
 }
 
-function AddLineSerie(chart: IChartApi, series: any) {
-    var lineSeries = chart.addLineSeries({
+function AddLineSerie(figure: Figure, seriesData: any) {
+    var chart = figure.Chart;
+    let series = chart.addLineSeries({
         priceLineVisible: false,
         lastValueVisible: false
     });
 
-    lineSeries.applyOptions(series.Options)
-    lineSeries.setData(series.Points);
-    lineSeries.setMarkers(series.Markers);
+    series.applyOptions(seriesData.Options)
+    series.setData(seriesData.Points);
+    series.setMarkers(seriesData.Markers);
+    figure.SeriesMap.set(series, seriesData);
 }
 
 
@@ -82,7 +73,7 @@ function CreateFigure(figureData) {
         }
     )
     var figure = new Figure(chart, box);
-    charts.push(figure);
+    figures.push(figure);
 
     figureData.Series.forEach(series => {
         switch (series.Type) {
@@ -90,7 +81,7 @@ function CreateFigure(figureData) {
                 AddCandlesSerie(figure, series);
                 break;
             case "Line":
-                AddLineSerie(chart, series);
+                AddLineSerie(figure, series);
                 break;
         }
     });
@@ -101,7 +92,7 @@ function CreateFigure(figureData) {
         var now = new Date();
         //if (now > inhibitSynchUntil) {
         if (lastVisibleRangeSet.from != newVisibleTimeRange.from || lastVisibleRangeSet.to != newVisibleTimeRange.to) {
-            charts.forEach(e => {
+            figures.forEach(e => {
                 if (e.Chart != chart)
                     e.Chart.timeScale().setVisibleRange(newVisibleTimeRange)
             });
@@ -109,10 +100,18 @@ function CreateFigure(figureData) {
         }
     }
 
+    //-- create legend --
+    figure.Legend = document.createElement('div');
+    figure.Legend.classList.add('legend');
+    figure.Container.appendChild(figure.Legend);
+
+
+    //---- crosshair handling ---
     chart.timeScale().subscribeVisibleTimeRangeChange(onVisibleTimeRangeChanged);
 
     chart.subscribeCrosshairMove(function (par: MouseEventParams) {
-        charts.forEach(c => {
+        // synch all figures
+        figures.forEach(c => {
             if (c.Chart != chart && par.point != undefined) {
                 if (c.LastCrosshairForcedPoint.x != par.point.x
                     || c.LastCrosshairForcedPoint.y != par.point.y) {
@@ -122,17 +121,26 @@ function CreateFigure(figureData) {
                 }
             }
         });
+        // add legend
+        figure.Legend.innerHTML = "";
+        if (par.time) {
+            par.seriesPrices.forEach((v, series) => {
+                let ser = figure.SeriesMap.get(series);
+                let row = document.createElement('div');
+                figure.Legend.appendChild(row);
+                if (ser.Type == "Candlestick") {
+                    let pointedVal: BarPrices = v as BarPrices;
+                    if (pointedVal != undefined)
+                        row.innerText = `${ser.Name} - O: ${pointedVal.open.toFixed(7)} - H: ${pointedVal.high.toFixed(7)} - L: ${pointedVal.low.toFixed(7)} - C: ${pointedVal.close.toFixed(7)}`;
+                } else {
+                    let pointedVal: BarPrice = v as BarPrice;
+                    if (pointedVal != undefined)
+                        row.innerText = `${ser.Name} - Y: ${pointedVal.toFixed(7)}`;
+                }
+            });
+        }
     });
 
-    //-- create legend --
-    var legend = document.createElement('div');
-    legend.classList.add('legend');
-    figure.Container.appendChild(legend);
-
-    var firstRow = document.createElement('div');
-    firstRow.innerText = '';
-    legend.appendChild(firstRow);
-    figure.LegendFirstRow = firstRow;
     //-- start auto resize --
     var intervalId = setInterval(function () {
         chart.resize(box.clientWidth, box.clientHeight);
