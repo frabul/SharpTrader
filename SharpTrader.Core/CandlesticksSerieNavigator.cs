@@ -186,7 +186,7 @@ namespace SharpTrader
                     lower = middle + 1;
             }
 
-            return ~lower;
+            return ~upper;
         }
 
 
