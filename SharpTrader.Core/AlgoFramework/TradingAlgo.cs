@@ -1,11 +1,8 @@
 ﻿using LiteDB;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace SharpTrader.AlgoFramework
@@ -66,10 +63,35 @@ namespace SharpTrader.AlgoFramework
             Market = marketApi;
             Market.OnNewTrade += Market_OnNewTrade;
             this.DoMarginTrading = config.MarginTrading;
-            Logger = logger
-               .ForContext(new MarketTimeEnricher(marketApi))
-               .ForContext("SourceContext", "TradingAlgo")
-               .ForContext("AlgoName", this.Name);
+            Logger = new Serilog.LoggerConfiguration()
+                .MinimumLevel.Verbose()
+                .Destructure.ByTransforming<Signal>(s => new { s.Id, Symbol = s.Symbol.Key, s.Kind, s.EntryExpiry, s.ExpireDate, s.PriceEntry, s.PriceTarget, s.ModifyTime, OpId = s.Operation?.Id })
+                .Destructure.ByTransforming<Operation>(op =>
+                            new
+                            {
+                                Symbol = op.Symbol.Key,
+                                op.Id,
+                                op.IsClosing,
+                                op.IsClosed,
+                                op.Signal,
+                                op.AmountTarget,
+                                op.AverageEntryPrice,
+                                op.AverageExitPrice,
+                                op.QuoteAmountInvested,
+                                op.QuoteAmountLiquidated,
+                                op.QuoteAmountRemaining,
+                                op.Type,
+                                op.CloseDeadTime,
+                                op.LastInvestmentTime,
+                                Entries = op.Entries.Select(t => t.Id).ToArray(),
+                                Exits = op.Exits.Select(t => t.Id).ToArray()
+                            })
+                .Enrich.With(new MarketTimeEnricher(marketApi))
+                .Enrich.WithProperty("AlgoName", this.Name)
+                .WriteTo.Logger(logger)
+                .CreateLogger()
+                .ForContext<TradingAlgo>();
+
             SymbolsFilterLogger = Logger.ForContext("SourceContext", "TradingAlgo.SymbolsFilter");
         }
 
@@ -194,7 +216,7 @@ namespace SharpTrader.AlgoFramework
             // register trades with their linked operations 
             foreach (ITrade trade in slice.Trades)
             {
-
+                var logger = Logger.ForContext("Symbol", trade.Symbol);
                 //first search in active operations
                 Operation activeOp = null;
                 if (_SymbolsData.ContainsKey(trade.Symbol))
@@ -206,7 +228,7 @@ namespace SharpTrader.AlgoFramework
                 if (activeOp != null)
                 {
                     if (activeOp.AddTrade(trade))
-                        Logger.Information("New trade {TradeId} for operation {OperationId}.", trade.Id, activeOp.Id);
+                        logger.Information("Trade {TradeId} from {ClientOrderId} added to operation {OperationId}.", trade.Id, trade.ClientOrderId, activeOp.Id);
                 }
                 else
                 {
@@ -217,21 +239,20 @@ namespace SharpTrader.AlgoFramework
                     {
                         if (oldOp.AddTrade(trade))
                         {
-                            Logger.Warning("New trade {TradeId} for 'old' operation {OperationId}.", trade.Id, oldOp.Id);
+                            logger.Warning("Trade {TradeId}  from {ClientOrderId} added to 'old' operation {OperationId}.", trade.Id, trade.ClientOrderId, oldOp.Id);
                             DbClosedOperations.Upsert(oldOp);
                         }
                         //check if it got resumed by this new trade
                         if (!oldOp.IsClosed)
                         {
-                            Logger.Information("Resuming 'old' operation {OperationId}.", oldOp.Id);
+                            logger.Information("Resuming 'old' operation {OperationId}.", oldOp.Id);
                             this.ResumeOperation(oldOp);
                         }
                         else
                             oldOp.Dispose(); //otherwise we must dispose it
                     }
                     else
-                        Logger.ForContext("Trade", trade, true)
-                            .Warning("The trade {TradeId} was not associated to any operation.", trade.Id);
+                        logger.Warning("The trade {TradeId} from {ClientOrderId} was not associated to any operation.", trade.Id, trade.ClientOrderId);
                 }
             }
 
@@ -257,10 +278,13 @@ namespace SharpTrader.AlgoFramework
                     {
                         var gain = op.CalculateGainAsQuteAsset(0.001m);
                         var gainPrc = gain * 100 / op.QuoteAmountInvested;
-                        Logger.Information("Closing operation {OperationId} - Gain: {gain:f6}, Gain%: {gainPrc:f2} ", op.Id, gain, gainPrc);
+                        Logger
+                            .ForContext("Symbol", op.Symbol)
+                            .ForContext("Operation", op, true)
+                            .Information("{OperationId} - Closing operation - Gain: {gain:f6}, Gain%: {gainPrc:f2}.", op.Id, gain, gainPrc);
                     }
                     else
-                        Logger.Debug("Closing operation {OperationId}.", op.Id);
+                        Logger.ForContext("Symbol", op.Symbol).Debug("{OperationId} - Closing operation.", op.Id);
 
                     op.Close();
 
@@ -325,7 +349,7 @@ namespace SharpTrader.AlgoFramework
 
         private void ResumeOperation(Operation op)
         {
-            Logger.Information("Resuming operation {OperationId}.", op.Id);
+            Logger.Information("Resuming operation {OperationId} / {Symbol}.", op.Id, op.Symbol);
             op.Resume();
             AddActiveOperation(op);
             var removed = this._ClosedOperations.Remove(op);

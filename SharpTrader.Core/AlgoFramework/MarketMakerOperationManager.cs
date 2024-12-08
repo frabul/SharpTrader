@@ -185,7 +185,7 @@ namespace SharpTrader.AlgoFramework
                         Op = op,
                         SymbolData = symData,
                         Next = MonitorOperation,
-                        Logger = Logger
+                        Logger = Logger.ForContext("Symbol", op.Symbol)
                     };
 
             if (myOpData.EntryManager == null)
@@ -196,7 +196,7 @@ namespace SharpTrader.AlgoFramework
                         Op = op,
                         SymbolData = symData,
                         Next = OpenEntryOrder,
-                        Logger = Logger
+                        Logger = Logger.ForContext("Symbol", op.Symbol)
                     };
             if (myOpData.ExitManager == null)
                 myOpData.ExitManager =
@@ -206,7 +206,7 @@ namespace SharpTrader.AlgoFramework
                         Op = op,
                         SymbolData = symData,
                         Next = OpenExitOrder,
-                        Logger = Logger
+                        Logger = Logger.ForContext("Symbol", op.Symbol)
                     };
         }
 
@@ -415,8 +415,8 @@ namespace SharpTrader.AlgoFramework
                                     ClientOrderId = op.GetNewOrderId(),
                                     Direction = op.ExitTradeDirection
                                 };
-                                self.Logger.Information("{OperationId} - Setting exit order: {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
-                                              op.Id, orderInfo.Direction, op.Symbol, orderInfo.Amount, orderInfo.Price);
+                                self.Logger.Information("{OperationId} - Setting exit order: {ClientOrderId} {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
+                                              op.Id, orderInfo.ClientOrderId, orderInfo.Direction, op.Symbol, orderInfo.Amount, orderInfo.Price);
                                 var request = await Algo.Market.PostNewOrder(orderInfo);
 
                                 if (request.IsSuccessful)
@@ -552,8 +552,8 @@ namespace SharpTrader.AlgoFramework
                             };
 
                             self.Logger.Information(
-                                "{OperationId} - Setting Entry: {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
-                                op.Id, orderInfo.Direction, orderInfo.Symbol, orderInfo.Amount, orderInfo.Price);
+                                "{OperationId} - Setting Entry: {ClientOrderId} {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
+                                op.Id, orderInfo.ClientOrderId, orderInfo.Direction, orderInfo.Symbol, orderInfo.Amount, orderInfo.Price);
 
                             var req = await Algo.Market.PostNewOrder(orderInfo);
 
@@ -603,6 +603,7 @@ namespace SharpTrader.AlgoFramework
                 //N.B. also when signal entry is not valid we keep monitoring as it could be updated
                 if (entryDistant || badPrice || entryExpired)
                 {
+                    self.Logger.Debug("{OperationId} - Cancelling entry order {OrderId}, flags {EntryOrderFlags}", op.Id, myOpData.CurrentEntryOrder.ClientId, new { entryDistant, badPrice, entryExpired });
                     var orderClosed = await CloseEntryOrder(op, myOpData);
                     if (orderClosed)
                     {
@@ -629,14 +630,15 @@ namespace SharpTrader.AlgoFramework
         }
 
         private async Task<bool> CloseOrder(IOrder order, Operation op)
-        { 
+        {
             bool ok = true;
+            var logger = Logger.ForContext("Symbol", op.Symbol);
             if (!order.IsClosed)
             {
                 var req = await Algo.Market.OrderCancelAsync(order.Id);
                 if (!req.IsSuccessful)
                 {
-                    Logger.Error("{OperationId} - unable to close order {OrderId}, reason: {Reason}. Trying to synch...", op.Id, order.ClientId, req.ErrorInfo);
+                    logger.Error("{OperationId} - unable to close order {OrderId}, reason: {Reason}. Trying to synch...", op.Id, order.ClientId, req.ErrorInfo);
                     //check if order was closed already
                     var req2 = await Algo.Market.OrderSynchAsync(order.Id);
                     if (req2.IsSuccessful)
@@ -644,16 +646,15 @@ namespace SharpTrader.AlgoFramework
                     else
                     {
                         ok = false;
-                        Logger.Error("{OperationId} - unable to synch order {OrderId}, reason: {Reason}", op.Id, order.ClientId, req.ErrorInfo);
+                        logger.Error("{OperationId} - unable to synch order {OrderId}, reason: {Reason}", op.Id, order.ClientId, req.ErrorInfo);
                     }
 
                     if (!order.IsClosed)
                     {
                         ok = false;
-                        Logger.Error("{OperationId} - order {OrderId} still open after sync.", op.Id, order.ClientId);
+                        logger.Error("{OperationId} - order {OrderId} still open after sync.", op.Id, order.ClientId);
                     }
                 }
-
             }
             return ok;
         }

@@ -72,7 +72,7 @@ namespace SharpTrader
             var backtesterConfig = JsonConvert.DeserializeObject<BackTester.Configuration>(JsonConvert.SerializeObject(Config.BacktesterConfig));
             backtesterConfig.AlgoConfig = JObject.FromObject(algoConfig);
             backtesterConfig.SessionName = $"{this.Config.SessionName}_{index}";
-            var backTester = new BackTester(backtesterConfig, HistoryDB, this.Logger);
+            var backTester = new BackTester(backtesterConfig, HistoryDB, this.Logger, this.Logger);
             backTester.Start();
         }
     }

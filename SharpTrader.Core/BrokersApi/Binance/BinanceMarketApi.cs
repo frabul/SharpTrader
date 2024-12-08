@@ -91,7 +91,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1)
         {
-            Logger = Serilog.Log.ForContext<BinanceMarketApi>();
+            Logger = Serilog.Log.Logger.ForContext<BinanceMarketApi>();
             Logger.Information("BinanceMarketApi Starting initialization...");
             OperationsDbPath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd.db");
             OperationsArchivePath = Path.Combine("Data", "BinanceAccountsData", $"{apiKey}_tnd_archive.db");
@@ -707,7 +707,7 @@ namespace SharpTrader.BrokersApi.Binance
                 else
                 {
                     Trades.Insert(newTrade);
-                    Logger.Debug("New trade {@Trade}", newTrade);
+                    Logger.Information("New trade {@Trade}", newTrade);
                     OnNewTrade?.Invoke(this, newTrade);
                 }
             }

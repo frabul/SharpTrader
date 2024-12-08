@@ -215,6 +215,7 @@ namespace SharpTrader.MarketSimulator
             }
             foreach (var trade in trades)
             {
+                Logger.Information("Found trade {@Trade}", trade);
                 this.OnNewTrade?.Invoke(this, trade);
             }
 
