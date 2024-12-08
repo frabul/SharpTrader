@@ -19,10 +19,9 @@ namespace SharpTrader.BrokersApi.Binance
 {
     class SymbolFeed : ISymbolFeed, IDisposable
     {
-        private readonly TimeSpan FinalCandleUpdateTimeout = TimeSpan.FromSeconds(3.5);
+        private readonly TimeSpan FinalCandleUpdateTimeout = TimeSpan.FromSeconds(7.5);
         public event Action<ISymbolFeed, IBaseData> OnData;
         private Serilog.ILogger Logger;
-        private BinanceClient Client;
         private CombinedWebSocketClient WebSocketClient;
         private BinanceMarketApi Market;
         private BinanceTradeBarsRepository HistoryDb;
@@ -205,7 +204,7 @@ namespace SharpTrader.BrokersApi.Binance
                     LastEmittedCandled = candleReceived;
                     CandlesToAdd.Add(LastEmittedCandled);
                     //the new forming candle is a filler
-                    FormingCandle = GetFiller(resolution);
+                    FormingCandle = Candlestick.GetFiller(LastEmittedCandled);
                 }
 
             }
@@ -217,11 +216,11 @@ namespace SharpTrader.BrokersApi.Binance
                 Logger.Verbose("{Symbol} SymbolFeed: emitting forming candle ", Symbol.Key);
                 LastEmittedCandled = FormingCandle;
                 CandlesToAdd.Add(LastEmittedCandled);
-                FormingCandle = GetFiller(resolution);
+                FormingCandle = Candlestick.GetFiller(LastEmittedCandled);
             }
 
             if (CandlesToAdd.Count > 0)
-            { 
+            {
                 HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
 
                 foreach (var c in CandlesToAdd)
@@ -229,18 +228,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
         }
 
-        private Candlestick GetFiller(TimeSpan resolution)
-        {
-            return new Candlestick(
-               LastEmittedCandled.CloseTime,
-               LastEmittedCandled.CloseTime + resolution,
-               LastEmittedCandled.Close,
-               LastEmittedCandled.Close,
-               LastEmittedCandled.Close,
-               LastEmittedCandled.Close,
-               0
-           );
-        }
+
 
         private static Candlestick KlineToCandlestick(BinanceKline kline)
         {
