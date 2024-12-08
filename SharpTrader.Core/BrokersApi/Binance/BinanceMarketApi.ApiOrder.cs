@@ -101,7 +101,7 @@ namespace SharpTrader.BrokersApi.Binance
             Status = GetStatus(bo.OrderStatus);
             Filled = bo.AccumulatedQuantityOfFilledTradesThisOrder;
             Id = Symbol + OrderId;
-            ClientId = bo.NewClientOrderId;
+            ClientId = bo.OriginalClientOrderId;
             Time = bo.EventTime;
         }
 
