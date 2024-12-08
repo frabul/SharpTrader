@@ -18,7 +18,7 @@ namespace SharpTrader
             {
                 if (Entries.ContainsKey(key))
                 {
-                    if (DateTime.Now < Entries[key].Expiry)
+                    if (DateTime.UtcNow < Entries[key].Expiry)
                     {
                         result = Entries[key].Object;
                         return true;
