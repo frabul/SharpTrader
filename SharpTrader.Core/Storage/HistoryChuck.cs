@@ -61,7 +61,7 @@ namespace SharpTrader.Storage
 
             if (fileExtension == ".bin")
             {
-                using (var fs = File.Open(filePath, FileMode.Open))
+                using (var fs = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     SymbolHistoryFile_Legacy fdata = Serializer.Deserialize<SymbolHistoryFile_Legacy>(fs);
                     return new HistoryChunkV2(fdata);
@@ -141,7 +141,7 @@ namespace SharpTrader.Storage
 
         public static HistoryChunkV2 LoadFrom(string filePath)
         {
-            using (FileStream fileStream = File.Open(filePath, FileMode.Open, FileAccess.Read))
+            using (FileStream fileStream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 return Serializer.Deserialize<HistoryChunkV2>(fileStream);
             }
@@ -189,7 +189,7 @@ namespace SharpTrader.Storage
 
         public static async Task<HistoryChunkV3> LoadFromAsync(string filePath)
         {
-            using (var fileStream = File.Open(filePath, FileMode.Open))
+            using (var fileStream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 var lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
                 return await MessagePackSerializer.DeserializeAsync<HistoryChunkV3>(fileStream, lz4Options);
