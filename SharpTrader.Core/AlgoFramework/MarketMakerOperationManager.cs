@@ -376,6 +376,7 @@ namespace SharpTrader.AlgoFramework
             //---------- manage exit orders -------------- 
             if (myOpData.CurrentExitOrder == null)
             {
+                // clip the target price based on current price
                 var price = op.ExitTradeDirection == TradeDirection.Buy ?
                     Math.Min(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Ask) :
                     Math.Max(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Bid);
@@ -507,8 +508,8 @@ namespace SharpTrader.AlgoFramework
             {
                 //--- open a new entry if needed ---
                 var entryNear = op.Signal.Kind == SignalKind.Buy ?
-                    ((decimal)symData.Feed.Ask - op.Signal.PriceEntry) / op.Signal.PriceEntry < EntryNearThreshold :
-                    (op.Signal.PriceEntry - (decimal)symData.Feed.Bid) / op.Signal.PriceEntry < EntryNearThreshold;
+                    ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / op.Signal.PriceEntry < EntryNearThreshold :
+                    (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry < EntryNearThreshold;
 
                 if (entryNear && !Algo.EntriesSuspended)
                 {
@@ -572,8 +573,8 @@ namespace SharpTrader.AlgoFramework
             //  open entry if we got near the target price
             //  cancel entry if we are too far  
             var entryDistant = op.Signal.Kind == SignalKind.Buy ?
-              ((decimal)symData.Feed.Ask - op.Signal.PriceEntry) / op.Signal.PriceEntry > EntryDistantThreshold :
-              (op.Signal.PriceEntry - (decimal)symData.Feed.Bid) / op.Signal.PriceEntry > EntryDistantThreshold;
+              ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / op.Signal.PriceEntry > EntryDistantThreshold :
+              (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry > EntryDistantThreshold;
 
             if (myOpData.CurrentEntryOrder != null)
             {
