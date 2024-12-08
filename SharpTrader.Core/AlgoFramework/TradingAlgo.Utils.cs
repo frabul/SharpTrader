@@ -59,6 +59,7 @@ namespace SharpTrader.AlgoFramework
             var logger = Logger.ForContext("Symbol", op.Symbol);
             (IOrder order, bool amountRemainingLow, bool OrderError, bool freeBalanceLow) result = default;
             await Executor.CancelAllOrders(op);
+            await Task.Delay(500);
             logger.Information("{OperationId} - liquidation because {Reason}", op.Id, reason);
             if (op.AmountRemaining < 0)
             {
