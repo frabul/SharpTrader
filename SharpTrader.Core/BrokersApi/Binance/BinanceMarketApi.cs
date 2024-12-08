@@ -543,12 +543,19 @@ namespace SharpTrader.BrokersApi.Binance
                                         order = null;
                                 }
                                 // put out of lokc to prevent deadlock
-                                if (order == null)
-                                    order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as Order;
-                                tr.ClientOrderId = order.ClientId;
+                                if (order == null ) {
 
-                                lock (LockOrdersTrades)
-                                    TradesUpdateOrInsert(tr);
+                                    order = OrderSynchAsync(tr.Symbol + tr.OrderId).Result.Result as Order;
+                                }
+                                if(order != null ) {
+
+                                    tr.ClientOrderId = order.ClientId;
+
+                                    lock (LockOrdersTrades)
+                                        TradesUpdateOrInsert(tr);
+                                } else {
+                                    Logger.Warning("Unable to find order for thrade {TradeId}", tr.Id);
+                                }
                             }
                         }
 
