@@ -41,7 +41,7 @@ namespace SharpTrader
         }
     }
    
-    public class CandlestickTimeComparer : IComparer<ITradeBar>, IComparer<Candlestick>
+    public class CandlestickTimeComparer : IComparer<ITradeBar>, IComparer<Candlestick>, IComparer<IBaseData>
     {
         public static CandlestickTimeComparer Instance { get; } = new CandlestickTimeComparer();
         public int Compare(ITradeBar x, ITradeBar y)
@@ -61,6 +61,11 @@ namespace SharpTrader
         public int Compare(Candlestick x, Candlestick y)
         {
             return x.OpenTime.CompareTo(y.OpenTime);
+        }
+
+        public int Compare(IBaseData x, IBaseData y)
+        {
+            return x.Time.CompareTo(y.Time);
         }
     }
 
