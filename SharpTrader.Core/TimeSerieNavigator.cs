@@ -70,7 +70,7 @@ namespace SharpTrader
             Records.OnShrink += OnRecordsShrunk;
         }
 
-      
+
 
         private void Records_NewRecord(TimeRecordCollection<T> sender, T rec)
         {
@@ -404,22 +404,25 @@ namespace SharpTrader
         {
             if (Items.Count < 1)
                 return -1;
+            if (time > Items[Items.Count - 1].Time)
+                return ~Items.Count;
+            if (time < Items[0].Time)
+                return ~0;
 
-            var list = Items;
-            var lower = 0;
-            var upper = list.Count - 1;
+            var lower = -1;
+            var upper = Items.Count;
 
-            while (lower <= upper)
+            while (lower < upper - 1)
             {
                 var middle = lower + ((upper - lower) / 2);
-                var compareResult = list[middle].Time.CompareTo(time);
+                var compareResult = Items[middle].Time.CompareTo(time);
 
                 if (compareResult == 0)
                     return middle;
                 if (compareResult > 0)
-                    upper = middle - 1;
+                    upper = middle;
                 else
-                    lower = middle + 1;
+                    lower = middle;
             }
 
             return ~upper;

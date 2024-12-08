@@ -167,23 +167,28 @@ namespace SharpTrader
 
 
         private int BinarySearchByOpenTime(DateTime openTime)
-        {
-            var list = Records;
+        { 
+            if (Records.Length < 1)
+                return -1;
+            if (openTime > Records[Records.Length - 1].OpenTime)
+                return ~Records.Length;
+            if (openTime < Records[0].OpenTime)
+                return ~0;
 
-            var lower = 0;
-            var upper = list.Length - 1;
+            var lower = -1;
+            var upper = Records.Length;
 
-            while (lower <= upper)
+            while (lower < upper - 1)
             {
                 var middle = lower + ((upper - lower) / 2);
-                var compareResult = list[middle].OpenTime.CompareTo(openTime);
+                var compareResult = Records[middle].OpenTime.CompareTo(openTime);
 
                 if (compareResult == 0)
                     return middle;
                 if (compareResult > 0)
-                    upper = middle - 1;
+                    upper = middle;
                 else
-                    lower = middle + 1;
+                    lower = middle;
             }
 
             return ~upper;
