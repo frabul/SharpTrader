@@ -63,7 +63,7 @@ namespace SharpTrader.Drawing
 
         public void PlotCandlesticks(string name, TimeSerieNavigator<ITradeBar> ticks)
         {
-            var candles = new CandlestickSeries() { Name = name }; 
+            var candles = new CandlestickSeries() { Name = name };
             TimeSerieNavigator<ITradeBar> mySeries = new TimeSerieNavigator<ITradeBar>(ticks);
             while (mySeries.MoveNext())
                 candles.Points.Add(new ChartCandlestick(mySeries.Current));

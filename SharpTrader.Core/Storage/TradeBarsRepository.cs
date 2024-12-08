@@ -42,8 +42,7 @@ namespace SharpTrader.Storage
             if (!Directory.Exists(DataDir))
                 Directory.CreateDirectory(DataDir);
 
-            Init();
-
+            Init(); 
         }
 
         public SymbolHistoryMetaData GetMetaData(SymbolHistoryId historyInfo) => GetMetaDataInternal(historyInfo);
@@ -223,7 +222,7 @@ namespace SharpTrader.Storage
                     var chunkFilePath = chunk.GetFilePath(DataDir);
                     var fdata = HistoryChunk.Load(chunkFilePath).Result;
                     histMetadata.AddBars(fdata.Ticks);
-                    File.Delete(chunkFilePath);
+                    //File.Delete(chunkFilePath);
                 }
                 histMetadata.Flush(DataDir);
                 data.Add(histMetadata);

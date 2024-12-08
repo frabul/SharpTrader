@@ -46,6 +46,7 @@ namespace SharpTrader.Storage
         public virtual double Spread { get; set; }
 
     }
+
     [Union(0, typeof(HistoryChunkV3))]
     [MessagePackObject]
     public abstract class HistoryChunk
@@ -77,6 +78,11 @@ namespace SharpTrader.Storage
                 HistoryChunk fdata = await HistoryChunkV3.LoadFromAsync(filePath);
                 return fdata;
             }
+            else if (fileExtension == ".zip")
+            {
+                HistoryChunk fdata = await HistoryChunk_BinancePublic.LoadFromAsync(filePath);
+                return fdata;
+            }
             else
             {
                 throw new InvalidOperationException("Wrong extension for loading HistoryChunk.");
@@ -86,7 +92,6 @@ namespace SharpTrader.Storage
 
 
     }
-
 
     [ProtoContract]
     public class HistoryChunkV2 : HistoryChunk
@@ -177,7 +182,7 @@ namespace SharpTrader.Storage
             var filePath = Id.GetFilePath(fileDir);
             using (FileStream fileStream = File.Open(filePath, FileMode.Create, FileAccess.Write))
             {
-                var lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray); 
+                var lz4Options = MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray);
                 await MessagePackSerializer.SerializeAsync<HistoryChunkV3>(fileStream, this, lz4Options);
 
             }
