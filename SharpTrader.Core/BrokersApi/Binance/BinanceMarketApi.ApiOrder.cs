@@ -165,7 +165,7 @@ namespace SharpTrader.BrokersApi.Binance
         }
         public override string ToString()
         {
-            return $"Order{{ Id: {this.Id}, ClientId: {this.ClientId} }}";
+            return $"{{ {this.Symbol} - {this.OrderId} - ClientId: {this.ClientId} }}";
         }
     }
 }
