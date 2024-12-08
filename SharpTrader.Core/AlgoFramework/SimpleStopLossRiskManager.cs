@@ -10,12 +10,16 @@ namespace SharpTrader.AlgoFramework
     {
         public class RMData : IChangeTracking
         {
-            public DateTime NextTry { get; set; } = DateTime.MinValue;
-            public int LiquidationTries { get; set; }
-            public bool IsChanged => false;
+            private DateTime nextTry = DateTime.MinValue;
+            private int liquidationTries;
+            private volatile bool isChanged;
+
+            public DateTime NextTry { get => nextTry; set { nextTry = value; IsChanged = true; } }
+            public int LiquidationTries { get => liquidationTries; set { liquidationTries = value; IsChanged = true; } }
+            public bool IsChanged { get => isChanged; private set => isChanged = value; }
             public void AcceptChanges()
             {
-
+                IsChanged = false;
             }
         }
 
@@ -49,7 +53,7 @@ namespace SharpTrader.AlgoFramework
                 {
                     await ManageOperation(op);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     var msg = BinanceMarketApi.GetExceptionErrorInfo(ex);
                     Logger.Error($"SimpleStopLossRiskManager: exception while managin  {op.ToString("c")}\n       Error: {msg}");

@@ -42,7 +42,7 @@ namespace SharpTrader.AlgoFramework
         public IChangeTracking ExecutorData { get; set; }
         public IChangeTracking RiskManagerData { get; set; }
 
-       
+
         public DateTime CreationTime { get; private set; }
 
         /// <summary>
@@ -53,7 +53,7 @@ namespace SharpTrader.AlgoFramework
             get => _Signal;
             private set
             {
-                if(_Signal != null)
+                if (_Signal != null)
                     _Signal.OnModify -= OnSignalModified;
                 //System.Diagnostics.Debug.Assert(value.Operation == null);
                 _Signal = value;
@@ -88,7 +88,7 @@ namespace SharpTrader.AlgoFramework
         public bool IsClosing { get; private set; }
         public DateTime CloseDeadTime { get; private set; } = DateTime.MaxValue;
         public DateTime LastInvestmentTime { get; private set; }
-        public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
+
 
         /// <summary>
         /// All trades associated with this operation
@@ -160,6 +160,8 @@ namespace SharpTrader.AlgoFramework
             QuoteAmountRemaining = 0;
             foreach (var trade in entries.Concat(exits))
                 this.AddTrade(trade);
+
+            this.SetChanged();
         }
 
         private void SetTradesDirections()
@@ -207,6 +209,7 @@ namespace SharpTrader.AlgoFramework
             AmountInvested = _Entries.Sum(t => t.Amount);
             AmountLiquidated = _Exits.Sum(t => t.Amount);
             QuoteAmountRemaining = AmountInvested - AmountLiquidated;
+            this.SetChanged();
         }
 
         public bool AddEntry(ITrade entry)
@@ -320,9 +323,14 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
+        public bool IsChanged => this.Signal.IsChanged || this._IsChanged || ExecutorData.IsChanged || RiskManagerData.IsChanged;
+
         public void AcceptChanges()
         {
             _IsChanged = false;
+            this.RiskManagerData?.AcceptChanges();
+            this.ExecutorData?.AcceptChanges();
+            this.Signal?.AcceptChanges();
         }
 
         private void SetChanged()
@@ -338,6 +346,12 @@ namespace SharpTrader.AlgoFramework
         public override int GetHashCode()
         {
             return this.Id.GetHashCode();
+        }
+
+        public override bool Equals(object obj)
+        {
+            var other = obj as Operation;
+            return other != null && other.Id == this.Id;
         }
 
         class EntriesEqualityComparer : IEqualityComparer<ITrade>, IEqualityComparer<IOrder>
