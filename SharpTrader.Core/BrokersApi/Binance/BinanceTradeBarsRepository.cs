@@ -108,26 +108,33 @@ namespace SharpTrader.Core.BrokersApi.Binance
                 var oldTicks = hist.Ticks;
 
                 //first find next available data, if not found download everything 
-                DateTime lastTime = fromTime;
-                while (lastTime < toTime)
+                DateTime checkTime = fromTime;
+                while (checkTime < toTime)
                 {
                     if (oldTicks.MoveNext())
                     {
-                        if (oldTicks.Time - lastTime > histInfo.Resolution)
+                        if (oldTicks.Time - checkTime > histInfo.Resolution)
                         {
-                            Logger.Debug($"Hole found in {histInfo.Symbol} history from {lastTime} to {hist.Ticks.NextTickTime}.");
-                            var candles = await DownloadCandles(histInfo.Symbol, lastTime, oldTicks.Current.CloseTime);
+                            Logger.Debug($"Hole found in {histInfo.Symbol} history from {checkTime} to {oldTicks.Time}.");
+                            var candles = await DownloadCandles(histInfo.Symbol, checkTime, oldTicks.Current.CloseTime);
                             this.AddCandlesticks(histInfo, candles);
                         }
-                        lastTime = oldTicks.Current.CloseTime;
+                        checkTime = oldTicks.Current.CloseTime;
                     }
                     else
                     {
-                        Logger.Debug($"Hole found in {histInfo.Symbol} history from {lastTime} to {toTime}.");
-                        //there isn't any other tick, all remaining data needs to be downloaded 
-                        var candles = await DownloadCandles(histInfo.Symbol, lastTime, toTime);
-                        this.AddCandlesticks(histInfo, candles);
-                        lastTime = toTime;
+                        if (oldTicks.Count < 1 || oldTicks.Current.CloseTime < checkTime)
+                        {
+                            Logger.Debug($"Hole found in {histInfo.Symbol} history from {checkTime} to {toTime}.");
+                            //there isn't any other tick, all remaining data needs to be downloaded 
+                            var candles = await DownloadCandles(histInfo.Symbol, checkTime, toTime);
+                            this.AddCandlesticks(histInfo, candles);
+                            checkTime = toTime;
+                        }
+                        else
+                            checkTime = checkTime + histInfo.Resolution;
+
+
                     }
                 }
 
@@ -161,9 +168,9 @@ namespace SharpTrader.Core.BrokersApi.Binance
                         var candles = await Client.GetKlinesCandlesticks(new GetKlinesCandlesticksRequest
                         {
                             Symbol = symbol,
-                            StartTime = startTime,
+                            StartTime = startTime - TimeSpan.FromSeconds(60),
                             Interval = KlineInterval.OneMinute,
-                            EndTime = endTime,
+                            EndTime = endTime - TimeSpan.FromSeconds(60),
                         });
 
                         var batch = candles.Select(KlineToCandlestick).ToList();

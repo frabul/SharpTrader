@@ -33,11 +33,21 @@ namespace SharpTrader.Storage
         [BsonIgnore]
         private object Locker = new object();
 
+        private HistoryView _View;
         [BsonIgnore]
         private Logger Logger = LogManager.GetLogger("SymbolHistoryMetaDataInternal");
 
         [BsonIgnore]
-        internal HistoryView View { get; private set; }
+        internal HistoryView View
+        {
+            get
+            {
+                if (_View == null)
+                    _View = new HistoryView(HistoryId);
+                return _View;
+            }
+            private set { _View = value; }
+        }
 
         public HashSet<HistoryChunkId> Chunks { get; set; }
         public bool Validated { get; internal set; } = false;
@@ -55,6 +65,7 @@ namespace SharpTrader.Storage
         /// <summary>
         /// Constructor used by serialization
         /// </summary>
+        [BsonCtor]
         public SymbolHistoryMetaDataInternal()
         {
 
@@ -150,7 +161,7 @@ namespace SharpTrader.Storage
 
         public void ClearView()
         {
-            View = null;
+            View = new HistoryView(View.Id);
         }
     }
 }
