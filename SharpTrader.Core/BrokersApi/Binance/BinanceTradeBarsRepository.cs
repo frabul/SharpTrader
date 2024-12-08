@@ -70,7 +70,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             if (toTime > DateTime.Now.AddYears(10))
                 toTime = DateTime.Now.AddYears(10);
             toTime = new DateTime(toTime.Year, toTime.Month, toTime.Day, toTime.Hour, toTime.Minute, 0, DateTimeKind.Utc);
-
+            Logger.Info($"Assuring data for {histInfo.Symbol} from {fromTime:yyyyMMdd HH:mm} to {toTime:yyyyMMdd HH:mm}");
             var epoch = new DateTime(2017, 07, 01, 0, 0, 0, DateTimeKind.Utc);
             if (fromTime < epoch)
                 fromTime = epoch;
@@ -109,11 +109,8 @@ namespace SharpTrader.Core.BrokersApi.Binance
                         }
                         else
                             checkTime = checkTime + histInfo.Resolution;
-
-
                     }
                 }
-
             }
             catch (Exception ex)
             {
@@ -124,12 +121,12 @@ namespace SharpTrader.Core.BrokersApi.Binance
                 DownloadCandlesSemaphore.Release();
                 sem.Release();
             }
-            //this.SaveAll();
+
         }
 
         private async Task<List<Candlestick>> DownloadCandles(string symbol, DateTime startTime, DateTime endTime)
         {
-            Logger.Info($"Downloading candles for {symbol} from {startTime} to {endTime}");
+            Logger.Debug($"Downloading candles for {symbol} from {startTime} to {endTime}");
             List<Candlestick> allCandles = new List<SharpTrader.Candlestick>();
             try
             {

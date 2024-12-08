@@ -198,8 +198,8 @@ namespace SharpTrader.BrokersApi.Binance
                 this.OnData?.Invoke(this, LastFullCandle);
                 CandlesToAdd.Add(LastFullCandle);
             }
-
-            HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
+            if (CandlesToAdd.Count > 0)
+                HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
             foreach (var c in CandlesToAdd)
             {
                 LastFullCandle = c;

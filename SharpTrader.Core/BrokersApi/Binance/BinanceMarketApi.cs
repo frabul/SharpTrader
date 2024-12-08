@@ -55,7 +55,7 @@ namespace SharpTrader.BrokersApi.Binance
         private LiteDatabase TradesAndOrdersDb;
         private List<SymbolFeed> Feeds = new List<SymbolFeed>();
         private Guid UserDataSocket;
-        private Regex IdRegex = new Regex("([A-Z]+)([0-9]+)", RegexOptions.Compiled);
+        private Regex IdRegex = new Regex("([0-9A-Z]+[A-Z])([0-9]+)", RegexOptions.Compiled);
         private DateTime LastOperationsArchivingTime = DateTime.MinValue;
         private string OperationsDbPath;
         private string OperationsArchivePath;
@@ -182,6 +182,7 @@ namespace SharpTrader.BrokersApi.Binance
                 {
                     while (true)
                     {
+                        await Task.Delay(TradesAndOrdersSynchPeriod);
                         try
                         {
                             //we first synch open orders 
@@ -191,9 +192,7 @@ namespace SharpTrader.BrokersApi.Binance
                             //then finally we restart the timer and archive operations  
                             ArchiveOldOperations();
                         }
-                        catch { }
-                        await Task.Delay(TradesAndOrdersSynchPeriod);
-
+                        catch { } 
                     }
                 };
                 OrdersAndTradesSynchTask = Task.Factory.StartNew(SynchOrdersAndTrades, TaskCreationOptions.LongRunning);
@@ -524,8 +523,7 @@ namespace SharpTrader.BrokersApi.Binance
 
                         //if has active orders want to continue update from that id until it's closed
                         if (lastOrderOpen != null)
-                        {
-
+                        { 
                             symData.LastOrderAtTradesSynch = lastOrderOpen.OrderId - 1;
                             SymbolsData.Update(symData);
                         }
