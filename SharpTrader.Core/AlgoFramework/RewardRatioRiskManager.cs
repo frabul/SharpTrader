@@ -55,7 +55,7 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
-        private NLog.Logger Logger = NLog.LogManager.GetLogger(nameof(RewardRatioRiskManager));
+        private Serilog.ILogger Logger = Serilog.Log.ForContext("SourceContext", nameof(RewardRatioRiskManager));
         public double RiskRewardRatio { get; set; } = 1;
         public TimeSpan BaseLevelTimespan { get; set; } = TimeSpan.Zero;
         public bool TrailingStopLoss { get; set; } = false;
@@ -107,6 +107,7 @@ namespace SharpTrader.AlgoFramework
         {
             foreach (var op in Algo.ActiveOperations.Where(o => o.IsStarted() && !o.IsClosed && !o.IsClosing))
             {
+                var logger = Logger.ForContext("Operation", op, true);
                 if (op.AmountRemaining <= 0)
                     op.ScheduleClose(Algo.Time + TimeSpan.FromMinutes(2));
 
@@ -137,21 +138,20 @@ namespace SharpTrader.AlgoFramework
                 {
                     if (op.AmountRemaining > 0)
                     {
-                        //--- liquidate operation funds ---
+                        //--- liquidate operation funds --- 
                         var lr = await Algo.TryLiquidateOperation(op, $"stopLoss reached");
                         if (lr.amountRemainingLow)
                         {
-                            if (op.AmountRemaining / op.AmountInvested < 0.07m) //todo gestire meglio
-                            {
-                                Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low.");
-                                op.ScheduleClose(Algo.Time.AddMinutes(3));
-                            }
+
+                            logger.Information("Schedule operation for close as amount remaining is low.");
+                            op.ScheduleClose(Algo.Time.AddMinutes(3));
+
                         }
                     }
                     else
                     {
-                        Logger.Info($"Queueing for close operation {op.ToString("c")}");
-                        op.ScheduleClose(Algo.Time.AddMinutes(3));
+                        logger.Information("Schedule operation for close");
+                        op.ScheduleClose(Algo.Time.AddMinutes(1));
                     }
                 }
             }

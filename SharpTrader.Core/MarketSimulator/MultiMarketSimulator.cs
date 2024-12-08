@@ -16,7 +16,7 @@ namespace SharpTrader.MarketSimulator
         private TradeBarsRepository HistoryDb;
         private Configuration Config;
         private TimeSpan Resolution = TimeSpan.FromSeconds(60);
-        private NLog.Logger Logger = NLog.LogManager.GetLogger(nameof(MultiMarketSimulator));
+        private Serilog.ILogger Logger = Serilog.Log.ForContext("SourceContext",nameof(MultiMarketSimulator));
         public IEnumerable<IMarketApi> Markets => _Markets;
         public DateTime StartTime { get; private set; }
         public DateTime EndTime { get; private set; }

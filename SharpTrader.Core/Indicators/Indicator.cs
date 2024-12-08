@@ -15,7 +15,7 @@ namespace SharpTrader.Indicators
     }
     public abstract class Indicator<TIn, TOut> : IIndicator where TIn : IBaseData where TOut : IBaseData
     {
-        NLog.Logger Log { get; }
+        Serilog.ILogger Log { get; }
 
         private TimeSerieNavigator<TIn> Signal;
         /// <summary>the most recent input that was given to this indicator</summary>
@@ -39,7 +39,7 @@ namespace SharpTrader.Indicators
 
         public Indicator(string name)
         {
-            Log = NLog.LogManager.GetLogger(name);
+            Log = Serilog.Log.ForContext("SourceContext",name);
             Name = name;
         }
 

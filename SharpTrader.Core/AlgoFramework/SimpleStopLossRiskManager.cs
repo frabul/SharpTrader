@@ -24,10 +24,10 @@ namespace SharpTrader.AlgoFramework
         }
 
         public decimal StopLoss { get; private set; }
-        private NLog.Logger Logger;
+        private Serilog.ILogger Logger;
         public SimpleStopLossRiskManager(decimal stopLoss)
         {
-            Logger = NLog.LogManager.GetLogger("SimpleStopLossRiskManager");
+            Logger = Serilog.Log.ForContext("SourceContext", "SimpleStopLossRiskManager");
             StopLoss = stopLoss;
         }
 
@@ -56,13 +56,14 @@ namespace SharpTrader.AlgoFramework
                 catch (Exception ex)
                 {
                     var msg = BinanceMarketApi.GetExceptionErrorInfo(ex);
-                    Logger.Error($"SimpleStopLossRiskManager: exception while managin  {op.ToString("c")}\n       Error: {msg}");
+                    Logger.Error(ex, "Exception while managing {@Operation}\nError: {msg}", op, msg);
                 }
             }
         }
 
         private async Task ManageOperation(Operation op)
         {
+            var logger = Logger.ForContext("Operation", op, true);
             var symData = Algo.SymbolsData[op.Symbol.Key];
             //---
             if (op.AmountRemaining > 0 && !op.RiskManaged)
@@ -94,8 +95,8 @@ namespace SharpTrader.AlgoFramework
                         bool remainingAmountSmall = (op.AmountInvested == 0 || amount <= 0);
                         if (remainingAmountSmall)
                         {
-                            Logger.Info($"Schedule operation for close {op.ToString("c")} as amount remaining is low (pt {op.Signal.PriceTarget}).");
-                            op.ScheduleClose(Algo.Time.AddMinutes(3));
+                            logger.Information("Schedule operation for close as amount remaining is low.");
+                            op.ScheduleClose(Algo.Time.AddMinutes(1));
                         }
                         else
                         {
@@ -106,19 +107,19 @@ namespace SharpTrader.AlgoFramework
                             myData.NextTry = Algo.Time.AddSeconds(delaySeconds);
                             if (lr.amountRemainingLow || lr.OrderError)
                             {
-                                Logger.Info($"Liquidation failed for {op.ToString("c")}, tries count: {myData.LiquidationTries}, retrying in {delaySeconds}s ");
+                                logger.Information("Liquidation failed, tries count: {LiquidationTries}, retrying in {RetryDelay}s ", myData.LiquidationTries, delaySeconds);
                             }
                             if (myData.LiquidationTries > 50)
                             {
-                                Logger.Info($"Schedule operation for close {op.ToString("c")} as it reached maximum number of liquidation tries.");
-                                op.ScheduleClose(Algo.Time.AddMinutes(3));
+                                logger.Information($"Scheduling operation for close as it reached maximum number of liquidation tries.");
+                                op.ScheduleClose(Algo.Time.AddMinutes(1));
                             }
                         }
                     }
                 }
                 else
                 {
-                    Logger.Info($"Queueing for close operation {op.ToString("c")}");
+                    logger.Information("Scheduling operation for close.");
                     op.ScheduleClose(Algo.Time.AddMinutes(3));
                 }
             }

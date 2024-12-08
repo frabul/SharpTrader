@@ -95,7 +95,7 @@ namespace SharpTrader
         /// How much history should be loaded back from the simulation start time
         /// </summary>
         public TimeSpan HistoryLookBack { get; private set; } = TimeSpan.Zero;
-        public NLog.Logger Logger { get; set; }
+        public Serilog.ILogger Logger { get; set; }
         public Action<PlotHelper> ShowPlotCallback { get; set; }
 
         public BackTester(Configuration config) : this(config, new TradeBarsRepository(config.HistoryDb))
@@ -107,7 +107,7 @@ namespace SharpTrader
             Config = config;
 
             if (Logger == null)
-                Logger = NLog.LogManager.GetLogger("BackTester_" + Config.SessionName);
+                Logger = Serilog.Log.ForContext("SourceContext","BackTester_" + Config.SessionName);
 
             var HistoryDB = db;
             this.MarketSimulator = new MultiMarketSimulator(Config.DataDir, HistoryDB, Config.StartTime, Config.EndTime);

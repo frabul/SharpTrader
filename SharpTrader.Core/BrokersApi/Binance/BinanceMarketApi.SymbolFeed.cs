@@ -21,7 +21,7 @@ namespace SharpTrader.BrokersApi.Binance
     class SymbolFeed : ISymbolFeed, IDisposable
     {
         public event Action<ISymbolFeed, IBaseData> OnData;
-        private NLog.Logger Logger;
+        private Serilog.ILogger Logger;
         private BinanceClient Client;
         private CombinedWebSocketClient WebSocketClient;
         private BinanceTradeBarsRepository HistoryDb;
