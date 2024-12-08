@@ -310,6 +310,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
             return x;
         }
+
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedUp(decimal amount, decimal price)
         {
             //round price to it's maximum precision
@@ -329,6 +330,7 @@ namespace SharpTrader.BrokersApi.Binance
 
             return (price / 1.00000000000m, amount / 1.000000000000m);
         }
+
         public (decimal price, decimal amount) GetOrderAmountAndPriceRoundedDown(decimal amount, decimal price)
         {
             //round price to it's maximum precision
