@@ -405,32 +405,45 @@ namespace SharpTrader.AlgoFramework
         {
             return Market.GetSymbolFeedAsync(symbolKey);
         }
+        private volatile bool OnTickRunning;
+        private DateTime LastWarningTime;
 
         public override Task OnTickAsync()
         {
-            if (Time >= NextUpdateTime)
+           
+            if (!BackTesting && OnTickRunning && Time >= NextUpdateTime)
             {
-                //ClearClosedOperations(TimeSpan.FromHours(1));
-                if (NextUpdateTime != DateTime.MinValue)// skip this warning for first iteration
-                    if (!BackTesting && Time - NextUpdateTime > TimeSpan.FromSeconds(Resolution.TotalSeconds * 1.3))
-                        Logger.Warning("OnTick duration longer than expected. " +
-                            "Expected {Expected} - elapsed {Elapsed}", Resolution, Time - NextUpdateTime + Resolution);
-
-                TimeSlice curSlice;
-                lock (WorkingSliceLock)
+                if (Time > LastWarningTime + TimeSpan.FromSeconds(30))
                 {
-                    NextUpdateTime = Time + Resolution;
-
-                    curSlice = WorkingSlice;
-                    WorkingSlice = OldSlice;
-                    WorkingSlice.Clear(Market.Time);
-
-                    OldSlice = curSlice;
+                    Logger.Warning("TradingAlgo.OnTickAsync is taking longer than expected: {Elapsed} vs {Expected}."
+                                    ,Time - (NextUpdateTime - Resolution), Resolution);
+                    LastWarningTime = Time;
                 }
-                return this.Update(curSlice);
+            }
+
+            if (!OnTickRunning && Time >= NextUpdateTime)
+            {
+                try
+                {
+                    OnTickRunning = true;
+                    NextUpdateTime = Time + Resolution;
+                    TimeSlice curSlice;
+                    lock (WorkingSliceLock)
+                    { 
+                        curSlice = WorkingSlice;
+                        WorkingSlice = OldSlice;
+                        WorkingSlice.Clear(Market.Time);
+
+                        OldSlice = curSlice;
+                    }
+                    return this.Update(curSlice);
+                }
+                catch { throw; }
+                finally { OnTickRunning = false; }
             }
             else
                 return Task.CompletedTask;
+
         }
 
         public void ReleaseFeed(ISymbolFeed feed)
