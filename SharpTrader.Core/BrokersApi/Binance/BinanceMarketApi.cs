@@ -37,7 +37,7 @@ namespace SharpTrader.BrokersApi.Binance
 
         private readonly object LockOrdersTrades = new object();
         private readonly object LockBalances = new object();
-        private readonly List<Order> OpenOrders = new List<Order>();
+        private readonly HashSet<Order> OpenOrders = new HashSet<Order>();
         private readonly Stopwatch StopwatchSocketClose = new Stopwatch();
         private readonly Stopwatch UserDataPingStopwatch = new Stopwatch();
 
@@ -450,8 +450,9 @@ namespace SharpTrader.BrokersApi.Binance
                 lock (LockOrdersTrades)
                     hasActiveOrders = OpenOrders.Any(o => o.Symbol == sym);
 
-                var sOrders = Orders.Find(o => o.Symbol == sym).OrderBy(o => o.OrderId);
-                var lastOrder = sOrders.LastOrDefault();
+                var pastOrders = Orders.Find(o => o.Symbol == sym).OrderBy(o => o.OrderId);
+                var lastOrderClosed = pastOrders.LastOrDefault(o => o.IsClosed);
+                var lastOrder = pastOrders.LastOrDefault();
 
                 if (lastOrder != null)
                 {
@@ -480,13 +481,13 @@ namespace SharpTrader.BrokersApi.Binance
                                     TradesUpdateOrInsert(tr);
                             }
                         }
+
                         //if has active orders we want it to continue updating when the active order becomes inactive
-                        if (!hasActiveOrders)
+                        if (lastOrderClosed != null)
                         {
-                            symData.LastOrderAtTradesSynch = lastOrder.OrderId;
+                            symData.LastOrderAtTradesSynch = lastOrderClosed.OrderId;
                             SymbolsData.Update(symData);
                         }
-
                     }
                 }
             }
@@ -539,7 +540,7 @@ namespace SharpTrader.BrokersApi.Binance
             }
 
         }
-         
+
         private void CloseUserDataSocket()
         {
             try
@@ -1165,10 +1166,6 @@ namespace SharpTrader.BrokersApi.Binance
             return Orders.FindById(orderId);
         }
 
-        public ITrade GetTradeById(JToken tradeId)
-        {
-            throw new NotImplementedException();
-        }
 
         public void RegisterCustomSerializers(BsonMapper mapper)
         {
@@ -1178,10 +1175,12 @@ namespace SharpTrader.BrokersApi.Binance
                 lock (LockOrdersTrades)
                 {
                     var order = OpenOrders.FirstOrDefault(o => o.Id == value["_id"].AsString);
+
                     if (order == null)
                         order = Orders.FindById(value["_id"].AsString);
                     if (order == null)
                         order = defaultMapper.Deserialize<Order>(value);
+
                     if (order != null)
                         OpenOrders.Add(order);
                     return order;
