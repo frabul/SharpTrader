@@ -32,6 +32,7 @@ namespace SharpTrader.BrokersApi.Binance
         private BinanceKline FormingCandle = new BinanceKline() { StartTime = DateTime.MaxValue };
         private static Dictionary<string, SemaphoreSlim> Semaphores = new Dictionary<string, SemaphoreSlim>();
         private SymbolHistoryId HistoryId;
+        private Candlestick LastFullCandle;
 
         ISymbolInfo ISymbolFeed.Symbol => Symbol;
         public SymbolInfo Symbol { get; private set; }
@@ -146,31 +147,53 @@ namespace SharpTrader.BrokersApi.Binance
 
         private void HandleKlineEvent(BinanceKlineData msg)
         {
+            TimeSpan resolution = TimeSpan.FromMinutes(1);
             this.Time = msg.EventTime;
-            if (FormingCandle != null && msg.Kline.StartTime > FormingCandle.StartTime)
+            List<Candlestick> CandlesToAdd = new List<Candlestick>(10);
+            var kline = msg.Kline;
+
+            //check if there could be a gap
+            if (FormingCandle != null && kline.StartTime > FormingCandle.StartTime)
             {
-                //if this tick is a new candle and the last candle was not added to ticks
-                //then let's add it
-                var candle =  KlineToCandlestick(FormingCandle);  
-                HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
-                this.OnData?.Invoke(this, candle);
-                FormingCandle = null;
+                if (FormingCandle.StartTime > LastFullCandle.OpenTime)
+                {
+                    //there is a gap
+                    var forming = KlineToCandlestick(FormingCandle);
+                    CandlesToAdd.Add(forming);
+                    DateTime time = FormingCandle.StartTime + resolution;
+                    while (time < kline.StartTime)
+                    {
+                        var filler = new Candlestick(forming);
+                        filler.Open = filler.Close;
+                        filler.High = filler.Close;
+                        filler.Low = filler.Close;
+                        CandlesToAdd.Add(filler);
+                    }
+                    Logger.Warn("{0:HH.mm.ss} - {1} symbol feed - found gap in kline events, {2} missing\n arrived now {3:HH.mm.ss} - forming {4:HH.mm.ss}",
+                        time,
+                        Symbol.Key,
+                        CandlesToAdd.Count,
+                        kline.StartTime, forming.OpenTime);
+                }
             }
-           
+
             if (msg.Kline.IsBarFinal)
             {
-                KlineWatchdog.Restart();
-                Candlestick candle = KlineToCandlestick(msg.Kline); 
-                HistoryDb.AddCandlesticks(HistoryId, new[] { candle });
-                this.OnData?.Invoke(this, candle);
-                FormingCandle = null;
+                LastFullCandle = KlineToCandlestick(msg.Kline);
+                this.OnData?.Invoke(this, LastFullCandle);
+                CandlesToAdd.Add(LastFullCandle);
             }
-            else
-            {
-                FormingCandle = msg.Kline;
-            }
-        }
 
+            HistoryDb.AddCandlesticks(HistoryId, CandlesToAdd);
+            foreach (var c in CandlesToAdd)
+            {
+                LastFullCandle = c;
+                this.OnData?.Invoke(this, c);
+            }
+
+
+            FormingCandle = msg.Kline;
+        }
         private static Candlestick KlineToCandlestick(BinanceKline kline)
         {
             return new Candlestick()
@@ -209,7 +232,13 @@ namespace SharpTrader.BrokersApi.Binance
 
                 //HistoryDb.CloseFile(this.Market, Symbol.Key, TimeSpan.FromSeconds(60)); 
                 while (symbolHistory.Ticks.MoveNext())
-                    history.AddRecord(symbolHistory.Ticks.Current, true);
+                {
+                    try { history.AddRecord(symbolHistory.Ticks.Current, true); }
+                    catch
+                    {
+                        Logger.Warn("Bad candle {0} in history {1}", symbolHistory.Ticks.Current.Time, symbolHistory.Symbol);
+                    } 
+                }
             }
             catch (Exception ex)
             {
