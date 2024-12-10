@@ -73,7 +73,9 @@ namespace SharpTrader.AlgoFramework
                 this.SetChanged();
             }
         }
-
+        /// <summary>
+        /// Amount of asset to buy/sell
+        /// </summary>
         public AssetAmount AmountTarget { get; private set; }
         public decimal AverageEntryPrice { get; private set; }
         public decimal AverageExitPrice { get; private set; }
