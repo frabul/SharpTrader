@@ -142,6 +142,18 @@ namespace SharpTrader.BrokersApi.Binance
                 await Task.Delay(100);
             Logger.Information("BinanceMarketApi initialization completed");
         }
+        
+        public async Task<List<(string symbol, DateTime time)>> GetDelistEvents(DateTime fromTime)
+        {
+            var delistEvents = await Client.GetDelistEvents(fromTime);
+            var retVal = new List<(string symbol, DateTime time)>();
+            foreach (var de in delistEvents)
+            {
+                var time = DateTime.UnixEpoch.AddMilliseconds(de.DelistTime);
+                retVal.AddRange(de.Symbols.Select(s => (s, time)));
+            }
+            return retVal;
+        }
 
         private async Task ServiceUpdateExchageInfo()
         {
@@ -182,16 +194,11 @@ namespace SharpTrader.BrokersApi.Binance
                     Logger.Error(ex, "Exception in ServiceUpdateExchageInfo.");
                     await Task.Delay(TimeSpan.FromMinutes(1));
                 }
-
-
-
             }
-
         }
 
         private void ArchiveOldOperations()
         {
-
             if (LastOperationsArchivingTime + TimeSpan.FromHours(24) < DateTime.UtcNow)
                 lock (LockOrdersTrades)
                 {

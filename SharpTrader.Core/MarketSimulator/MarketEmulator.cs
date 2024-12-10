@@ -517,5 +517,10 @@ namespace SharpTrader.MarketSimulator
         {
             return SymbolsFeeds[symbolKey].Symbol;
         }
+
+        public Task<List<(string symbol, DateTime time)>> GetDelistEvents(DateTime fromTime)
+        {
+            return Task.FromResult(new List<(string symbol, DateTime time)>());
+        }
     }
 }
