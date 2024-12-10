@@ -13,8 +13,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpTrader.Plotting", "Sha
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BinanceExchange.API", "BinanceDotNet\BinanceExchange.API\BinanceExchange.API.csproj", "{2A8F66F5-44A4-4618-B21E-3D9D1B86FB2D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KrakenCore", "KrakenCore\src\KrakenCore.csproj", "{EF02A781-AD28-4927-8749-B73515CCC1A8}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backtester", "Backtester\Backtester.csproj", "{86382442-47C1-464D-9D73-FA8E1A01223D}"
 EndProject
 Global
