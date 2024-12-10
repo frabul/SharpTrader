@@ -26,9 +26,9 @@ namespace SharpTrader.AlgoFramework
             decimal StillInvestedGetter(Operation o)
             {
                 if (o.Symbol.Asset == BudgetPerOperation.Asset)
-                    return o.AmountRemaining;
+                    return o.AmountTarget.Amount;
                 else if (o.Symbol.QuoteAsset == BudgetPerOperation.Asset)
-                    return o.QuoteAmountRemaining;
+                    return o.AmountTarget.Amount * o.Signal.PriceEntry;
                 else
                     throw new NotSupportedException("Only supported operations where asset or quoteAsset coincide with budget asset");
             }
@@ -59,7 +59,7 @@ namespace SharpTrader.AlgoFramework
                         symData.AllocatorData = new MySymbolData();
 
                     DateTime lastInvestment = (symData.AllocatorData as MySymbolData).LastInvestmentTime;
-                    //todo MaxActiveOperationsPerSymbol is a problem if we gat a new signal because we ignore it if there is another operation 
+                    //todo MaxActiveOperationsPerSymbol is a problem if we get a new signal because we ignore it if there is another operation 
                     //     with bad signal
                     if (Algo.Time >= lastInvestment + CoolDown && symData.ActiveOperations.Count < this.MaxActiveOperationsPerSymbol)
                     {
