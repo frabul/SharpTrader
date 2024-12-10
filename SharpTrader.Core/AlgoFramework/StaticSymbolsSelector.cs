@@ -15,9 +15,9 @@ namespace SharpTrader.AlgoFramework
             Symbols = symbolsKeys.ToArray();
         }
 
-        protected override ISymbolInfo[] OnUpdate(TimeSlice slice)
+        protected override Task<ISymbolInfo[]> OnUpdate(TimeSlice slice)
         {
-            return Symbols;
+            return Task.FromResult(Symbols);
         }
 
         protected override async Task OnInitialize()

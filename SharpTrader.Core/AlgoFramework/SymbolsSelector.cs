@@ -17,7 +17,7 @@ namespace SharpTrader.AlgoFramework
         /// Returns all symbols that could potentially be selected for trading
         /// </summary>
         public abstract ISymbolInfo[] SymbolsPool { get; }
-        protected abstract ISymbolInfo[] OnUpdate(TimeSlice slice);
+        protected abstract Task<ISymbolInfo[]> OnUpdate(TimeSlice slice);
 
         protected abstract Task OnInitialize();
 
@@ -33,7 +33,7 @@ namespace SharpTrader.AlgoFramework
             {
                 NextSwapTime = Algo.Market.Time + UpdatePeriod;
 
-                var filtered = OnUpdate(slice);
+                var filtered = await OnUpdate(slice);
 
                 var removedSymbols =
                     (from sym in _SymbolsSelected.Values where !filtered.Any(s => s.Key == sym.Key) select sym)
