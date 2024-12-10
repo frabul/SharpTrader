@@ -70,7 +70,7 @@ namespace SharpTrader
         void DisposeFeed(ISymbolFeed feed);
         ITrade GetTradeById(string tradeId);
         IOrder GetOrderById(string asString);
-       
+        Task<List<(string symbol, DateTime time)>> GetDelistEvents(DateTime fromTime);
     }
 
     public enum TimeInForce
