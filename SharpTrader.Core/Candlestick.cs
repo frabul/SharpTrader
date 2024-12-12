@@ -62,13 +62,13 @@ namespace SharpTrader
 
         public Candlestick() { }
 
-        public Candlestick(DateTime ot, DateTime ct, double o, double c, double h, double l, double vol)
+        public Candlestick(DateTime ot, DateTime ct, double o, double h, double l, double c,  double vol)
         {
             Open = o;
             Close = c;
             High = h;
             Low = l;
-            QuoteAssetVolume = 0;
+            QuoteAssetVolume = vol;
             openTime = ot;
             closeTime = ct;
         }
