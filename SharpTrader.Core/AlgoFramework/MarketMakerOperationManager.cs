@@ -476,7 +476,7 @@ namespace SharpTrader.AlgoFramework
                 //check if amount is wrong
                 var wrongAmout = Math.Abs(amountToTrade - amountInOrder) > amountToTrade * 0.10m;
                 //check if order price is wrong
-                var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m;
+                var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.004m;
                 var opExpired = Algo.Time > op.Signal.ExpireDate;
                 if (wrongPrice || wrongAmout || opExpired)
                 {
@@ -611,7 +611,7 @@ namespace SharpTrader.AlgoFramework
                 //var badAmout = Math.Abs(LastEntryOrder.Amount - orderAmount) / orderAmount > 0.20m; 
                 var amount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
                 var priceAdjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(amount, op.Signal.PriceEntry);
-                var badPrice = Math.Abs(myOpData.CurrentEntryOrder.Price - priceAdjusted.price) / priceAdjusted.price > 0.006m;
+                var badPrice = Math.Abs(myOpData.CurrentEntryOrder.Price - priceAdjusted.price) / priceAdjusted.price > 0.004m;
                 var entryExpired = op.IsEntryExpired(Algo.Time);
 
                 //N.B. also when signal entry is not valid we keep monitoring as it could be updated
