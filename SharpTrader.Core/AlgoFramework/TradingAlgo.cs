@@ -58,9 +58,9 @@ namespace SharpTrader.AlgoFramework
         public Serilog.ILogger Logger { get; private set; }
 
         public TradingAlgo(IMarketApi marketApi, Serilog.ILogger logger, Configuration config)
-        {   
+        {
             // name can't contain the '-' character because it is used in client order id naming
-            if(config.Name.Contains('-'))
+            if (config.Name.Contains('-'))
                 throw new ArgumentException("The name cannot contain the '-' character.");
 
             Config = config;
@@ -265,7 +265,6 @@ namespace SharpTrader.AlgoFramework
 
             // call OnUpdate
             await OnUpdate(slice);
-
             // get signals 
             if (Sentry != null)
                 await Sentry.UpdateAsync(slice);
@@ -370,7 +369,7 @@ namespace SharpTrader.AlgoFramework
             if (Name.Length > 6)
                 return this.Name.Substring(0, 7) + "_" + (State.TotalOperations++).ToString();
             else
-                return $"{this.Name}_{ State.TotalOperations++ }";
+                return $"{this.Name}_{State.TotalOperations++}";
         }
 
         public string GetNewSignalId()
