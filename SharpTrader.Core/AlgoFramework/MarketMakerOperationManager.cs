@@ -252,7 +252,7 @@ namespace SharpTrader.AlgoFramework
             if (entryClosed && exitClosed)
             {
                 //schedule the liquidation for later 
-                self.LiquidationTries = 0; 
+                self.LiquidationTries = 0;
                 self.Next = LiquidateOperation;
                 self.Time = Algo.Time + DelayAfterOrderClosed;
             }
@@ -272,7 +272,8 @@ namespace SharpTrader.AlgoFramework
             {
                 //immediatly liquidate everything with a market order 
                 //self.Logger.Information("Try liquidate operation with market order because {Reason}", self.LiquidateReason);
-                if( Algo.Market.IsServiceAvailable ) {  
+                if (Algo.Market.IsServiceAvailable)
+                {
                     var liquidationResult = await Algo.TryLiquidateOperation(op, self.LiquidateReason);
                     self.Time = Algo.Time + TimeSpan.FromSeconds(30);
                     if (liquidationResult.order != null)
@@ -281,18 +282,23 @@ namespace SharpTrader.AlgoFramework
                         await CloseQueueAsync(op, CloseQueueTime);
                         terminate = true;
                     }
-                    else if (liquidationResult.amountRemainingLow )
+                    else if (liquidationResult.amountRemainingLow)
                     {
                         self.Logger.Information("{OperationId} - Queue operation for close because liquidation retunrned amountRemainingLow", self.Op.Id);
                         await this.CloseQueueAsync(op, CloseQueueTime);
                         terminate = true;
-                    } else  {
+                    }
+                    else
+                    {
                         self.LiquidationTries++;
                         // retry in 5 minutes
-                        if(self.LiquidationTries < 20) {
+                        if (self.LiquidationTries < 20)
+                        {
                             self.Time = Algo.Time + TimeSpan.FromMinutes(10);
                             self.Logger.Information("{OperationId} - Liquidation tries {LiquidationTries} ", self.Op.Id, self.LiquidationTries);
-                        } else {
+                        }
+                        else
+                        {
                             self.Logger.Information("{OperationId} - Queue operation for close because LiquidationTries limit was reached.", self.Op.Id);
                             await this.CloseQueueAsync(op, CloseQueueTime);
                             terminate = true;
@@ -539,15 +545,13 @@ namespace SharpTrader.AlgoFramework
 
                 if (entryNear && !Algo.EntriesSuspended)
                 {
-                    var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
+                    var price = op.EntryTradeDirection == TradeDirection.Buy ?
+                            Math.Min(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Ask) :
+                            Math.Max(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Bid);
+                    var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed, target_price: price);
                     var stillToBuy = originalAmount - op.AmountInvested;
                     if (stillToBuy / originalAmount > 0.2m)
                     {
-                        //assure to enter a limit order ( doesn't execute immediatly
-                        var price = op.EntryTradeDirection == TradeDirection.Buy ?
-                            Math.Min(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Ask) :
-                            Math.Max(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Bid);
-
                         //adjust price 
                         var adjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(stillToBuy, price);
                         adjusted = Algo.ClampOrderAmount(symData, op.EntryTradeDirection, adjusted);
@@ -733,7 +737,7 @@ namespace SharpTrader.AlgoFramework
             public SymbolData SymbolData { get; internal set; }
             public string LiquidateReason { get; internal set; }
             public ILogger Logger { get; internal set; }
-            public int LiquidationTries {get; internal set; }
+            public int LiquidationTries { get; internal set; }
         }
     }
 }
