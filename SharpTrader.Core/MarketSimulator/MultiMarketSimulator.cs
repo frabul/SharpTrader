@@ -136,7 +136,7 @@ namespace SharpTrader.MarketSimulator
                 int totalLoaded = 0;
                 int loadedSymbols = 0;
                 // we load the data from current time to the end of month
-                var chunkEndTime = new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1);
+                var chunkEndTime = new DateTime(Time.Year, Time.Month, 1, 0, 0, 0, Time.Kind).AddMonths(1);
                 foreach (var feed in market.SymbolsFeeds.Values)
                 {
                     var histInfo = new SymbolHistoryId(market.MarketName, feed.Symbol.Key, TimeSpan.FromSeconds(60));
@@ -144,7 +144,7 @@ namespace SharpTrader.MarketSimulator
                     feed.DataSource = this.HistoryDb.GetSymbolHistory(
                         histInfo,
                         this.Time,
-                        new DateTime(Time.Year, Time.Month, 1, 0, 0, 0).AddMonths(1));
+                        chunkEndTime);
                     this.HistoryDb.SaveAndClose(histInfo, false);
                     market.FistTickPassed = true;
                     if(feed.DataSource.Ticks.Count > 0)
