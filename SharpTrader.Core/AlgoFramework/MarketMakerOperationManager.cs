@@ -78,6 +78,10 @@ namespace SharpTrader.AlgoFramework
         }
         public decimal EntryDistantThreshold { get; private set; }
         public decimal EntryNearThreshold { get; private set; }
+
+        public decimal MinimumPriceChangeEntry { get; set; } = 0.003m;
+        public decimal MinimumPriceChangeExit { get; set; } = 0.003m;
+
         private Random rand = new Random();
         public MarketMakerOperationManager(decimal entryDistantThreshold, decimal entryNearThreshold)
         {
@@ -482,7 +486,7 @@ namespace SharpTrader.AlgoFramework
                 //check if amount is wrong
                 var wrongAmout = Math.Abs(amountToTrade - amountInOrder) > amountToTrade * 0.10m;
                 //check if order price is wrong
-                var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > 0.01m;
+                var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > MinimumPriceChangeExit;
                 var opExpired = Algo.Time > op.Signal.ExpireDate;
                 if (wrongPrice || wrongAmout || opExpired)
                 {
@@ -615,7 +619,7 @@ namespace SharpTrader.AlgoFramework
                 //var badAmout = Math.Abs(LastEntryOrder.Amount - orderAmount) / orderAmount > 0.20m; 
                 var amount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
                 var priceAdjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(amount, op.Signal.PriceEntry);
-                var badPrice = Math.Abs(myOpData.CurrentEntryOrder.Price - priceAdjusted.price) / priceAdjusted.price > 0.006m;
+                var badPrice = Math.Abs(myOpData.CurrentEntryOrder.Price - priceAdjusted.price) / priceAdjusted.price > MinimumPriceChangeEntry;
                 var entryExpired = op.IsEntryExpired(Algo.Time);
 
                 //N.B. also when signal entry is not valid we keep monitoring as it could be updated
