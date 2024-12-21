@@ -172,22 +172,6 @@ namespace SharpTrader.AlgoFramework
                     .Information("Changes in symbols selected.");
 
                 var selectedForOperationsActive = this.ActiveOperations.Select(ao => ao.Symbol).GroupBy(ao => ao.Key).Select(g => g.First()).ToList();
-                //release feeds of unused symbols 
-                foreach (var sym in changes.RemovedSymbols)
-                {
-                    SymbolData symbolData = GetSymbolData(sym);
-                    symbolData.IsSelectedForTrading = false;
-                    //if it doesn't have acrive operations
-                    if (!selectedForOperationsActive.Any(aos => aos.Key == sym.Key))
-                    {
-                        if (symbolData.Feed != null)
-                        {
-                            symbolData.Feed.OnData -= Feed_OnData;
-                            this.ReleaseFeed(symbolData.Feed);
-                            symbolData.Feed = null;
-                        }
-                    }
-                }
 
                 //add feeds for added symbols and those that have open operations
                 foreach (var sym in changes.AddedSymbols)
