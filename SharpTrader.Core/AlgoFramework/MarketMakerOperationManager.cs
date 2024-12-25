@@ -81,6 +81,8 @@ namespace SharpTrader.AlgoFramework
 
         public decimal MinimumPriceChangeEntry { get; set; } = 0.003m;
         public decimal MinimumPriceChangeExit { get; set; } = 0.003m;
+        public uint MaximumPendingEntryOrdersCount { get; set; } = 1000;
+        private int CurrentlyOpenEntryOrdersCount { get; set; }
 
         private Random rand = new Random();
         public MarketMakerOperationManager(decimal entryDistantThreshold, decimal entryNearThreshold)
@@ -103,6 +105,20 @@ namespace SharpTrader.AlgoFramework
         {
 
             var symbols = Algo.SymbolsData.Values.OrderBy(el => rand.NextDouble()).ToArray();
+            var openEntryOrdersCont = 0;
+            foreach (var sym in symbols)
+            {
+                foreach (var op in sym.ActiveOperations)
+                {
+                    var myOpData = GetMyOperationData(op);
+                    if (myOpData.CurrentEntryOrder != null && myOpData.CurrentEntryOrder.Status < OrderStatus.Cancelled)
+                    {
+                        openEntryOrdersCont++;
+                    }
+                }
+            }
+            this.CurrentlyOpenEntryOrdersCount = openEntryOrdersCont;
+
             //randomize the order of completion
             foreach (var symSlice in symbols)
             {
@@ -220,7 +236,6 @@ namespace SharpTrader.AlgoFramework
             foreach (Operation op in symData.ActiveOperations)
             {
                 var myOpData = GetMyOperationData(op);
-
                 //queue the operation for close  if
                 //   entry expired and amount remaining <= 0 
                 if (!op.IsClosed && !op.IsClosing && !op.RiskManaged)
@@ -539,7 +554,9 @@ namespace SharpTrader.AlgoFramework
                     self.Logger.Warning("{OperationId} - Operation is closing but amountremaining is > 0", op.Id);
                 return true;
             }
-
+            // check the number of open entry orders
+            if (this.CurrentlyOpenEntryOrdersCount >= this.MaximumPendingEntryOrdersCount)
+                return false;
             if (!op.IsEntryExpired(Algo.Time) && myOpData.CurrentEntryOrder == null)
             {
                 //--- open a new entry if needed ---
@@ -581,6 +598,7 @@ namespace SharpTrader.AlgoFramework
 
                             if (req.IsSuccessful)
                             {
+                                this.CurrentlyOpenEntryOrdersCount++;
                                 // register operation and return to ManageEntry
                                 myOpData.CurrentEntryOrder = req.Result;
                                 self.Next = MonitorEntry;
