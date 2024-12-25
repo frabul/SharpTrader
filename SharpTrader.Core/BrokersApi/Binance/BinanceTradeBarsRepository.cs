@@ -229,8 +229,5 @@ namespace SharpTrader.Core.BrokersApi.Binance
             }
             await Task.WhenAll(tasks);
         }
-
-
-
     }
 }
