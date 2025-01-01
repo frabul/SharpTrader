@@ -552,7 +552,7 @@ namespace SharpTrader.AlgoFramework
                     var price = op.EntryTradeDirection == TradeDirection.Buy ?
                             Math.Min(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Ask) :
                             Math.Max(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Bid);
-                    var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed, target_price: price);
+                    var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, op.Symbol, price);
                     var stillToBuy = originalAmount - op.AmountInvested;
                     if (stillToBuy / originalAmount > 0.2m)
                     {

@@ -35,24 +35,38 @@ namespace SharpTrader
             else
                 throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair");
         }
-        /// <summary>
-        /// Convert the amount to the target asset
-        /// Allows to specify a custom target price for the conversion
-        /// </summary>
-        public static decimal Convert(AssetAmount amount, string targetAsset, ISymbolFeed feed, decimal? target_price = null)
+
+        public static decimal Convert(AssetAmount amount, string targetAsset, ISymbolFeed feed)
         {
             if (amount.Asset == targetAsset)
                 return amount.Amount;
             if (feed == null)
                 throw new ArgumentException("No feed provieded for the conversion");
             if (feed.Symbol.Asset == targetAsset && feed.Symbol.QuoteAsset == amount.Asset)
-                return amount.Amount / (target_price == null ? (decimal)feed.Ask : target_price.Value);
+                return amount.Amount / (decimal)feed.Ask;
             else if (feed.Symbol.QuoteAsset == targetAsset && feed.Symbol.Asset == amount.Asset)
-                return amount.Amount * (target_price == null ? (decimal)feed.Bid : target_price.Value);
+                return amount.Amount * (decimal)feed.Bid;
             else
                 throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair");
         }
-
+        /// <summary>
+        /// Convert the amount to the target asset
+        /// Allows to specify a custom target price for the conversion
+        /// The price is intended 'how much of quote asset is needed to buy 1 unit of asset'
+        /// </summary>
+        public static decimal Convert(AssetAmount amount, string targetAsset, ISymbolInfo symbol, decimal price)
+        {
+            if (amount.Asset == targetAsset)
+                return amount.Amount;
+            if (symbol == null)
+                throw new ArgumentException("No feed provieded for the conversion");
+            if (symbol.Asset == targetAsset && symbol.QuoteAsset == amount.Asset)
+                return amount.Amount / price;
+            else if (symbol.QuoteAsset == targetAsset && symbol.Asset == amount.Asset)
+                return amount.Amount * price;
+            else
+                throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair");
+        }
 
         public override string ToString()
         {

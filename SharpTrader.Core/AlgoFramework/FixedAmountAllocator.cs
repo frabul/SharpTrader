@@ -23,24 +23,11 @@ namespace SharpTrader.AlgoFramework
 
         public override Task Update(TimeSlice slice)
         {
-            decimal StillInvestedGetter(Operation o)
-            {
-                if (o.Symbol.Asset == BudgetPerOperation.Asset)
-                    return o.AmountTarget.Amount;
-                else if (o.Symbol.QuoteAsset == BudgetPerOperation.Asset)
-                    return o.AmountTarget.Amount * o.Signal.PriceEntry;
-                else
-                    throw new NotSupportedException("Only supported operations where asset or quoteAsset coincide with budget asset");
-            }
-
             //check the free budget - the used budget is the sum of all money still invested in operations
-            var totalInvested = Algo.ActiveOperations.Sum(StillInvestedGetter);
-            var freeBudged = Budget - totalInvested;
-            if (freeBudged <= 0)
-            {
-                Algo.StopEntries();
-            }
-            else
+            var allocatedBudget = Algo.ActiveOperations.Sum(o =>
+                    AssetAmount.Convert(o.AmountTarget, BudgetPerOperation.Asset, o.Symbol, o.Signal.PriceEntry));
+            var freeBudged = Budget - allocatedBudget;
+            if (freeBudged > 0)
             {
                 Algo.ResumeEntries();
 
@@ -81,12 +68,12 @@ namespace SharpTrader.AlgoFramework
                                     if (t.Direction == o.EntryTradeDirection)
                                         (symData.AllocatorData as MySymbolData).LastInvestmentTime = t.Time;
                                 };
+                                freeBudged -= budget;
                                 slice.Add(newOper);
                             }
                         }
                     }
                 }
-                //todo it is possible that for a given symbol some budget get freed , in this case we should allocate this margin to existent operations
             }
             return Task.CompletedTask;
         }
