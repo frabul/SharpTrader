@@ -53,6 +53,19 @@ namespace SharpTrader
                 throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair");
         }
 
+        public static decimal Convert(AssetAmount amount, string targetAsset, ISymbolInfo symbol, decimal target_price)
+        {
+            if (amount.Asset == targetAsset)
+                return amount.Amount;
+            if (symbol == null)
+                throw new ArgumentException("No feed provieded for the conversion");
+            if (symbol.Asset == targetAsset && symbol.QuoteAsset == amount.Asset)
+                return amount.Amount / target_price;
+            else if (symbol.QuoteAsset == targetAsset && symbol.Asset == amount.Asset)
+                return amount.Amount * target_price;
+            else
+                throw new ArgumentException("The symbol feed is doesn't correspond to the assets pair");
+        }
 
         public override string ToString()
         {

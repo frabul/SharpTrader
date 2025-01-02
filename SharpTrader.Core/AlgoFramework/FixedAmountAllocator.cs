@@ -23,29 +23,16 @@ namespace SharpTrader.AlgoFramework
 
         public override Task Update(TimeSlice slice)
         {
-            decimal StillInvestedGetter(Operation o)
-            {
-                if (o.Symbol.Asset == BudgetPerOperation.Asset)
-                    return o.AmountTarget.Amount;
-                else if (o.Symbol.QuoteAsset == BudgetPerOperation.Asset)
-                    return o.AmountTarget.Amount * o.Signal.PriceEntry;
-                else
-                    throw new NotSupportedException("Only supported operations where asset or quoteAsset coincide with budget asset");
-            }
-
             //check the free budget - the used budget is the sum of all money still invested in operations
-            var totalInvested = Algo.ActiveOperations.Sum(StillInvestedGetter);
-            var freeBudged = Budget - totalInvested;
-            if (freeBudged <= 0)
-            {
-                Algo.StopEntries();
-            }
-            else
+            var allocatedBudget = Algo.ActiveOperations.Where(o => o.IsActive).Sum(o =>
+                                AssetAmount.Convert(o.AmountTarget, BudgetPerOperation.Asset, o.Symbol, o.Signal.PriceEntry));
+            var freeBudget = Budget - allocatedBudget;
+            if (freeBudget > 0)
             {
                 Algo.ResumeEntries();
-
+                var signalsOrderedByPriority = slice.NewSignals.OrderByDescending(s => s.Priority);
                 //for each signal allocate a fixed amount
-                foreach (Signal signal in slice.NewSignals)
+                foreach (Signal signal in signalsOrderedByPriority)
                 {
                     var newAmount = BudgetPerOperation.Amount;
                     if (ProportionalToProfit)
@@ -59,8 +46,9 @@ namespace SharpTrader.AlgoFramework
                         symData.AllocatorData = new MySymbolData();
 
                     DateTime lastInvestment = (symData.AllocatorData as MySymbolData).LastInvestmentTime;
-                    //todo MaxActiveOperationsPerSymbol is a problem if we get a new signal because we ignore it if there is another operation 
-                    //     with bad signal
+                    //NOTICE MaxActiveOperationsPerSymbol is a problem if we get a new signal because we ignore the signale if there is an operation 
+                    //     with bad signal tied to it. So it is important that the sentry modifies the signal tied to the last active operation if 
+                    //     this limit is enabled
                     if (Algo.Time >= lastInvestment + CoolDown && symData.ActiveOperations.Count < this.MaxActiveOperationsPerSymbol)
                     {
                         int operationsWaitingForEntry = symData.ActiveOperations.Count(o => o.IsActive && o.AmountInvested == 0);
@@ -69,13 +57,18 @@ namespace SharpTrader.AlgoFramework
                             //if cooldown has elapsed we can open a new operation
                             var freeSymbolBudget = BudgetPerSymbol - Algo.Executor.GetInvestedOrLockedAmount(signal.Symbol, BudgetPerOperation.Asset);
 
-                            var budget = new[] { freeSymbolBudget, freeBudged, newAmount }.Min();
+                            var budget = new[] { freeSymbolBudget, freeBudget, newAmount }.Min();
 
                             if (budget >= 0.2m * newAmount)
                             {
                                 //create operations
                                 var operType = signal.Kind == SignalKind.Buy ? OperationType.BuyThenSell : OperationType.SellThenBuy;
-                                var newOper = new Operation(Algo.GetNewOperationId(), signal, new AssetAmount(BudgetPerOperation.Asset, budget), operType);
+                                var newOper = new Operation(
+                                    Algo.GetNewOperationId(),
+                                    signal,
+                                    new AssetAmount(BudgetPerOperation.Asset, budget),
+                                    operType);
+                                freeBudget -= budget;
                                 newOper.OnNewTrade += (o, t) =>
                                 {
                                     if (t.Direction == o.EntryTradeDirection)
@@ -86,7 +79,6 @@ namespace SharpTrader.AlgoFramework
                         }
                     }
                 }
-                //todo it is possible that for a given symbol some budget get freed , in this case we should allocate this margin to existent operations
             }
             return Task.CompletedTask;
         }
