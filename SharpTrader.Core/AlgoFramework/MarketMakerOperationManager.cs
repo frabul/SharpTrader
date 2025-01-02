@@ -105,31 +105,40 @@ namespace SharpTrader.AlgoFramework
         {
 
             var symbols = Algo.SymbolsData.Values.OrderBy(el => rand.NextDouble()).ToArray();
-            var openEntryOrdersCont = 0;
+
+#if DEBUG_MUCH
+            var allActiveOperations = new List<Operation>();
             foreach (var sym in symbols)
             {
                 foreach (var op in sym.ActiveOperations)
                 {
-                    var myOpData = GetMyOperationData(op);
-                    if (myOpData.CurrentEntryOrder != null && myOpData.CurrentEntryOrder.Status < OrderStatus.Cancelled)
-                    {
-                        openEntryOrdersCont++;
-                    }
+                    allActiveOperations.Add(op);
+
                 }
             }
+            Debug.Assert(allActiveOperations.Count == Algo.ActiveOperations.Count);
+            foreach (var op in Algo.ActiveOperations)
+            {
+                Debug.Assert(allActiveOperations.Contains(op));
+            }
+#endif
+            var openEntryOrdersCont = Algo.ActiveOperations.Count(op =>
+            {
+                var myOpData = GetMyOperationData(op);
+                return myOpData.CurrentEntryOrder != null && myOpData.CurrentEntryOrder.Status < OrderStatus.Cancelled;
+            });
             this.CurrentlyOpenEntryOrdersCount = openEntryOrdersCont;
 
-            //randomize the order of completion
-            foreach (var symSlice in symbols)
+            var activeOperationsSortedByPriority = Algo.ActiveOperations.OrderByDescending(op => op.Signal.Priority);
+            foreach (var op in activeOperationsSortedByPriority)
             {
-                //if we got a new signal let 
                 try
                 {
-                    await ManageSymbol(slice, symSlice);
+                    await ManageOperation(op);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "{Symbol} - Exception during MarketMakerOperationManager.Update", symSlice.Symbol.Key);
+                    Logger.Error(ex, "{Symbol} - Exception during MarketMakerOperationManager.Update", op.Symbol.Key);
                 }
             }
         }
@@ -230,35 +239,32 @@ namespace SharpTrader.AlgoFramework
                     };
         }
 
-        private async Task ManageSymbol(TimeSlice slice, SymbolData symData)
+        private async Task ManageOperation(Operation op)
         {
             // for each operation check entry and exit orders
-            foreach (Operation op in symData.ActiveOperations)
+            var myOpData = GetMyOperationData(op);
+            //queue the operation for close  if
+            //   entry expired and amount remaining <= 0 
+            if (!op.IsClosed && !op.IsClosing && !op.RiskManaged)
             {
-                var myOpData = GetMyOperationData(op);
-                //queue the operation for close  if
-                //   entry expired and amount remaining <= 0 
-                if (!op.IsClosed && !op.IsClosing && !op.RiskManaged)
-                {
-                    //if operation is not closed or closing we must assure that there are the tasks to manage it 
-                    if (myOpData.OperationManager != null && await myOpData.OperationManager.Next(myOpData.OperationManager))
-                        myOpData.OperationManager = null;
-                    if (myOpData.EntryManager != null && await myOpData.EntryManager.Next(myOpData.EntryManager))
-                        myOpData.EntryManager = null;
-                    if (myOpData.ExitManager != null && await myOpData.ExitManager.Next(myOpData.ExitManager))
-                        myOpData.ExitManager = null;
+                //if operation is not closed or closing we must assure that there are the tasks to manage it 
+                if (myOpData.OperationManager != null && await myOpData.OperationManager.Next(myOpData.OperationManager))
+                    myOpData.OperationManager = null;
+                if (myOpData.EntryManager != null && await myOpData.EntryManager.Next(myOpData.EntryManager))
+                    myOpData.EntryManager = null;
+                if (myOpData.ExitManager != null && await myOpData.ExitManager.Next(myOpData.ExitManager))
+                    myOpData.ExitManager = null;
 
-                    //for (int i = 0; i < myOpData.ScheduledTasks.Count; i++)
-                    //{
-                    //    var task = myOpData.ScheduledTasks[i];
-                    //    if (Algo.Time >= task.Time)
-                    //    {
-                    //         var terminate = await task.Next(task);
-                    //        if (terminate)
-                    //            myOpData.ScheduledTasks.RemoveAt(i--);
-                    //    }
-                    //}
-                }
+                //for (int i = 0; i < myOpData.ScheduledTasks.Count; i++)
+                //{
+                //    var task = myOpData.ScheduledTasks[i];
+                //    if (Algo.Time >= task.Time)
+                //    {
+                //         var terminate = await task.Next(task);
+                //        if (terminate)
+                //            myOpData.ScheduledTasks.RemoveAt(i--);
+                //    }
+                //}
             }
         }
 

@@ -68,13 +68,20 @@ namespace SharpTrader.AlgoFramework
 
         public bool IsChanged => _IsChanged;
 
-        public void ModifyConditions(DateTime timeNow, decimal entry, DateTime entryExpiry, decimal target, DateTime targetExpiry)
+        /// <summary>
+        /// The priority of this signal. Higher values means higher priority.
+        /// </summary>
+        public double Priority { get; private set; } = 0;
+
+        public void ModifyConditions(DateTime timeNow, decimal entry, DateTime entryExpiry, decimal target, DateTime targetExpiry, double? priority = null)
         {
             ModifyTime = timeNow;
             PriceEntry = entry;
             EntryExpiry = entryExpiry;
             PriceTarget = target;
             ExpireDate = targetExpiry;
+            if (priority.HasValue)
+                Priority = priority.Value;
             _IsChanged = true;
             OnModify?.Invoke(this);
         }
@@ -96,6 +103,7 @@ namespace SharpTrader.AlgoFramework
                 return sign.Id == Id;
             return false;
         }
+
         public override int GetHashCode()
         {
             return Id.GetHashCode();
