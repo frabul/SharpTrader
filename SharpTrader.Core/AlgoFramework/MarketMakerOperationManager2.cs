@@ -1,5 +1,7 @@
 ﻿using LiteDB;
 using Serilog;
+using Serilog.Core;
+using SharpTrader.BrokersApi.Binance;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -13,50 +15,32 @@ namespace SharpTrader.AlgoFramework
 {
     public class CountDownStopwatch
     {
+        public TradingAlgo Algo { get; }
         public DateTime EndTime { get; private set; }
-        public CountDownStopwatch(TimeSpan duration)
+        public CountDownStopwatch(TradingAlgo algo, TimeSpan duration)
         {
-            EndTime = DateTime.UtcNow + duration;
+            Algo = algo;
+            EndTime = Algo.Time + duration;
         }
-        public CountDownStopwatch(DateTime endTime)
+        public CountDownStopwatch(TradingAlgo algo, DateTime endTime)
         {
+            Algo = algo;
             EndTime = endTime;
         }
-        public bool IsElapsed => DateTime.UtcNow >= EndTime;
+        public bool IsElapsed => Algo.Time >= EndTime;
     }
 
     public class MarketMakerOperationManager2 : OperationManager
     {
-        // This manager must execute 3 tasks for each opeartion:
-        // 1. Accumuation task (manages entry orders)
-        // 2. Distribution task (manages exit orders)
-        // 3. Super task (manages the whole operation state)
-        //
-        // Accumulation task tries to accumulate the asset with limit orders at the target price
-        // It opens a limit order when the price is near the target price and cancels the order when the price is far from the target price.
-        // It stops accumulating if the target amount is reached or if the signal expires.
-        //
-        // Distribution task tries to distribute the asset with limit orders at the target price
-        // It checks that there is an active exit order. Modifies the exit order if needed ( price or amount changed ).
-        // Here it is important to avoid double spending, it happens if the order results closed but the trades are not registered yet.
-        //
-        // Super task manages the operation lifetime and state. It checks if the operation is closing or closed for any reason and updates its state for 
-        // the external observers. It also checks if the operation is expired and queues it for close.
-        //
-        // It should be able to manage multiple operations with different
         Serilog.ILogger Logger;
         public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(15);
         public TimeSpan DelayAfterCloseFailed = TimeSpan.FromSeconds(60);
         public TimeSpan CloseQueueTime = TimeSpan.FromMinutes(2);
         public decimal MinimumPriceChangeEntry { get; set; } = 0.003m;
         public decimal MinimumPriceChangeExit { get; set; } = 0.003m;
-        public uint MaximumPendingEntryOrdersCount { get; set; } = 1000;
         public decimal EntryDistantThreshold { get; private set; }
         public decimal EntryNearThreshold { get; private set; }
         public AssetAmount TotalBudget { get; set; }
-
-        private int CurrentlyOpenEntryOrdersCount { get; set; }
-
 
         public class MyOperationData : IChangeTracking
         {
@@ -84,15 +68,30 @@ namespace SharpTrader.AlgoFramework
                 get => currentExitOrder;
                 set
                 {
+                    if (currentEntryOrder != null && currentEntryOrder.Id != value?.Id)
+                    {
+                        FilledAmountByOrders += currentEntryOrder.Filled;
+                    }
                     if (value != null)
                         AllExits.Add(value.Id);
+
                     currentExitOrder = value;
                     _IsChanged = true;
                 }
             }
             public bool IsChanged => _IsChanged;
-            public CountDownStopwatch TryCloseCountdown { get; set; } = new CountDownStopwatch(TimeSpan.Zero);
-            public bool Liquidation { get; set; } = false;
+            [BsonIgnore]
+            public CountDownStopwatch TryCloseCountdown { get; set; }
+            [BsonIgnore]
+            public LiquidationTask LiquidationTask { get; set; }
+            [BsonIgnore]
+            public CountDownStopwatch EntryOrderCountdown { get; internal set; }
+
+            [BsonIgnore]
+            public CountDownStopwatch ExitOrderCountdown { get; internal set; }
+            [BsonIgnore]
+            public CountDownStopwatch CloseExitCountdown { get; internal set; }
+            public decimal FilledAmountByOrders { get; private set; } = 0;
 
             public MyOperationData()
             {
@@ -132,31 +131,105 @@ namespace SharpTrader.AlgoFramework
                           var myOpData = GetMyOperationData(op);
                           var symData = Algo.SymbolsData[op.Symbol.Key];
                           return (op, myOpData, symData);
-                      }).ToList();
+                      }).OrderByDescending(x => x.op.Signal.Priority).ToList();
             // check if any operation can be closed and close it
             var tasks = operationsData.Select(x =>
             {
                 var (op, myOpData, symData) = x;
                 return CloseIfCan(op, myOpData, symData);
+
             });
             await Task.WhenAll(tasks);
-            // try liquidate opearations that should be liquidated
+
+            // try liquidate opearations that are expired ( max time reached )
+            var liqTasks = operationsData.Where(x => x.op.IsActive).Select(async x =>
+            {
+                var (op, myOpData, symData) = x;
+                var result = true;
+                //if signal exit is expired 
+                //      then we must exit any pending order and liquidate everything with a market order
+                if (op.IsExitExpired(Algo.Time) && myOpData.LiquidationTask == null)
+                    myOpData.LiquidationTask = StartLiquidationTask(op, myOpData, symData);
+                if (myOpData.LiquidationTask != null)
+                {
+                    result = await myOpData.LiquidationTask.Poll();
+                    if (Algo.BackTesting)
+                    {
+                        while (!result)
+                            result = await myOpData.LiquidationTask.Poll();
+                    }
+                }
+
+                return result; // terminated
+
+            });
+            await Task.WhenAll(liqTasks);
 
             // check if any open entry order should be closed and close it
+            IEnumerable<Operation> operationsInterdictedForEntry = GetOperationsInterdictedForEntry();
+            var tasks2 = operationsData.Where(x => x.myOpData.CurrentEntryOrder != null).Select(async x =>
+            {
+                var (op, myOpData, symData) = x;
+                var interdicted = operationsInterdictedForEntry.Contains(op);
+                var entryDistant = op.Signal.Kind == SignalKind.Buy ?
+                    ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / op.Signal.PriceEntry > EntryDistantThreshold :
+                    (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry > EntryDistantThreshold;
+                var entryExpired = op.IsEntryExpired(Algo.Time);
+                bool shouldClose = false;
+                if (entryDistant || entryExpired || interdicted)
+                {
+                    shouldClose = true;
+                    Logger.Debug("{OperationId} - Cancelling entry order {OrderId}, flags {EntryOrderFlags}", op.Id, myOpData.CurrentEntryOrder.ClientId, new { entryDistant, entryExpired, interdicted });
+                }
+                else
+                {
+                    // for performance reasons check bad price and amount only here 
+                    var amount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Symbol, op.Signal.PriceTarget);
+                    var priceAdjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(amount, op.Signal.PriceEntry);
+                    var badPrice = Math.Abs(myOpData.CurrentEntryOrder.Price - priceAdjusted.price) / priceAdjusted.price > MinimumPriceChangeEntry;
+                    shouldClose = badPrice;
+                }
+                if (shouldClose)
+                {
+                    await CloseEntryOrder(op, myOpData);
+                    if (!Algo.BackTesting)
+                        myOpData.EntryOrderCountdown = new CountDownStopwatch(Algo, DelayAfterOrderClosed);
+                }
+            });
+            await Task.WhenAll(tasks2);
+
+            // now we can open entry orders
+            var usedBudget = operationsData.Sum(x => x.op.QuoteAmountRemaining + x.myOpData.CurrentEntryOrder?.Amount ?? 0); // todo handle different cases, we assume here that the quote asset is the budget asset
+            var budgetRemaining = TotalBudget.Amount - usedBudget;
+            // the operations are already sorted by priority
+            // open entry orders until the budget is used
+            foreach (var (op, myOpData, symData) in operationsData)
+            {
+                var used = await OpenEntryOrder(op, myOpData, symData, budgetRemaining);
+                budgetRemaining -= used;
+            }
+
+            // finally close exit orders which need to be modified
+            // and post exit orders
+            var tasks3 = operationsData.Where(x => x.op.IsActive).Select(async x =>
+                    {
+                        var (op, myOpData, symData) = x;
+                        await CloseExitIfNeeded(op, myOpData, symData);
+                        await OpenExitOrder(op, myOpData, symData);
+                    });
+            await Task.WhenAll(tasks3);
+        }
 
 
+        // Gives the list of the operation that are allowed to have an entry order
+        // by looking at the priority of the signal, maximum numbeb of entry orders and the total budget
+        private IEnumerable<Operation> GetOperationsInterdictedForEntry()
+        {
+            throw new NotImplementedException();
         }
 
         private async Task CloseIfCan(Operation op, MyOperationData myOpData, SymbolData symData)
         {
-            //if operation is closing or closed we terminate the task chain
-            if (op.IsClosing || op.IsClosed)
-            {
-                if (op.AmountRemaining > 0)
-                    this.Logger.Warning("{OperationId} - Closing operation but amountremaining is > 0", op);
-                return;
-            }
-
             //if signal entry is expired and we yet didn't get to enter, then we can just   
             //      queue the operation for close 
             bool isEntryExpired = op.IsEntryExpired(Algo.Time);
@@ -171,111 +244,136 @@ namespace SharpTrader.AlgoFramework
             }
 
             //queue operation for close if conditions are met
-            if (isEntryExpired && noActiveExit && remainingAmountSmall && myOpData.TryCloseCountdown.IsElapsed)
+            if (isEntryExpired && noActiveExit && remainingAmountSmall && myOpData.TryCloseCountdown?.IsElapsed == true)
             {
                 var entryClosed = await CloseEntryOrder(op, myOpData);
                 var exitClosed = await CloseExitOrder(op, myOpData); // redundant but ok
                 if (entryClosed && exitClosed)
                 {
-                    var conditions = new { isEntryExpired, noActiveExit, remainingAmountSmall };
                     //put in close queue
                     if (op.AmountInvested == 0)
                         Logger.Verbose("{OperationId} - scheduling for close.", op.Id);
                     else if (op.AmountRemaining == 0)
                         Logger.Information("{OperationId} - scheduling for close.", op.Id);
                     else
-                        Logger.Warning("{OperationId} - scheduling op for close but amount remaining > 0, {RemainingAmountSmall}", op.Id, remainingAmountSmall);
+                        Logger.Warning("{OperationId} - scheduling op for close but amount remaining > 0, amount small={RemainingAmountSmall}", op.Id, remainingAmountSmall);
                     await CloseQueueAsync(op, CloseQueueTime);
                 }
                 else
                 {
                     // retry in 30 seconds
-                    myOpData.TryCloseCountdown = new CountDownStopwatch(TimeSpan.FromSeconds(30));
+                    myOpData.TryCloseCountdown = new CountDownStopwatch(Algo, TimeSpan.FromSeconds(30));
                 }
                 return;
             }
 
-            //if signal exit is expired 
-            //      then we must exit any pending order and liquidate everything with a market order
-            if (op.IsExitExpired(Algo.Time))
-            {
-                var entryClosed = await CloseEntryOrder(op, myOpData);
-                var exitClosed = await CloseExitOrder(op, myOpData);
-
-                myOpData.Liquidation = true;
-
-                //set next step to close orders and liquidate operation
-                self.Next = new DeferredTaskDelegate(CloseOrdersAndLiquidate);
-                self.LiquidateReason = " exit deadtime elapsed.";
-                //also call next step immediatly only during backtesting
-                if (Algo.BackTesting)
-                    return await self.Next.Invoke(self);
-            }
-
         }
 
-        private async Task LiquidateOperation(Operation op, MyOperationData myOpData, SymbolData symData)
+        public enum LiquidationTaskPhase
         {
-            myOpData.Liquidation = true;
-            // close pending orders
-            uint tries = 0;
-            do
-            {
-                if (Algo.Market.IsServiceAvailable)
-                {
-                    await CloseEntryOrder(op, myOpData);
-                    await CloseExitOrder(op, myOpData);
-                    tries++;
-                    if (tries > 4)
-                        Logger.Warning("{OperationId} - Unable to close orders before liquidation.", op.Id);
-                }
-                await Task.Delay(20000); // always wait 20 seconds after closing orders so that the trades are registered
-            } while (myOpData.CurrentEntryOrder != null || myOpData.CurrentEntryOrder != null);
+            CloseOrders,
+            Liquidate,
+            Done
+        }
 
-            //liquidate operation
-            tries = 0;
-            bool terminate = false;
-            while (op.AmountRemaining > 0 || terminate)
+        public class LiquidationTask
+        {
+            public TradingAlgo Algo;
+            public Operation op;
+            public MyOperationData myOpData;
+            public SymbolData symData;
+            public MarketMakerOperationManager2 Manager;
+            public int CloseOrdersAttempts { get; private set; } = 0;
+
+            public LiquidationTaskPhase Phase { get; private set; } = LiquidationTaskPhase.CloseOrders;
+            public ILogger Logger => Manager.Logger;
+
+            public int LiquidationAttempts { get; private set; } = 0;
+            public DateTime DelayUntil { get; private set; } = DateTime.MinValue;
+
+            /// <summary>
+            ///  Returns true if the task is done
+            /// </summary>
+            /// <returns></returns>
+            public async Task<bool> Poll()
             {
+                // If the service is not available let's wait
+                if (!Algo.Market.IsServiceAvailable || Algo.Time < DelayUntil)
+                    return false;
+                switch (Phase)
+                {
+                    case LiquidationTaskPhase.CloseOrders:
+                        await CloseOrders();
+                        break;
+                    case LiquidationTaskPhase.Liquidate:
+                        await Liquidate();
+                        break;
+                    case LiquidationTaskPhase.Done:
+                        await Manager.CloseQueueAsync(op, Manager.CloseQueueTime);
+                        break;
+                }
+                return Phase == LiquidationTaskPhase.Done;
+            }
+
+            async Task CloseOrders()
+            {
+                var orders_closed =
+                    await Manager.CloseEntryOrder(op, myOpData) &&
+                    await Manager.CloseExitOrder(op, myOpData);
+                CloseOrdersAttempts++;
+                if (CloseOrdersAttempts > 4)
+                    Logger.Warning("{OperationId} - Unable to close orders before liquidation.", op.Id);
+                if (orders_closed || CloseOrdersAttempts > 4)
+                    Phase = LiquidationTaskPhase.Liquidate;
+                else
+                    DelayUntil = Algo.Time + Manager.DelayAfterCloseFailed;
+            }
+
+            // Returns true if this phase was completed ( done or failed for too many attempts ) 
+            async Task Liquidate()
+            {
+                var done = false;
                 //immediatly liquidate everything with a market order 
-                //Logger.Information("Try liquidate operation with market order because {Reason}", self.LiquidateReason);
-                if (!Algo.Market.IsServiceAvailable)
-                {
-                    await Task.Delay(20000);
-                    continue;
-                }
-
                 var liquidationResult = await Algo.TryLiquidateOperation(op, " operation max duration reached.");
                 if (liquidationResult.order != null)
                 {
                     myOpData.CurrentExitOrder = liquidationResult.order;
-                    terminate = true;
+                    done = true;
                 }
                 else if (liquidationResult.amountRemainingLow)
                 {
                     Logger.Information("{OperationId} - Queue operation for close because liquidation retunrned amountRemainingLow", op.Id);
-                    terminate = true;
+                    done = true;
                 }
                 else
                 {
-                    tries++;
-                    if (tries < 20)
+                    LiquidationAttempts++;
+                    if (LiquidationAttempts < 20)
                     {
-                        Logger.Information("{OperationId} - Liquidation tries {LiquidationTries} ", op.Id, tries);
-                        await Task.Delay(TimeSpan.FromMinutes(2));
+                        Logger.Information("{OperationId} - Liquidation tries {LiquidationTries} ", op.Id, LiquidationAttempts);
+                        DelayUntil = Algo.Time.AddSeconds(LiquidationAttempts < 4 ? 30 : 120);
                     }
                     else
                     {
                         Logger.Information("{OperationId} - Queue operation for close because LiquidationTries limit was reached.", op.Id);
-                        terminate = true;
+                        done = true;
                     }
                 }
-
+                if (done)
+                    Phase = LiquidationTaskPhase.Done;
             }
+        }
 
-
-            await CloseQueueAsync(op, CloseQueueTime);
-
+        private LiquidationTask StartLiquidationTask(Operation op, MyOperationData myOpData, SymbolData symData)
+        {
+            return new LiquidationTask()
+            {
+                Algo = Algo,
+                op = op,
+                myOpData = myOpData,
+                symData = symData,
+                Manager = this,
+            };
         }
 
         public override Task CancelAllOrders(Operation op)
@@ -287,8 +385,6 @@ namespace SharpTrader.AlgoFramework
             };
             return Task.WhenAll(tasks);
         }
-
-
 
         protected override Task OnInitialize()
         {
@@ -331,118 +427,87 @@ namespace SharpTrader.AlgoFramework
                 op.ExecutorData = myOpData;
             }
 
-            InitOpTasks(op, myOpData);
             return myOpData;
         }
 
-
-        private async Task<bool> CloseOrdersAndLiquidate(DeferredTask self)
+        private async Task OpenExitOrder(Operation op, MyOperationData myOpData, SymbolData symData)
         {
-            //se questo expire accade in contemporanea con un trade generato da exit order abbiamo un problema di corsa critica...
-            //     quindi per prima cosa cancelliamo ordine, poi controlliamo il filled di tutti gli ordini, dopo 1 minuto liquidiamo
-            var entryClosed = await CloseEntryOrder(self.Op, self.myOpData);
-            var exitClosed = await CloseExitOrder(self.Op, self.myOpData);
-            if (entryClosed && exitClosed)
+
+            IEnumerable<bool> getConditions()
             {
-                //schedule the liquidation for later 
-                self.LiquidationTries = 0;
-                self.Next = LiquidateOperation;
-                self.Time = Algo.Time + DelayAfterOrderClosed;
-            }
-            else
-            {
-                //retry in 30 seconds
-                self.Time = Algo.Time + DelayAfterCloseFailed;
-            }
-            return false;
-        }
-
-
-
-
-
-        private async Task<bool> OpenExitOrder(DeferredTask self)
-        {
-            var myOpData = self.myOpData;
-            Operation op = self.Op;
-            SymbolData symData = self.SymbolData;
-            Debug.Assert(myOpData.CurrentExitOrder == null || !Algo.BackTesting, "Current exit order is not null");
-
-            if (op.IsClosing || op.IsClosed)
-            {
-                if (op.AmountRemaining > 0)
-                    Logger.Warning("{OperationId} - Operation was closed but amountremaining is > 0", op.Id);
-                return true;
-            }
-
+                yield return op.IsActive;
+                yield return op.AmountRemaining > 0;
+                yield return !op.IsExitExpired(Algo.Time);
+                yield return myOpData.CurrentExitOrder == null;
+                yield return myOpData.ExitOrderCountdown?.IsElapsed == true;
+            };
             //---------- manage exit orders -------------- 
-            if (myOpData.CurrentExitOrder == null)
+            if (getConditions().All(c => c))
             {
                 // clip the target price based on current price
                 var price = op.ExitTradeDirection == TradeDirection.Buy ?
-                    Math.Min(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Ask) :
-                    Math.Max(op.Signal.PriceTarget, (decimal)self.SymbolData.Feed.Bid);
-
-                if (op.AmountRemaining > 0 && !op.IsExitExpired(Algo.Time))
+                    Math.Min(op.Signal.PriceTarget, (decimal)symData.Feed.Ask) :
+                    Math.Max(op.Signal.PriceTarget, (decimal)symData.Feed.Bid);
+                // try to also use the information from orders updates to avoid double spending
+                var amountRemainingReal = Math.Min(op.AmountRemaining, op.AmountInvested - myOpData.FilledAmountByOrders);
+                var adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(amountRemainingReal, price);
+                //create a limit order 
+                if (adj.amount > 0)
                 {
-                    //if we have no order 
-                    if (myOpData.CurrentExitOrder == null)
+                    adj = Algo.ClampOrderAmount(symData, op.ExitTradeDirection, adj);
+                    if (adj.amount > 0)
                     {
-                        var adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(op.AmountRemaining, price);
-                        //create a limit order 
-                        if (adj.amount > 0)
+                        //Debug.Assert(adj.amount == op.AmountRemaining);
+
+                        var orderInfo = new OrderInfo()
                         {
-                            adj = Algo.ClampOrderAmount(symData, op.ExitTradeDirection, adj);
-                            if (adj.amount > 0)
-                            {
-                                //Debug.Assert(adj.amount == op.AmountRemaining);
+                            Symbol = op.Symbol.Key,
+                            Type = OrderType.Limit,
+                            Effect = Algo.DoMarginTrading ? MarginOrderEffect.ClosePosition : MarginOrderEffect.None,
+                            Amount = adj.amount,
+                            Price = adj.price,
+                            ClientOrderId = op.GetNewOrderId(),
+                            Direction = op.ExitTradeDirection
+                        };
+                        Logger.Information("{OperationId} - Setting exit order: {ClientOrderId} {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
+                                      op.Id, orderInfo.ClientOrderId, orderInfo.Direction, op.Symbol, orderInfo.Amount, orderInfo.Price);
+                        var request = await Algo.Market.PostNewOrder(orderInfo);
 
-                                var orderInfo = new OrderInfo()
-                                {
-                                    Symbol = op.Symbol.Key,
-                                    Type = OrderType.Limit,
-                                    Effect = Algo.DoMarginTrading ? MarginOrderEffect.ClosePosition : MarginOrderEffect.None,
-                                    Amount = adj.amount,
-                                    Price = adj.price,
-                                    ClientOrderId = op.GetNewOrderId(),
-                                    Direction = op.ExitTradeDirection
-                                };
-                                Logger.Information("{OperationId} - Setting exit order: {ClientOrderId} {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
-                                              op.Id, orderInfo.ClientOrderId, orderInfo.Direction, op.Symbol, orderInfo.Amount, orderInfo.Price);
-                                var request = await Algo.Market.PostNewOrder(orderInfo);
-
-                                if (request.IsSuccessful)
-                                {
-                                    myOpData.CurrentExitOrder = request.Result;
-                                    self.Next = MonitorExit;
-                                }
-                                else
-                                {
-                                    //order failed, retry in 10 seconds
-                                    Logger.Error("{OperationId} - Failed setting exit order, reason: {Reason}", op.Id, request.ErrorInfo);
-                                    self.Time = Algo.Time.AddSeconds(10);
-                                }
-                            }
+                        if (request.IsSuccessful)
+                        {
+                            myOpData.CurrentExitOrder = request.Result;
+                        }
+                        else
+                        {
+                            //order failed, retry in 10 seconds
+                            Logger.Error("{OperationId} - Failed setting exit order, reason: {Reason}", op.Id, request.ErrorInfo);
+                            myOpData.ExitOrderCountdown = new CountDownStopwatch(Algo, TimeSpan.FromSeconds(10));
                         }
                     }
                 }
             }
-            else
-                self.Next = MonitorExit;
-            return false;
+
         }
 
-        private async Task<bool> MonitorExit(DeferredTask self)
+        private async Task CloseExitIfNeeded(Operation op, MyOperationData myOpData, SymbolData symData)
         {
-            var myOpData = self.myOpData;
-            Operation op = self.Op;
-            SymbolData symData = self.SymbolData;
-            //if the operation is closing or is already closed then we can stop monitoring exit
-            if (op.IsClosing || op.IsClosed)
-                return true;
+            if (myOpData.CurrentExitOrder == null)
+                return;
 
-            Debug.Assert(myOpData.CurrentExitOrder != null);
-            if (myOpData.CurrentExitOrder != null && !myOpData.CurrentExitOrder.IsClosed)
+            if (myOpData.CurrentExitOrder.IsClosed && myOpData.CurrentExitOrder.Filled == 0)
+            {
+                // order was closed for some reason but not filled
+                // it is safe to open an other order right away
+                myOpData.CurrentExitOrder = null;
+            }
+            else if (myOpData.CurrentExitOrder.IsClosed)
+            {
+                // order was closed and filled, before opening a new one 
+                // we need to make sure that the trades are registered
+                myOpData.CurrentExitOrder = null;
+                myOpData.ExitOrderCountdown = new CountDownStopwatch(Algo, DelayAfterOrderClosed);
+            }
+            else
             {
                 //check if we need to change order in case that the amount invested was increased 
                 var amountInOrder = myOpData.CurrentExitOrder.Amount - myOpData.CurrentExitOrder.Filled;
@@ -459,161 +524,97 @@ namespace SharpTrader.AlgoFramework
                 if (wrongPrice || wrongAmout || opExpired)
                 {
                     Logger.Debug("{OperationId} - cancelling exit order, reason: {Reason}", op.Id, new { wrongPrice, wrongAmout, opExpired });
-                    var requestResult = await this.CloseExitOrder(op, myOpData);
+                    var requestResult = await CloseExitOrder(op, myOpData);
                     if (requestResult)
                     {
                         myOpData.CurrentExitOrder = null;
-                        self.Next = OpenExitOrder;
                         // if backtesting we want to reopen exit order immediatly
-                        if (Algo.BackTesting)
-                            await self.Next(self);
-                        else
-                            self.Time = Algo.Time + DelayAfterOrderClosed;
-
-                        //in case signal expired there is no pressure to open a new order, take some more time ( to avoid double exit )
-                        if (Algo.Time > op.Signal.ExpireDate)
-                            self.Time = Algo.Time.AddSeconds(30);
+                        if (!Algo.BackTesting)
+                            myOpData.ExitOrderCountdown = new CountDownStopwatch(Algo, DelayAfterOrderClosed);
                     }
                     else
                     {
-                        //retry in 20 seconds
-                        self.Time = Algo.Time + TimeSpan.FromSeconds(19);
+                        //retry  after some time
+                        myOpData.CloseExitCountdown = new CountDownStopwatch(Algo, TimeSpan.FromSeconds(15));
                     }
 
                 }
             }
-            else
-            {
-                myOpData.CurrentExitOrder = null;
-            }
-
-            if (myOpData.CurrentExitOrder == null)
-                self.Next = OpenExitOrder;
-
-            return false;
         }
 
-        private async Task<bool> OpenEntryOrder(DeferredTask self)
+        /// <summary>
+        /// Returns the used budget
+        /// </summary>
+        private async Task<decimal> OpenEntryOrder(Operation op, MyOperationData myOpData, SymbolData symData, decimal remainingBudget)
         {
-            var myOpData = self.myOpData;
-            Operation op = self.Op;
-            SymbolData symData = self.SymbolData;
-
             Debug.Assert(myOpData.CurrentEntryOrder == null || !Algo.BackTesting);
 
-            if (op.IsClosing || op.IsClosed)
+            IEnumerable<bool> getConditions()
             {
-                if (op.AmountRemaining > 0)
-                    Logger.Warning("{OperationId} - Operation is closing but amountremaining is > 0", op.Id);
-                return true;
-            }
-            // check the number of open entry orders
-            if (this.CurrentlyOpenEntryOrdersCount >= this.MaximumPendingEntryOrdersCount)
-                return false;
-            if (!op.IsEntryExpired(Algo.Time) && myOpData.CurrentEntryOrder == null)
-            {
-                //--- open a new entry if needed ---
-                var entryNear = op.Signal.Kind == SignalKind.Buy ?
+                yield return remainingBudget > 0;
+                yield return op.IsActive;
+                yield return !op.IsEntryExpired(Algo.Time);
+                yield return myOpData.CurrentEntryOrder == null;
+                yield return !Algo.EntriesSuspended;
+                yield return myOpData.EntryOrderCountdown?.IsElapsed == true;
+                yield return op.Signal.Kind == SignalKind.Buy ?
                     ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / op.Signal.PriceEntry < EntryNearThreshold :
                     (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry < EntryNearThreshold;
-
-                if (entryNear && !Algo.EntriesSuspended)
-                {
-                    var price = op.EntryTradeDirection == TradeDirection.Buy ?
-                            Math.Min(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Ask) :
-                            Math.Max(op.Signal.PriceEntry, (decimal)self.SymbolData.Feed.Bid);
-                    var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed, target_price: price);
-                    var stillToBuy = originalAmount - op.AmountInvested;
-                    if (stillToBuy / originalAmount > 0.2m)
-                    {
-                        //adjust price 
-                        var adjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(stillToBuy, price);
-                        adjusted = Algo.ClampOrderAmount(symData, op.EntryTradeDirection, adjusted);
-                        if (adjusted.amount / originalAmount > 0.1m)
-                        {
-                            //Debug.Assert(op.AmountInvested == 0);
-                            var orderInfo = new OrderInfo()
-                            {
-                                Symbol = op.Symbol.Key,
-                                Type = OrderType.Limit,
-                                Effect = Algo.DoMarginTrading ? MarginOrderEffect.OpenPosition : MarginOrderEffect.None,
-                                Amount = adjusted.amount,
-                                Price = adjusted.price,
-                                ClientOrderId = op.GetNewOrderId(),
-                                Direction = op.EntryTradeDirection
-                            };
-
-                            Logger.Information(
-                                "{OperationId} - Setting Entry: {ClientOrderId} {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
-                                op.Id, orderInfo.ClientOrderId, orderInfo.Direction, orderInfo.Symbol, orderInfo.Amount, orderInfo.Price);
-
-                            var req = await Algo.Market.PostNewOrder(orderInfo);
-
-                            if (req.IsSuccessful)
-                            {
-                                this.CurrentlyOpenEntryOrdersCount++;
-                                // register operation and return to ManageEntry
-                                myOpData.CurrentEntryOrder = req.Result;
-                                self.Next = MonitorEntry;
-                            }
-                            else
-                            {
-                                //log error and repeat operation in 30 seconds
-                                Logger.Error("{OperationId} - failed opening Entry order, reason: {Reason}", op.Id, req.ErrorInfo);
-                                self.Time = Algo.Time.AddSeconds(30);
-                            }
-                        }
-                    }
-                }
             }
-            return false;
-        }
 
-        private async Task<bool> MonitorEntry(DeferredTask self)
-        {
-            var myOpData = self.myOpData;
-            Operation op = self.Op;
-            SymbolData symData = self.SymbolData;
+            if (!getConditions().All(c => c))
+                return 0;
+            //--- basic conditions are met, we can try to open an entry order
+            var price = op.EntryTradeDirection == TradeDirection.Buy ?
+                Math.Min(op.Signal.PriceEntry, (decimal)symData.Feed.Ask) :
+                Math.Max(op.Signal.PriceEntry, (decimal)symData.Feed.Bid);
+            Debug.Assert(op.AmountTarget.Asset == TotalBudget.Asset); // we assume here that the quote asset is the budget asset
 
-            if (op.IsClosing || op.IsClosed)
-                return false;
-
-            //----------------------- manage entry orders -------------------------------- 
-            //  open entry if we got near the target price
-            //  cancel entry if we are too far  
-            var entryDistant = op.Signal.Kind == SignalKind.Buy ?
-              ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / op.Signal.PriceEntry > EntryDistantThreshold :
-              (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry > EntryDistantThreshold;
-
-            if (myOpData.CurrentEntryOrder != null)
+            var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed, target_price: price);
+            var stillToBuy = originalAmount - op.AmountInvested;
+            var remainingBudgetConverted = AssetAmount.Convert(new AssetAmount(TotalBudget.Asset, remainingBudget), op.Symbol.Asset, symData.Feed, target_price: price);
+            stillToBuy = Math.Min(stillToBuy, remainingBudgetConverted);
+            if (stillToBuy / originalAmount > 0.2m)
             {
-                //var badAmout = Math.Abs(LastEntryOrder.Amount - orderAmount) / orderAmount > 0.20m; 
-                var amount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed);
-                var priceAdjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(amount, op.Signal.PriceEntry);
-                var badPrice = Math.Abs(myOpData.CurrentEntryOrder.Price - priceAdjusted.price) / priceAdjusted.price > MinimumPriceChangeEntry;
-                var entryExpired = op.IsEntryExpired(Algo.Time);
-
-                //N.B. also when signal entry is not valid we keep monitoring as it could be updated
-                if (entryDistant || badPrice || entryExpired)
+                //adjust price 
+                var adjusted = symData.Feed.GetOrderAmountAndPriceRoundedDown(stillToBuy, price);
+                adjusted = Algo.ClampOrderAmount(symData, op.EntryTradeDirection, adjusted);
+                if (adjusted.amount / originalAmount > 0.1m)
                 {
-                    Logger.Debug("{OperationId} - Cancelling entry order {OrderId}, flags {EntryOrderFlags}", op.Id, myOpData.CurrentEntryOrder.ClientId, new { entryDistant, badPrice, entryExpired });
-                    var orderClosed = await CloseEntryOrder(op, myOpData);
-                    if (orderClosed)
+                    //Debug.Assert(op.AmountInvested == 0);
+                    var orderInfo = new OrderInfo()
                     {
-                        //then we schedule a task to open new ordder
-                        self.Time = Algo.Time + DelayAfterOrderClosed;
-                        self.Next = new DeferredTaskDelegate(OpenEntryOrder);
-                        //if we are backtesting, next tick will be much later so we call continuation instantly
-                        if (Algo.BackTesting)
-                            await self.Next(self);
+                        Symbol = op.Symbol.Key,
+                        Type = OrderType.Limit,
+                        Effect = Algo.DoMarginTrading ? MarginOrderEffect.OpenPosition : MarginOrderEffect.None,
+                        Amount = adjusted.amount,
+                        Price = adjusted.price,
+                        ClientOrderId = op.GetNewOrderId(),
+                        Direction = op.EntryTradeDirection
+                    };
+
+                    Logger.Information(
+                        "{OperationId} - Setting Entry: {ClientOrderId} {OrderDirection} {Symbol} {OrderAmount}@{OrderPrice}",
+                        op.Id, orderInfo.ClientOrderId, orderInfo.Direction, orderInfo.Symbol, orderInfo.Amount, orderInfo.Price);
+
+                    var req = await Algo.Market.PostNewOrder(orderInfo);
+
+                    if (req.IsSuccessful)
+                    {
+                        // register operation and return to ManageEntry
+                        myOpData.CurrentEntryOrder = req.Result;
+                        return AssetAmount.Convert(new AssetAmount(op.Symbol.Asset, adjusted.amount), TotalBudget.Asset, op.Symbol, target_price: adjusted.price);
+                    }
+                    else
+                    {
+                        //log error and repeat operation in 30 seconds
+                        Logger.Error("{OperationId} - failed opening Entry order, reason: {Reason}", op.Id, req.ErrorInfo);
+                        myOpData.EntryOrderCountdown = new CountDownStopwatch(Algo, TimeSpan.FromSeconds(30));
                     }
                 }
             }
-
-            return false;
+            return 0;
         }
-
-
 
         private async Task<bool> CloseOrder(IOrder order, Operation op)
         {
@@ -692,8 +693,5 @@ namespace SharpTrader.AlgoFramework
 
             op.ScheduleClose(Algo.Time + delay);
         }
-
-
-
     }
 }
