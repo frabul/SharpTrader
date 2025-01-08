@@ -21,15 +21,16 @@ namespace SharpTrader.AlgoFramework
         {
         }
 
-        public override Task Update(TimeSlice slice)
+        public override async Task Update(TimeSlice slice)
         {
+            await Algo.Executor.UpdateOperationsState();
             //check the free budget - the used budget is the sum of all money still invested in operations
             var allocatedBudget = Algo.ActiveOperations.Where(o => o.IsActive).Sum(o =>
                                 AssetAmount.Convert(o.AmountTarget, BudgetPerOperation.Asset, o.Symbol, o.Signal.PriceEntry));
             var freeBudget = Budget - allocatedBudget;
             if (freeBudget > 0)
             {
-                Algo.ResumeEntries();
+
                 var signalsOrderedByPriority = slice.NewSignals.OrderByDescending(s => s.Priority);
                 //for each signal allocate a fixed amount
                 foreach (Signal signal in signalsOrderedByPriority)
@@ -80,7 +81,6 @@ namespace SharpTrader.AlgoFramework
                     }
                 }
             }
-            return Task.CompletedTask;
         }
 
         class MySymbolData
