@@ -28,6 +28,7 @@ namespace SharpTrader.AlgoFramework
             EndTime = endTime;
         }
         public bool IsElapsed => Algo.Time >= EndTime;
+        public bool IsRunning => Algo.Time < EndTime;
     }
 
     public class MarketMakerOperationManager2 : OperationManager
@@ -68,9 +69,9 @@ namespace SharpTrader.AlgoFramework
                 get => currentExitOrder;
                 set
                 {
-                    if (currentEntryOrder != null && currentEntryOrder.Id != value?.Id)
+                    if (currentExitOrder != null && currentExitOrder.Id != value?.Id)
                     {
-                        FilledAmountByOrders += currentEntryOrder.Filled;
+                        FilledAmountByOrders += currentExitOrder.Filled;
                     }
                     if (value != null)
                         AllExits.Add(value.Id);
@@ -116,15 +117,30 @@ namespace SharpTrader.AlgoFramework
             EntryDistantThreshold = entryDistantThreshold;
             EntryNearThreshold = entryNearThreshold;
         }
-
-        public override async Task Update(TimeSlice slice)
+        override public async Task UpdateOperationsState()
         {
-            var openEntryOrdersCont = Algo.ActiveOperations.Count(op =>
+            var operations = Algo.ActiveOperations.Where(op => op.IsActive && !op.RiskManaged).ToList();
+            List<(Operation op, MyOperationData myOpData, SymbolData symData)> operationsData = operations.Select(op =>
             {
                 var myOpData = GetMyOperationData(op);
-                return myOpData.CurrentEntryOrder != null && myOpData.CurrentEntryOrder.Status < OrderStatus.Cancelled;
-            });
+                var symData = Algo.SymbolsData[op.Symbol.Key];
+                return (op, myOpData, symData);
+            }).OrderByDescending(x => x.op.Signal.Priority).ToList();
 
+            if (operationsData.Count == 0)
+                return;
+
+            // check if any operation can be closed and close it
+            var tasks = operationsData.Select(x =>
+            {
+                var (op, myOpData, symData) = x;
+                return CloseIfCan(op, myOpData, symData);
+
+            });
+            await Task.WhenAll(tasks);
+        }
+        public override async Task Update(TimeSlice slice)
+        {
             var operations = Algo.ActiveOperations.Where(op => op.IsActive && !op.RiskManaged).ToList();
             List<(Operation op, MyOperationData myOpData, SymbolData symData)> operationsData = operations.Select(op =>
                       {
@@ -132,6 +148,10 @@ namespace SharpTrader.AlgoFramework
                           var symData = Algo.SymbolsData[op.Symbol.Key];
                           return (op, myOpData, symData);
                       }).OrderByDescending(x => x.op.Signal.Priority).ToList();
+
+            if (operationsData.Count == 0)
+                return;
+
             // check if any operation can be closed and close it
             var tasks = operationsData.Select(x =>
             {
@@ -165,12 +185,24 @@ namespace SharpTrader.AlgoFramework
             });
             await Task.WhenAll(liqTasks);
 
+            // resample operations to those that are not under liquidation liquidate, nor risk managed
+            operationsData = operationsData.Where(x => x.op.IsActive).ToList();
+
             // check if any open entry order should be closed and close it
-            IEnumerable<Operation> operationsInterdictedForEntry = GetOperationsInterdictedForEntry();
+            var minPriority = CalculateMinimumPriorityForEntry(operationsData);
             var tasks2 = operationsData.Where(x => x.myOpData.CurrentEntryOrder != null).Select(async x =>
             {
                 var (op, myOpData, symData) = x;
-                var interdicted = operationsInterdictedForEntry.Contains(op);
+                if (myOpData.CurrentEntryOrder.IsClosed)
+                {
+                    myOpData.CurrentEntryOrder = null;
+                    if (!Algo.BackTesting)
+                        myOpData.EntryOrderCountdown = new CountDownStopwatch(Algo, DelayAfterOrderClosed);
+                    return;
+                }
+
+
+                var interdicted = op.Signal.Priority < minPriority;
                 var entryDistant = op.Signal.Kind == SignalKind.Buy ?
                     ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / op.Signal.PriceEntry > EntryDistantThreshold :
                     (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry > EntryDistantThreshold;
@@ -199,11 +231,11 @@ namespace SharpTrader.AlgoFramework
             await Task.WhenAll(tasks2);
 
             // now we can open entry orders
-            var usedBudget = operationsData.Sum(x => x.op.QuoteAmountRemaining + x.myOpData.CurrentEntryOrder?.Amount ?? 0); // todo handle different cases, we assume here that the quote asset is the budget asset
+            var usedBudget = operationsData.Where(x => x.op.IsActive).Sum(x => CalculateUsedBudget(x.op, x.myOpData)); // todo handle different cases, we assume here that the quote asset is the budget asset
             var budgetRemaining = TotalBudget.Amount - usedBudget;
             // the operations are already sorted by priority
             // open entry orders until the budget is used
-            foreach (var (op, myOpData, symData) in operationsData)
+            foreach (var (op, myOpData, symData) in operationsData.Where(x => !x.op.RiskManaged && x.myOpData.LiquidationTask == null))
             {
                 var used = await OpenEntryOrder(op, myOpData, symData, budgetRemaining);
                 budgetRemaining -= used;
@@ -211,7 +243,7 @@ namespace SharpTrader.AlgoFramework
 
             // finally close exit orders which need to be modified
             // and post exit orders
-            var tasks3 = operationsData.Where(x => x.op.IsActive).Select(async x =>
+            var tasks3 = operationsData.Where(x => !x.op.RiskManaged && x.myOpData.LiquidationTask == null).Select(async x =>
                     {
                         var (op, myOpData, symData) = x;
                         await CloseExitIfNeeded(op, myOpData, symData);
@@ -221,11 +253,46 @@ namespace SharpTrader.AlgoFramework
         }
 
 
+
+
         // Gives the list of the operation that are allowed to have an entry order
         // by looking at the priority of the signal, maximum numbeb of entry orders and the total budget
-        private IEnumerable<Operation> GetOperationsInterdictedForEntry()
+        private double CalculateMinimumPriorityForEntry(List<(Operation op, MyOperationData myOpData, SymbolData symData)> operationsData)
         {
-            throw new NotImplementedException();
+            if (operationsData.Count == 0)
+                return 0;
+            var usedBudget = operationsData.Sum(x => CalculateUsedBudget(x.op, x.myOpData)); // todo handle different cases, we assume here that the quote asset is the budget asset
+            var budgetRemaining = TotalBudget.Amount - usedBudget;
+            for (int i = 0; i < operationsData.Count; i++)
+            {
+                var (op, myOpData, symData) = operationsData[i];
+                var willOpenEntry = EnumerateEntryOrderConditions(op, myOpData, symData).All(c => c);
+                if (willOpenEntry)
+                {
+                    var used = AssetAmount.Convert(op.AmountTarget, TotalBudget.Asset, op.Symbol, target_price: op.Signal.PriceEntry);
+                    budgetRemaining -= used;
+                }
+                if (budgetRemaining < 0)
+                {
+                    // allow 2 more operations to open entry orders 
+                    // to avoid ping pong effect ( open close open close )
+                    var index = Math.Min(i + 2, operationsData.Count - 1);
+                    return operationsData[index].op.Signal.Priority;
+                }
+            }
+            return operationsData.Last().op.Signal.Priority - 1;
+        }
+
+        private decimal CalculateUsedBudget(Operation op, MyOperationData opData)
+        {
+            var usedBudget = op.Symbol.QuoteAsset == TotalBudget.Asset ? op.QuoteAmountRemaining : op.AmountRemaining;
+            var entryOrder = opData.CurrentEntryOrder;
+            if (entryOrder != null && !entryOrder.IsClosed)
+                usedBudget += AssetAmount.Convert(
+                    new AssetAmount(op.Symbol.Asset, entryOrder.Amount - entryOrder.Filled), // pick only pending amount
+                    TotalBudget.Asset, op.Symbol,
+                    target_price: opData.CurrentEntryOrder.Price);
+            return usedBudget;
         }
 
         private async Task CloseIfCan(Operation op, MyOperationData myOpData, SymbolData symData)
@@ -244,7 +311,7 @@ namespace SharpTrader.AlgoFramework
             }
 
             //queue operation for close if conditions are met
-            if (isEntryExpired && noActiveExit && remainingAmountSmall && myOpData.TryCloseCountdown?.IsElapsed == true)
+            if (isEntryExpired && noActiveExit && remainingAmountSmall && myOpData.TryCloseCountdown?.IsRunning != true)
             {
                 var entryClosed = await CloseEntryOrder(op, myOpData);
                 var exitClosed = await CloseExitOrder(op, myOpData); // redundant but ok
@@ -437,9 +504,10 @@ namespace SharpTrader.AlgoFramework
             {
                 yield return op.IsActive;
                 yield return op.AmountRemaining > 0;
+                yield return myOpData.LiquidationTask == null;
                 yield return !op.IsExitExpired(Algo.Time);
                 yield return myOpData.CurrentExitOrder == null;
-                yield return myOpData.ExitOrderCountdown?.IsElapsed == true;
+                yield return myOpData.ExitOrderCountdown?.IsRunning != true;
             };
             //---------- manage exit orders -------------- 
             if (getConditions().All(c => c))
@@ -542,27 +610,24 @@ namespace SharpTrader.AlgoFramework
             }
         }
 
+
+        IEnumerable<bool> EnumerateEntryOrderConditions(Operation op, MyOperationData myOpData, SymbolData symData)
+        {
+            yield return op.IsActive;
+            yield return !op.IsEntryExpired(Algo.Time);
+            yield return myOpData.CurrentEntryOrder == null;
+            yield return !Algo.EntriesSuspended;
+            yield return myOpData.EntryOrderCountdown?.IsRunning != true;
+            yield return op.Signal.Kind == SignalKind.Buy ?
+                ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / op.Signal.PriceEntry < EntryNearThreshold :
+                (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry < EntryNearThreshold;
+        }
         /// <summary>
         /// Returns the used budget
         /// </summary>
         private async Task<decimal> OpenEntryOrder(Operation op, MyOperationData myOpData, SymbolData symData, decimal remainingBudget)
         {
-            Debug.Assert(myOpData.CurrentEntryOrder == null || !Algo.BackTesting);
-
-            IEnumerable<bool> getConditions()
-            {
-                yield return remainingBudget > 0;
-                yield return op.IsActive;
-                yield return !op.IsEntryExpired(Algo.Time);
-                yield return myOpData.CurrentEntryOrder == null;
-                yield return !Algo.EntriesSuspended;
-                yield return myOpData.EntryOrderCountdown?.IsElapsed == true;
-                yield return op.Signal.Kind == SignalKind.Buy ?
-                    ((decimal)symData.Feed.Bid - op.Signal.PriceEntry) / op.Signal.PriceEntry < EntryNearThreshold :
-                    (op.Signal.PriceEntry - (decimal)symData.Feed.Ask) / op.Signal.PriceEntry < EntryNearThreshold;
-            }
-
-            if (!getConditions().All(c => c))
+            if (remainingBudget <= 0 || !EnumerateEntryOrderConditions(op, myOpData, symData).All(c => c))
                 return 0;
             //--- basic conditions are met, we can try to open an entry order
             var price = op.EntryTradeDirection == TradeDirection.Buy ?
@@ -643,6 +708,7 @@ namespace SharpTrader.AlgoFramework
                     }
                 }
             }
+
             return ok;
         }
 

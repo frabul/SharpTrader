@@ -10,6 +10,10 @@ namespace SharpTrader.AlgoFramework
         public TradingAlgo Algo { get; private set; }
         protected virtual Task OnInitialize() { return Task.CompletedTask; }
         public virtual void OnSymbolsChanged(SelectedSymbolsChanges changes) { }
+        public virtual Task UpdateOperationsState()
+        {
+            return Task.CompletedTask;
+        }
         public abstract Task Update(TimeSlice slice);
         public Task Initialize(TradingAlgo algo)
         {
