@@ -286,6 +286,17 @@ namespace SharpTrader
                     partialResultsLines = toWrite.Split('\n').Length;
                     cursorPositionAfterPartialResults = Console.CursorTop;
                 }
+                
+                if (Console.KeyAvailable)
+                {
+                    var key = Console.ReadKey();
+                    if (key.Key == ConsoleKey.Q)
+                    {
+                        Console.WriteLine("You pressed Q. Press Y to confirm exit");
+                        if (Console.ReadKey().Key == ConsoleKey.Y)
+                            break;
+                    }
+                }
 
                 steps++;
             }
