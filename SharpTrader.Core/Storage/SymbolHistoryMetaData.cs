@@ -14,6 +14,7 @@ namespace SharpTrader.Storage
         public SymbolHistoryId HistoryId { get; protected set; }
         public List<DateRange> GapsConfirmed { get; protected set; }
         public List<DateRange> GapsUnconfirmed { get; protected set; }
+        public virtual DateRange GetDataRange() { return new DateRange(DateTime.MinValue, DateTime.MaxValue); }
     }
 
     public class SymbolHistoryMetaDataInternal : SymbolHistoryMetaData
@@ -60,7 +61,21 @@ namespace SharpTrader.Storage
         {
 
         }
-
+        public override DateRange GetDataRange()
+        {
+            if (this.Chunks.Count < 1)
+                return new DateRange(DateTime.MinValue, DateTime.MinValue);
+            var min = DateTime.MaxValue;
+            var max = DateTime.MinValue;
+            foreach (var chund in this.Chunks)
+            {
+                if (min > chund.StartDate)
+                    min = chund.StartDate;
+                if (max < chund.EndDate)
+                    max = chund.EndDate;
+            }
+            return new DateRange(min, max);
+        }
         public void AddBars(IEnumerable<Candlestick> candles)
         {
             lock (this.Locker)

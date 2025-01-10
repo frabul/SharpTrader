@@ -57,6 +57,7 @@ namespace SharpTrader.MarketSimulator
                 // integrate symbols table with symbols found in db  
                 var example_symbol = SymbolsTable["BNBBTC"];
                 var regex = new System.Text.RegularExpressions.Regex(@"(.+)(BTC|ETH|USDT)");
+                symbolsInDb = symbolsInDb.Where(s => s.Market == name).ToArray();
                 foreach (var sym in symbolsInDb.Where(s => s.Market == name))
                 {
                     if (!SymbolsTable.ContainsKey(sym.Symbol))
@@ -83,9 +84,9 @@ namespace SharpTrader.MarketSimulator
                         SymbolsTable.Add(sInfo.Key, sInfo);
                     }
                 }
-                //set all symbols trading
+                // set trading enabled if the symbol is in db
                 foreach (var sym in SymbolsTable.Values)
-                    sym.IsTradingEnabled = true;
+                    sym.IsTradingEnabled = symbolsInDb.Any(s => s.Symbol == sym.Key);
             }
             catch (Exception ex)
             {
@@ -456,7 +457,7 @@ namespace SharpTrader.MarketSimulator
 
         public IEnumerable<ISymbolInfo> GetSymbols()
         {
-            return SymbolsTable.Values;
+            return SymbolsTable.Values.Where(s => s.IsTradingEnabled);
         }
 
         public void DisposeFeed(ISymbolFeed feed)

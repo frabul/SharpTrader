@@ -90,11 +90,6 @@ namespace SharpTrader.Storage
             }
         }
 
-        internal void UpdateFirstKnownData(SymbolHistoryId info, ITradeBar firstAvailable)
-        {
-            var data = GetMetaDataInternal(info);
-        }
-
         private void Init()
         {
             var connectionString = $"Filename={Path.Combine(this.DataDir, "DatabaseV3.db")};connection=shared";

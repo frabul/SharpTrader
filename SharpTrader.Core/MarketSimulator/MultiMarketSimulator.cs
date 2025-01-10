@@ -30,9 +30,17 @@ namespace SharpTrader.MarketSimulator
 
             Config = config;
             HistoryDb = historyDb;
+            // filter all symbols by including only those that have data in the period of interest 
+            var allSymbols = historyDb.ListAvailableData();
+            allSymbols = allSymbols.Where(s =>
+            {
+                var metadata = historyDb.GetMetaData(s);
+                return metadata.GetDataRange().Overlaps(simulationStartTime, endTime);
+
+            }).ToArray();
+
             this._Markets = new MarketEmulator[Config.Markets.Length];
             int i = 0;
-            var allSymbols = historyDb.ListAvailableData();
             foreach (var mc in Config.Markets)
             {
                 var market = new MarketEmulator(mc.MarketName, mc.MakerFee, mc.TakerFee, dataDirectory, InitializeDataSourceCallBack, allSymbols);
@@ -53,7 +61,15 @@ namespace SharpTrader.MarketSimulator
             HistoryDb = historyDb;
             var text = File.ReadAllText(Path.Combine(dataDirectory, ConfigFile));
             Config = Newtonsoft.Json.JsonConvert.DeserializeObject<Configuration>(text);
+            // filter all symbols by including only those that have data in the period of interest
             var allSymbols = historyDb.ListAvailableData();
+            allSymbols = allSymbols.Where(s =>
+            {
+                var metadata = historyDb.GetMetaData(s);
+                return metadata.GetDataRange().Overlaps(simulationStartTime, endTime);
+
+            }).ToArray();
+
             this._Markets = new MarketEmulator[Config.Markets.Length];
             int i = 0;
             foreach (var mc in Config.Markets)
@@ -125,7 +141,7 @@ namespace SharpTrader.MarketSimulator
             foreach (var market in _Markets)
                 market.RaisePendingEvents();
             var stillMoreData = NoMoreDataCount < 10 || IncrementalHistoryLoading; // if incremental history is selected we cannot be sure that we don't have more data
-            
+
             return nextTick <= this.EndTime && stillMoreData;
         }
 
@@ -147,9 +163,9 @@ namespace SharpTrader.MarketSimulator
                         chunkEndTime);
                     this.HistoryDb.SaveAndClose(histInfo, false);
                     market.FistTickPassed = true;
-                    if(feed.DataSource.Ticks.Count > 0)
+                    if (feed.DataSource.Ticks.Count > 0)
                     {
-                        totalLoaded+= feed.DataSource.Ticks.Count;
+                        totalLoaded += feed.DataSource.Ticks.Count;
                         loadedSymbols++;
                     }
                 }
