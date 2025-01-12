@@ -1,4 +1,4 @@
-﻿
+
 using BinanceExchange.API.Client;
 using BinanceExchange.API.Enums;
 using BinanceExchange.API.Models.WebSocket;
@@ -189,31 +189,36 @@ namespace SharpTrader.BrokersApi.Binance
 
                 //trace final bar  
                 if (msg.Kline.IsBarFinal)
-                    Logger.Verbose("{Symbol} - Final bar {@Candle} arrived at local system time {Time:HH.mm.ss} ",
+                {
+                    DateTime arrival_time = DateTime.UtcNow;
+                    Logger.Verbose("{Symbol} - Final bar {@Candle} arrived at local system time {Time:HH.mm.ss} with {Delay:f2} ms delay.",
                         msg.Symbol,
                         msg.Kline,
-                        DateTime.UtcNow);
-
+                        arrival_time,
+                        (arrival_time - msg.Kline.EndTime).TotalMilliseconds);
+                }
 
                 FormingCandle = candleReceived;
 
                 //emit candle if it is final
                 if (msg.Kline.IsBarFinal)
                 {
-
-                    LastEmittedCandled = candleReceived;
-                    CandlesToAdd.Add(LastEmittedCandled);
-                    //the new forming candle is a filler
+                    // emit the candle only if the last emitted one is preceding this one
+                    if (LastEmittedCandled.CloseTime < candleReceived.CloseTime)
+                    {
+                        LastEmittedCandled = candleReceived;
+                        CandlesToAdd.Add(LastEmittedCandled);
+                    }
+                    // always update the forming candle ( also if the the candle for this close was already emitted )
                     FormingCandle = Candlestick.GetFiller(LastEmittedCandled);
                 }
-
             }
 
             //instad of waiting for the candle we just emit forming candle   
             var finalCandleUpdateTimeoutElapsed = DateTime.UtcNow > LastEmittedCandled.Time + resolution + FinalCandleUpdateTimeout;
             if (!LastEmittedCandled.IsDefault() && Market.IsServiceAvailable && finalCandleUpdateTimeoutElapsed)
             {
-                Logger.Verbose("{Symbol} SymbolFeed: emitting forming candle ", Symbol.Key);
+                Logger.Warning("{Symbol} SymbolFeed: emitting forming candle ", Symbol.Key);
                 LastEmittedCandled = FormingCandle;
                 CandlesToAdd.Add(LastEmittedCandled);
                 FormingCandle = Candlestick.GetFiller(LastEmittedCandled);
@@ -375,6 +380,5 @@ namespace SharpTrader.BrokersApi.Binance
                 amount = 0;
             return (price / 1.00000000000m, amount / 1.000000000000m);
         }
-
     }
 }
