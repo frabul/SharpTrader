@@ -1,4 +1,4 @@
-
+﻿
 using BinanceExchange.API.Client;
 using BinanceExchange.API.Enums;
 using BinanceExchange.API.Models.WebSocket;
@@ -19,7 +19,7 @@ namespace SharpTrader.BrokersApi.Binance
 {
     class SymbolFeed : ISymbolFeed, IDisposable
     {
-        private readonly TimeSpan FinalCandleUpdateTimeout = TimeSpan.FromSeconds(7.5);
+        private readonly TimeSpan FinalCandleUpdateTimeout = TimeSpan.FromSeconds(1.9);
         public event Action<ISymbolFeed, IBaseData> OnData;
         private Serilog.ILogger Logger;
         private CombinedWebSocketClient WebSocketClient;
