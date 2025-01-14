@@ -1,4 +1,4 @@
-using LiteDB;
+﻿using LiteDB;
 using Serilog;
 using Serilog.Core;
 using SharpTrader.BrokersApi.Binance;
@@ -612,15 +612,15 @@ namespace SharpTrader.AlgoFramework
             {
                 //check if we need to change order in case that the amount invested was increased 
                 var amountInOrder = myOpData.CurrentExitOrder.Amount - myOpData.CurrentExitOrder.Filled;
-                var availableForTrading =
-                    Algo.ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)).amount //free to trade
-                                            + amountInOrder;                      //amount derived from cancelling the order
+                // tradable amount if we close the current order
+                var (tradableAmount, tradablePrice) =
+                    Algo.ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)); //free to trade
                 // we want to trade amount remaining as max 
-                var amountToTrade = Math.Min(op.AmountRemaining, availableForTrading);
+                var amountToTrade = Math.Min(op.AmountRemaining, tradableAmount);
                 //check if amount is wrong
                 var wrongAmout = Math.Abs(amountToTrade - amountInOrder) > amountToTrade * 0.10m;
                 //check if order price is wrong
-                var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - op.Signal.PriceTarget) / op.Signal.PriceTarget > MinimumPriceChangeExit;
+                var wrongPrice = Math.Abs(myOpData.CurrentExitOrder.Price - tradablePrice) / tradablePrice > MinimumPriceChangeExit;
                 var opExpired = Algo.Time > op.Signal.ExpireDate;
                 if (wrongPrice || wrongAmout || opExpired)
                 {
