@@ -1,4 +1,4 @@
-﻿using LiteDB;
+using LiteDB;
 using Serilog;
 using Serilog.Core;
 using SharpTrader.BrokersApi.Binance;
@@ -34,7 +34,7 @@ namespace SharpTrader.AlgoFramework
     public class MarketMakerOperationManager2 : OperationManager
     {
         Serilog.ILogger Logger;
-        public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(15);
+        public TimeSpan DelayAfterOrderClosed = TimeSpan.FromSeconds(4);
         public TimeSpan DelayAfterCloseFailed = TimeSpan.FromSeconds(60);
         public TimeSpan CloseQueueTime = TimeSpan.FromMinutes(2);
         public decimal MinimumPriceChangeEntry { get; set; } = 0.003m;
@@ -252,8 +252,41 @@ namespace SharpTrader.AlgoFramework
             await Task.WhenAll(tasks3);
         }
 
+        decimal GetFilledAmountByExitOrders(MyOperationData myOpData)
+        {
+            decimal totalFilled = 0;
+            foreach (var orderId in myOpData.AllExits)
+            {
+                var order = Algo.Market.GetOrderById(orderId);
+                if (order == null)
+                {
+                    Logger.Warning("Unable to find order id {OrderId}", orderId);
+                }
+                else
+                {
+                    totalFilled += order.Filled;
+                }
+            }
+            return totalFilled;
+        }
 
-
+        decimal GetFilledAmountByEntryOrders(MyOperationData myOpData)
+        {
+            decimal totalFilled = 0;
+            foreach (var orderId in myOpData.AllEntries)
+            {
+                var order = Algo.Market.GetOrderById(orderId);
+                if (order == null)
+                {
+                    Logger.Warning("Unable to find order id {OrderId}", orderId);
+                }
+                else
+                {
+                    totalFilled += order.Filled;
+                }
+            }
+            return totalFilled;
+        }
 
         // Gives the list of the operation that are allowed to have an entry order
         // by looking at the priority of the signal, maximum numbeb of entry orders and the total budget
@@ -517,7 +550,7 @@ namespace SharpTrader.AlgoFramework
                     Math.Min(op.Signal.PriceTarget, (decimal)symData.Feed.Ask) :
                     Math.Max(op.Signal.PriceTarget, (decimal)symData.Feed.Bid);
                 // try to also use the information from orders updates to avoid double spending
-                var amountRemainingReal = Math.Min(op.AmountRemaining, op.AmountInvested - myOpData.FilledAmountByOrders);
+                var amountRemainingReal = Math.Min(op.AmountRemaining, op.AmountInvested - GetFilledAmountByExitOrders(myOpData));
                 var adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(amountRemainingReal, price);
                 //create a limit order 
                 if (adj.amount > 0)
@@ -636,7 +669,7 @@ namespace SharpTrader.AlgoFramework
             Debug.Assert(op.AmountTarget.Asset == TotalBudget.Asset); // we assume here that the quote asset is the budget asset
 
             var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed, target_price: price);
-            var stillToBuy = originalAmount - op.AmountInvested;
+            var stillToBuy = Math.Min(originalAmount - op.AmountInvested, originalAmount - GetFilledAmountByEntryOrders(myOpData));
             var remainingBudgetConverted = AssetAmount.Convert(new AssetAmount(TotalBudget.Asset, remainingBudget), op.Symbol.Asset, symData.Feed, target_price: price);
             stillToBuy = Math.Min(stillToBuy, remainingBudgetConverted);
             if (stillToBuy / originalAmount > 0.2m)
@@ -690,9 +723,9 @@ namespace SharpTrader.AlgoFramework
                 var req = await Algo.Market.OrderCancelAsync(order.Id);
                 if (!req.IsSuccessful)
                 {
+                    var req2 = await Algo.Market.OrderSynchAsync(order.Id);
                     logger.Error("{OperationId} - unable to close order {OrderId}, reason: {Reason}. Trying to synch...", op.Id, order.ClientId, req.ErrorInfo);
                     //check if order was closed already
-                    var req2 = await Algo.Market.OrderSynchAsync(order.Id);
                     if (req2.IsSuccessful)
                         order = req2.Result;
                     else
