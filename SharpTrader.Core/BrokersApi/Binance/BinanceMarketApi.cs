@@ -142,7 +142,7 @@ namespace SharpTrader.BrokersApi.Binance
                 await Task.Delay(100);
             Logger.Information("BinanceMarketApi initialization completed");
         }
-        
+
         public async Task<List<(string symbol, DateTime time)>> GetDelistEvents(DateTime fromTime)
         {
             var delistEvents = await Client.GetDelistEvents(fromTime);
@@ -1418,18 +1418,7 @@ namespace SharpTrader.BrokersApi.Binance
         }
         public async Task<ConvertDustResponse> DustConvert()
         {
-            List<AssetBalance> allBalances = await this.GetAllBalancesConvertedAsync("BTC");
-
-            var dustAssets = allBalances.Where(bal => bal.Asset != "BNB" && (bal.Free + bal.Locked) > 0 && (bal.Free + bal.Locked) < 0.0009m).Select(bal => bal.Asset as string).ToList();
-
-            List<string> finalAssets = new List<string>();
-            foreach (var asset in dustAssets)
-            {
-                var sym = asset + "BTC";
-                var info = this.GetSymbolInfo(sym);
-                if (info?.IsTradingEnabled == true)
-                    finalAssets.Add(asset);
-            }
+            var finalAssets = await this.Client.GetDustAssets();
             if (finalAssets.Count > 0)
             {
                 var pars = new ConvertDustRequest(finalAssets);
