@@ -13,6 +13,9 @@ namespace SharpTrader.BrokersApi.Binance
         [BsonId]
         public string Id { get; set; }
         public string Symbol { get; set; }
+        /// <summary>
+        /// The original order id received from Binance 
+        /// </summary>
         public long OrderId { get; set; }
         public decimal Filled { get; set; }
         public string Market { get; set; }
@@ -155,9 +158,10 @@ namespace SharpTrader.BrokersApi.Binance
         internal void Update(Order order)
         {
             this.Amount = order.Amount;
-            this.Filled = order.Filled;
-            this.Status = order.Status;
-            this.Filled = order.Filled;
+            // prevent updating using outdated information ( the status and filled amount can only grow )
+            this.Filled = order.Filled > this.Filled ? order.Filled : this.Filled; 
+            this.Status = order.Status > this.Status ? order.Status : this.Status;
+
         }
 
         public override int GetHashCode()
