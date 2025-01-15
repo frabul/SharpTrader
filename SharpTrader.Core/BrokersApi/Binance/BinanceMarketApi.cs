@@ -1,4 +1,4 @@
-﻿
+
 using BinanceExchange.API.Client;
 using BinanceExchange.API.Enums;
 using BinanceExchange.API.Models.Request;
@@ -852,11 +852,11 @@ namespace SharpTrader.BrokersApi.Binance
                         finalOrder.Update(newOrder);
                         if (finalOrder.IsClosed)
                         {
-                            OpenOrders.Remove(newOrder);
+                            OpenOrders.Remove(finalOrder);
                             DbOpenOrders.Delete(newOrder.Id);
                         }
                         else
-                            DbOpenOrders.Upsert(newOrder);
+                            DbOpenOrders.Upsert(finalOrder);
                     }
                     else
                     {
@@ -1012,17 +1012,31 @@ namespace SharpTrader.BrokersApi.Binance
 
         public async Task<IRequest<IOrder>> OrderSynchAsync(string id)
         {
+            long binance_id = 0;
+            string symbol = null;
             try
             {
-                var res = DeconstructId(id);
-                var binOrd = await Client.QueryOrder(new QueryOrderRequest() { OrderId = res.id, Symbol = res.symbol });
+
+                var knownOrder = Orders.FindOne(o => o.Id == id);
+                if (knownOrder != null)
+                {
+                    symbol = knownOrder.Symbol;
+                    binance_id = knownOrder.OrderId;
+                }
+                else
+                {
+                    (symbol, binance_id) = DeconstructId(id);
+                }
+
+                var binOrd = await Client.QueryOrder(new QueryOrderRequest() { OrderId = binance_id, Symbol = symbol });
                 var newOrder = new Order(binOrd);
-                newOrder = OrdersActiveInsertOrUpdate(newOrder);
                 OrdersUpdateOrInsert(newOrder);
+                newOrder = OrdersActiveInsertOrUpdate(newOrder);
                 return new Request<IOrder>(RequestStatus.Completed, newOrder);
             }
             catch (Exception ex)
             {
+                Logger.Error("Unable to query order {OrderId} for symbol {Symbol} from app id {AppOrderId}", binance_id, symbol, id);
                 return new Request<IOrder>(GetExceptionErrorInfo(ex));
             }
         }
