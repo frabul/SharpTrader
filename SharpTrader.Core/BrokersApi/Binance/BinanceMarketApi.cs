@@ -1,4 +1,4 @@
-
+﻿
 using BinanceExchange.API.Client;
 using BinanceExchange.API.Enums;
 using BinanceExchange.API.Models.Request;
@@ -270,7 +270,16 @@ namespace SharpTrader.BrokersApi.Binance
             DbOpenOrders = TradesAndOrdersDb.GetCollection<Order>("OpenOrders");
             Orders = TradesAndOrdersDb.GetCollection<Order>("Orders");
             Trades = TradesAndOrdersDb.GetCollection<Trade>("Trades");
-            OpenOrders = new HashSet<Order>(DbOpenOrders.FindAll());
+            var ordersToUpdate = DbOpenOrders.FindAll().ToList();
+            if (OpenOrders == null || OpenOrders.Count < 1)
+                OpenOrders = new HashSet<Order>(ordersToUpdate);
+            else
+            {
+                foreach (var dbOrder in ordersToUpdate)
+                {
+                    OrdersActiveInsertOrUpdate(dbOrder);
+                }
+            }
             SymbolsData = TradesAndOrdersDb.GetCollection<SymbolData>("SymbolsData");
 
             OrdersArchive = TradesAndOrdersArch.GetCollection<Order>("Orders");
@@ -1129,7 +1138,7 @@ namespace SharpTrader.BrokersApi.Binance
             allPrices = allPrices.Where(p => p.symbol != null);
 
             if (badSymbols.Any())
-                Logger.Warning("It was not possible to find symbol info for {BadSymbols}.", badSymbols);
+                Logger.Verbose("It was not possible to find symbol info for {BadSymbols}.", badSymbols); // set to verbose because its binance's fault
 
 
 
@@ -1402,7 +1411,6 @@ namespace SharpTrader.BrokersApi.Binance
                     {
                         Symbol = order.Symbol,
                         OrderId = order.OrderId,
-                        NewClientOrderId = order.ClientId + "c"
                     });
                     lock (LockBalances)
                     {
