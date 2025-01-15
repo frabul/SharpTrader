@@ -624,8 +624,8 @@ namespace SharpTrader.BrokersApi.Binance
         {
             Guid UserDataSocket = Guid.Empty;
             DateTime nextPing = DateTime.MinValue;
-            DateTime nextHandOverTime = DateTime.UtcNow.AddMinutes(120);
-            DateTime nextKeepAliveTime = DateTime.UtcNow.AddMinutes(15);
+            DateTime nextHandOverTime = DateTime.UtcNow.AddMinutes(60);
+            DateTime nextKeepAliveTime = DateTime.UtcNow.AddMinutes(10);
             Guid oldSocket = Guid.Empty;
             while (!(this.IsDisposed || IsDisposing))
             {
@@ -660,7 +660,7 @@ namespace SharpTrader.BrokersApi.Binance
                     try
                     {
                         await WSClient.KeepAliveListenKey(UserDataSocket);
-                        nextKeepAliveTime = DateTime.UtcNow.AddMinutes(15);
+                        nextKeepAliveTime = DateTime.UtcNow.AddMinutes(5);
                     }
                     catch (Exception ex)
                     {
@@ -696,8 +696,8 @@ namespace SharpTrader.BrokersApi.Binance
                                 OutboundAccountPositionHandler = HandleOutboundAccountPosition,
                                 BalanceUpdateMessageHandler = HandleBalanceUpdateMessage
                             });
-                            nextHandOverTime = DateTime.UtcNow.AddMinutes(120);
-                            nextKeepAliveTime = DateTime.UtcNow.AddMinutes(15);
+                            nextHandOverTime = DateTime.UtcNow.AddMinutes(60);
+                            nextKeepAliveTime = DateTime.UtcNow.AddMinutes(10);
                             //close old socket
                             if (oldSocket != Guid.Empty && oldSocket != UserDataSocket)
                             {
