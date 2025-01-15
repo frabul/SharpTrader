@@ -724,14 +724,17 @@ namespace SharpTrader.AlgoFramework
                 if (!req.IsSuccessful)
                 {
                     var req2 = await Algo.Market.OrderSynchAsync(order.Id);
-                    logger.Error("{OperationId} - unable to close order {OrderId}, reason: {Reason}. Trying to synch...", op.Id, order.ClientId, req.ErrorInfo);
+                    logger
+                        .ForContext("OriginalOrderId", order.Id)
+                        .Error("{OperationId} - unable to close order {OrderId}, reason: {Reason}. Trying to synch...", op.Id, order.ClientId, req.ErrorInfo);
                     //check if order was closed already
                     if (req2.IsSuccessful)
                         order = req2.Result;
                     else
                     {
                         ok = false;
-                        logger.Error("{OperationId} - unable to synch order {OrderId}, reason: {Reason}", op.Id, order.ClientId, req.ErrorInfo);
+                        logger.ForContext("OriginalOrderId", order.Id)
+                            .Error("{OperationId} - unable to synch order {OrderId}, reason: {Reason}", op.Id, order.ClientId, req.ErrorInfo);
                     }
 
                     if (!order.IsClosed)
