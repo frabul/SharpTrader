@@ -613,8 +613,8 @@ namespace SharpTrader.AlgoFramework
                 //check if we need to change order in case that the amount invested was increased 
                 var amountInOrder = myOpData.CurrentExitOrder.Amount - myOpData.CurrentExitOrder.Filled;
                 // tradable amount if we close the current order
-                var (tradableAmount, tradablePrice) =
-                    Algo.ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining)); //free to trade
+                var (tradablePrice, tradableAmount) =
+                    Algo.ClampOrderAmount(symData, op.ExitTradeDirection, (op.Signal.PriceTarget, op.AmountRemaining), amountInOrder); //free to trade
                 // we want to trade amount remaining as max 
                 var amountToTrade = Math.Min(op.AmountRemaining, tradableAmount);
                 //check if amount is wrong

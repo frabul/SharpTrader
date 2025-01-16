@@ -109,13 +109,13 @@ namespace SharpTrader.AlgoFramework
             return result;
         }
 
-        public (decimal price, decimal amount) ClampOrderAmount(SymbolData symData, TradeDirection tradeDirection, (decimal price, decimal amount) adj)
+        public (decimal price, decimal amount) ClampOrderAmount(SymbolData symData, TradeDirection tradeDirection, (decimal price, decimal amount) adj, decimal unlockableAmount = 0)
         {
             if (adj.amount > 0)
             {
                 if (tradeDirection == TradeDirection.Buy)
                 {
-                    var freeAmount = Market.GetFreeBalance(symData.Symbol.QuoteAsset);
+                    var freeAmount = Market.GetFreeBalance(symData.Symbol.QuoteAsset) + unlockableAmount;
                     if (adj.amount * adj.price > freeAmount)
                     {
                         adj.amount = 0.99m * freeAmount / adj.price;
@@ -126,7 +126,7 @@ namespace SharpTrader.AlgoFramework
                 else
                 {
 
-                    var freeAmount = Market.GetFreeBalance(symData.Symbol.Asset);
+                    var freeAmount = Market.GetFreeBalance(symData.Symbol.Asset) + unlockableAmount;
                     if (adj.amount > freeAmount)
                     {
                         if (!symData.Symbol.IsMarginTadingAllowed || !this.DoMarginTrading)
