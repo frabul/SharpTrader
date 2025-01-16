@@ -428,7 +428,13 @@ namespace SharpTrader.AlgoFramework
                     }
                     return this.Update(curSlice);
                 }
-                catch { throw; }
+                catch (Exception ex)
+                {
+                    Logger
+                        .ForContext("Exception", ex)
+                        .Error("Exception in OnTickAsync: {Message}", ex.Message);
+                    throw;
+                }
                 finally { OnTickRunning = false; }
             }
             else
