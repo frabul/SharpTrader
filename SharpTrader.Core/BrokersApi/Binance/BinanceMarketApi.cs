@@ -1528,13 +1528,16 @@ namespace SharpTrader.BrokersApi.Binance
                         lock (LockOrdersTrades)
                             order = Orders.FindById(value["_id"].AsString);
                     bool notFoundIndOrders = order == null;
-                    Logger.Warning("Order not found in orders");
                     if (order == null)
                         order = defaultMapper.Deserialize<Order>(value);
                     //if the order was not found in the oders db we add it to openOrders so it will be checked during orders synchronization
                     if (order != null && notFoundIndOrders)
+                    {
+                        Logger.Warning("Order {OrderId} not found in orders", order.Id);
                         OpenOrders.Add(order);
-
+                    }
+                    if (order == null)
+                        Logger.Error("Error while deserializing order {OrderId}", value["_id"]);
                     return order;
                 }
             }
