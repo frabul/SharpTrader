@@ -551,7 +551,10 @@ namespace SharpTrader.AlgoFramework
                     Math.Min(op.Signal.PriceTarget, (decimal)symData.Feed.Ask) :
                     Math.Max(op.Signal.PriceTarget, (decimal)symData.Feed.Bid);
                 // try to also use the information from orders updates to avoid double spending
-                var amountRemainingReal = Math.Min(op.AmountRemaining, op.AmountInvested - GetFilledAmountByExitOrders(myOpData));
+
+                var amountRemainingReal = !Algo.BackTesting ?
+                    Math.Min(op.AmountRemaining, op.AmountInvested - GetFilledAmountByExitOrders(myOpData))
+                    : op.AmountRemaining;
                 var adj = symData.Feed.GetOrderAmountAndPriceRoundedDown(amountRemainingReal, price);
                 //create a limit order 
                 if (adj.amount > 0)
@@ -672,7 +675,10 @@ namespace SharpTrader.AlgoFramework
             Debug.Assert(op.AmountTarget.Asset == TotalBudget.Asset); // we assume here that the quote asset is the budget asset
 
             var originalAmount = AssetAmount.Convert(op.AmountTarget, op.Symbol.Asset, symData.Feed, target_price: price);
-            var stillToBuy = Math.Min(originalAmount - op.AmountInvested, originalAmount - GetFilledAmountByEntryOrders(myOpData));
+            var stillToBuy = !Algo.BackTesting ?
+                Math.Min(originalAmount - op.AmountInvested, originalAmount - GetFilledAmountByEntryOrders(myOpData)) :
+                originalAmount - op.AmountInvested;
+
             var remainingBudgetConverted = AssetAmount.Convert(new AssetAmount(TotalBudget.Asset, remainingBudget), op.Symbol.Asset, symData.Feed, target_price: price);
             stillToBuy = Math.Min(stillToBuy, remainingBudgetConverted);
             if (stillToBuy / originalAmount > 0.2m)

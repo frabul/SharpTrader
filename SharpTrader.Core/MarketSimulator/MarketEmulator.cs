@@ -467,12 +467,14 @@ namespace SharpTrader.MarketSimulator
 
         public ITrade GetTradeById(string tradeId)
         {
-            return Trades.FirstOrDefault(tr => tr.Id == tradeId);
+            throw new NotImplementedException("Do not use this function in backtests, performance hit too high.");
+            // return Trades.FirstOrDefault(tr => tr.Id == tradeId);
         }
 
         public IOrder GetOrderById(string orderId)
         {
-            return ClosedOrders.Concat(PendingOrders).FirstOrDefault(o => o.Id == orderId);
+            throw new NotImplementedException("Do not use this function in backtests, performance hit too high.");
+            // return ClosedOrders.Concat(PendingOrders).FirstOrDefault(o => o.Id == orderId);
         }
 
         private List<Order> DeserializedOrders = new List<Order>();
