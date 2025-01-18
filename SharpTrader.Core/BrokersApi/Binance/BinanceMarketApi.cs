@@ -90,7 +90,7 @@ namespace SharpTrader.BrokersApi.Binance
         public bool PublicAccessOnly { get; }
         public bool IsDisposed { get; private set; }
         public bool IsDisposing { get; private set; }
-        public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1, bool publicOnly = false, Serilog.ILogger logger = null)
+        public BinanceMarketApi(string apiKey, string apiSecret, string dataDir, double rateLimitFactor = 1, bool publicOnly = false, Serilog.ILogger logger = null, bool testNet = false)
         {
             PublicAccessOnly = publicOnly;
             logger = logger ?? Serilog.Log.Logger;
@@ -101,6 +101,7 @@ namespace SharpTrader.BrokersApi.Binance
             InitializeOperationsDb();
             Client = new BinanceClient(new ClientConfiguration()
             {
+                TestNet = testNet,
                 ApiKey = apiKey ?? "null",
                 SecretKey = apiSecret ?? "null",
                 RateLimitFactor = rateLimitFactor
