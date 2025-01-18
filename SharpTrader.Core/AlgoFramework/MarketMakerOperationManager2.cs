@@ -541,7 +541,8 @@ namespace SharpTrader.AlgoFramework
                 yield return !op.IsExitExpired(Algo.Time);
                 yield return myOpData.CurrentExitOrder == null;
                 yield return myOpData.ExitOrderCountdown?.IsRunning != true;
-            };
+            }
+
             //---------- manage exit orders -------------- 
             if (getConditions().All(c => c))
             {
@@ -624,7 +625,10 @@ namespace SharpTrader.AlgoFramework
                 var opExpired = Algo.Time > op.Signal.ExpireDate;
                 if (wrongPrice || wrongAmout || opExpired)
                 {
-                    Logger.Debug("{OperationId} - cancelling exit order, reason: {Reason}", op.Id, new { wrongPrice, wrongAmout, opExpired });
+                    Logger
+                        .ForContext("AmountToTrade", amountToTrade)
+                        .ForContext("AmountInOrder", amountInOrder)
+                        .Debug("{OperationId} - cancelling exit order, reason: {Reason}", op.Id, new { wrongPrice, wrongAmout, opExpired });
                     var requestResult = await CloseExitOrder(op, myOpData);
                     if (requestResult)
                     {
@@ -638,7 +642,6 @@ namespace SharpTrader.AlgoFramework
                         //retry  after some time
                         myOpData.CloseExitCountdown = new CountDownStopwatch(Algo, TimeSpan.FromSeconds(15));
                     }
-
                 }
             }
         }
