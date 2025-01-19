@@ -1,4 +1,6 @@
-﻿namespace SharpTrader.BrokersApi.Binance
+﻿using System;
+
+namespace SharpTrader.BrokersApi.Binance
 {
     public class AssetBalance
     {
@@ -6,5 +8,6 @@
         public decimal Free;
         public decimal Locked;
         public decimal Total => Free + Locked;
+        public DateTime LastUpdate = DateTime.MinValue;
     }
 }

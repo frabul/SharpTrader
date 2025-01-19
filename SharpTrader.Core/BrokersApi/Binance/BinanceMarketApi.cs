@@ -455,10 +455,11 @@ namespace SharpTrader.BrokersApi.Binance
                             {
                                 if (!_Balances.ContainsKey(bal.Asset))
                                     this._Balances[bal.Asset] = new AssetBalance();
-
-                                this._Balances[bal.Asset].Asset = bal.Asset;
-                                this._Balances[bal.Asset].Free = bal.Free;
-                                this._Balances[bal.Asset].Locked = bal.Locked;
+                                var assetBal = this._Balances[bal.Asset];
+                                assetBal.Asset = bal.Asset;
+                                assetBal.Free = bal.Free;
+                                assetBal.Locked = bal.Locked;
+                                assetBal.LastUpdate = this.Time;
                             }
                         }
                         await Task.Delay(BalanceAndTimeSynchPeriod);
@@ -764,8 +765,10 @@ namespace SharpTrader.BrokersApi.Binance
                 {
                     if (!_Balances.ContainsKey(bal.Asset))
                         this._Balances[bal.Asset] = new AssetBalance();
-                    this._Balances[bal.Asset].Free = bal.Free;
-                    this._Balances[bal.Asset].Locked = bal.Locked;
+                    var assetBal = this._Balances[bal.Asset];
+                    assetBal.Free = bal.Free;
+                    assetBal.Locked = bal.Locked;
+                    assetBal.LastUpdate = this.Time;
                 }
             }
         }
@@ -778,9 +781,10 @@ namespace SharpTrader.BrokersApi.Binance
                 {
                     if (!_Balances.ContainsKey(bal.Asset))
                         this._Balances[bal.Asset] = new AssetBalance();
-
-                    this._Balances[bal.Asset].Free = bal.Free;
-                    this._Balances[bal.Asset].Locked = bal.Locked;
+                    var assetBal = this._Balances[bal.Asset];
+                    assetBal.Free = bal.Free;
+                    assetBal.Locked = bal.Locked;
+                    assetBal.LastUpdate = this.Time;
                 }
             }
         }
@@ -1295,6 +1299,7 @@ namespace SharpTrader.BrokersApi.Binance
                     orderInfo.Price = null;
                     orderInfo.TimeInForce = null;
                 }
+                var eventTime = this.Time;
                 if (orderInfo.Effect == MarginOrderEffect.None)
                 {
                     ResultCreateOrderResponse newOrd = (ResultCreateOrderResponse)await Client.CreateOrder(
@@ -1335,24 +1340,29 @@ namespace SharpTrader.BrokersApi.Binance
                 OrdersUpdateOrInsert(newApiOrder);
 
 
-                // lock the balance in advance
+                // we can update the balances only if they were not already updated after we sent the order
                 lock (LockBalances)
                 {
                     var symbol = Symbols[newApiOrder.Symbol];
-                    //amount to lock =
                     if (newApiOrder.TradeType == TradeDirection.Buy)
                     {
-                        var amountToLock = newApiOrder.Amount * newApiOrder.Price;
                         var quoteBal = this._Balances[symbol.QuoteAsset];
-                        quoteBal.Free -= amountToLock;
-                        quoteBal.Locked += amountToLock;
+                        if (quoteBal.LastUpdate < eventTime)
+                        {
+                            var amountToLock = newApiOrder.Amount * newApiOrder.Price;
+                            quoteBal.Free -= amountToLock;
+                            quoteBal.Locked += amountToLock;
+                        }
                     }
                     else
                     {
-                        var amountToLock = newApiOrder.Amount;
                         var assetBal = this._Balances[symbol.Asset];
-                        assetBal.Free -= amountToLock;
-                        assetBal.Locked += amountToLock;
+                        if (assetBal.LastUpdate < eventTime)
+                        {
+                            var amountToLock = newApiOrder.Amount;
+                            assetBal.Free -= amountToLock;
+                            assetBal.Locked += amountToLock;
+                        }
                     }
                 }
                 return new Request<IOrder>(RequestStatus.Completed, newApiOrder);
