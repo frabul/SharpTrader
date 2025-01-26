@@ -350,8 +350,8 @@ namespace SharpTrader.AlgoFramework
 
         public string GetNewOperationId()
         {
-            if (Name.Length > 6)
-                return this.Name.Substring(0, 7) + "_" + (State.TotalOperations++).ToString();
+            if (Name.Length > 16)
+                return this.Name.Substring(0, 16) + "_" + (State.TotalOperations++).ToString();
             else
                 return $"{this.Name}_{State.TotalOperations++}";
         }
