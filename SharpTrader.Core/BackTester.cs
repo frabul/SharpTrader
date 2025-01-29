@@ -277,16 +277,17 @@ namespace SharpTrader
                     PrintStats(true, outputBuffer);
                     var toWrite = outputBuffer.ToString();
                     outputBuffer.Clear();
-                    if (cursorPositionAfterPartialResults == Console.CursorTop)
+                    if (cursorPositionAfterPartialResults == Console.CursorTop && cursorPositionAfterPartialResults < Console.BufferHeight - 1)
                     {
                         Console.SetCursorPosition(0, Console.CursorTop - partialResultsLines);
                         DeleteConsoleLines(toWrite.Split('\n').Length);
                     }
+
                     Console.WriteLine(toWrite);
                     partialResultsLines = toWrite.Split('\n').Length;
                     cursorPositionAfterPartialResults = Console.CursorTop;
                 }
-                
+
                 if (Console.KeyAvailable)
                 {
                     var key = Console.ReadKey();
