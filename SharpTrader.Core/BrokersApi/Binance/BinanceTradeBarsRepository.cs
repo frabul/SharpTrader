@@ -54,7 +54,7 @@ namespace SharpTrader.Core.BrokersApi.Binance
             System.IO.File.WriteAllText(System.IO.Path.Combine(DataDir, "BinanceSymbolsTable.json"), json);
         }
 
-        public async Task AssureData(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime, bool fillGaps = true)
+        public async Task AssureData(SymbolHistoryId histInfo, DateTime fromTime, DateTime toTime, bool fillGaps = true, bool saveAndCLose = false)
         {
 
 
@@ -115,6 +115,10 @@ namespace SharpTrader.Core.BrokersApi.Binance
                 //now fill gaps  
                 if (fillGaps)
                     this.FillGaps(histInfo);
+                hist = null;
+                oldTicks = null;
+                if (saveAndCLose)
+                    this.SaveAndClose(histInfo, true);
             }
             catch (Exception ex)
             {
@@ -216,16 +220,21 @@ namespace SharpTrader.Core.BrokersApi.Binance
             var symbols = exchangeInfo.Symbols;
 
             var toDownload = symbols
-
                 .Where(s => filter(s.symbol))
-                .Select(sp => sp.symbol).ToList();
-            toDownload.Sort();
+                .Select(sp => sp.symbol)
+                .OrderBy(sp => sp)
+                ;
+
             List<Task> tasks = new List<Task>();
             foreach (var sym in toDownload)
             {
                 var histInfo = new SymbolHistoryId("Binance", sym, TimeSpan.FromMinutes(1));
-                var task = this.AssureData(histInfo, fromTime, toTime).ContinueWith(t => this.SaveAndClose(histInfo, true));
+                var task = this.AssureData(histInfo, fromTime, toTime, saveAndCLose: true);
                 tasks.Add(task);
+                // remove completed tasks
+                foreach (var t in tasks.Where(tt => tt.IsCompleted).ToList())
+                    tasks.Remove(t);
+
             }
             await Task.WhenAll(tasks);
         }
