@@ -152,12 +152,19 @@ namespace SharpTrader.Storage
                 if (!string.IsNullOrWhiteSpace(line))
                 {
                     var fields = line.Split(',');
-
+                    long time = long.Parse(fields[0]);
+                    // if time is in microseconds convert to milliseconds
+                    if (time > 99999999999999)
+                        time /= 1000;
+                    // if time is in seconds convert to milliseconds
+                    if (time < 100000000000)
+                        time *= 1000;
+                    //open time,open,high,low,close,volume,close time,quote
                     var candle = new Candlestick()
                     {
-                        OpenTime = DateTime.UnixEpoch.AddMilliseconds(long.Parse(fields[0])),
+                        OpenTime = DateTime.UnixEpoch.AddMilliseconds(time),
                         //CloseTime = DateTime.UnixEpoch.AddMilliseconds(1 + long.Parse(fields[6])),
-                        CloseTime = DateTime.UnixEpoch.AddMilliseconds(long.Parse(fields[0])).AddMinutes(1),
+                        CloseTime = DateTime.UnixEpoch.AddMilliseconds(time).AddMinutes(1),
                         Open = double.Parse(fields[1]),
                         High = double.Parse(fields[2]),
                         Low = double.Parse(fields[3]),
