@@ -262,8 +262,8 @@ namespace SharpTrader.Storage
                     DbSymbolsMetaData.Upsert(meta);
                 }
             }
-            else
-                meta.ClearView();
+
+            meta.ClearView();
 
         }
         public void Delete(SymbolHistoryId id)
