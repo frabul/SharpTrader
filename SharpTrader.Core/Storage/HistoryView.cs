@@ -195,10 +195,19 @@ namespace SharpTrader.Storage
                     var fileToLoad = newChunkId.GetFilePath(dataDir);
                     if (File.Exists(fileToLoad))
                     {
-                        var loadedChunk = HistoryChunk.Load(fileToLoad).Result;
-                        foreach (var candle in loadedChunk.Ticks)
-                            if (candle.Time > startDate && candle.OpenTime < endDate)
-                                candlesOfMont.AddRecord(candle, true);
+                        try
+                        {
+                            var loadedChunk = HistoryChunk.Load(fileToLoad).Result;
+                            foreach (var candle in loadedChunk.Ticks)
+                                if (candle.Time > startDate && candle.OpenTime < endDate)
+                                    candlesOfMont.AddRecord(candle, true);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine($"{nameof(HistoryView)}: Error loading chunk {fileToLoad}: {e.Message}");
+                            throw;
+                        }
+
                     }
                     HistoryChunk dataToSave = chunkFactory(newChunkId, candlesOfMont.ToList());
 
